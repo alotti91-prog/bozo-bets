@@ -1,0 +1,94 @@
+import { useCallback, useEffect, useState } from 'react';
+import { supabase, configured, friendly } from './lib/supabase.js';
+import { store, toast } from './lib/ui.js';
+import { Toaster, Brand } from './components/common.jsx';
+import SignIn from './screens/SignIn.jsx';
+import Onboard from './screens/Onboard.jsx';
+import League from './screens/League.jsx';
+
+// An invite link looks like https://your-site/?join=ABC123. Remember the code
+// across the sign-in round trip, then tidy the address bar.
+function readJoinCode() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('join');
+  if (code) {
+    store.set('bz-pending-join', code.toUpperCase());
+    params.delete('join');
+    const qs = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+  }
+  return store.get('bz-pending-join', null);
+}
+
+export default function App() {
+  if (!configured) return <SetupNeeded />;
+  return (
+    <>
+      <Main />
+      <Toaster />
+    </>
+  );
+}
+
+function Main() {
+  const [session, setSession] = useState(undefined);
+  const [joinCode] = useState(readJoinCode);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  if (session === undefined) return <div className="center-msg">Loading{'…'}</div>;
+  if (!session) return <SignIn joinCode={joinCode} />;
+  return <Home userId={session.user.id} />;
+}
+
+function Home({ userId }) {
+  const [leagues, setLeagues] = useState(null);
+  const [current, setCurrent] = useState(() => store.get('bz-league', null));
+  const [adding, setAdding] = useState(false);
+
+  const loadLeagues = useCallback(async () => {
+    const pending = store.get('bz-pending-join', null);
+    if (pending) {
+      const { data, error } = await supabase.rpc('join_league', { p_code: pending });
+      store.remove('bz-pending-join');
+      if (error) toast(friendly(error));
+      else { store.set('bz-league', data); setCurrent(data); }
+    }
+    const { data, error } = await supabase.from('members').select('league_id, role, player_id, leagues(name)').eq('user_id', userId).order('joined_at');
+    if (error) { toast(friendly(error)); setLeagues([]); return; }
+    setLeagues(data);
+  }, [userId]);
+
+  useEffect(() => { loadLeagues(); }, [loadLeagues]);
+
+  const pick = (id) => { store.set('bz-league', id); setCurrent(id); setAdding(false); loadLeagues(); };
+  const signOut = async () => { store.remove('bz-league'); await supabase.auth.signOut(); };
+
+  if (!leagues) return <div className="center-msg">Loading{'…'}</div>;
+  if (!leagues.length || adding) {
+    return <Onboard onJoined={pick} onSignOut={signOut} hasLeagues={leagues.length > 0} onCancel={() => setAdding(false)} />;
+  }
+  const active = leagues.some((l) => l.league_id === current) ? current : leagues[0].league_id;
+  return (
+    <League key={active} leagueId={active} userId={userId} leagues={leagues}
+      onSwitchLeague={pick} onAddLeague={() => setAdding(true)} onSignOut={signOut} />
+  );
+}
+
+function SetupNeeded() {
+  return (
+    <main className="wrap gate">
+      <h1 className="brand"><Brand /></h1>
+      <div className="card stack">
+        <h2 className="sec-title-sm">Almost there: connect the database</h2>
+        <p>This copy of the app doesn{'’'}t know which Supabase project to use yet. Add these two settings, then reload:</p>
+        <p className="note"><code>VITE_SUPABASE_URL</code><br /><code>VITE_SUPABASE_PUBLISHABLE_KEY</code></p>
+        <p className="sub">On your computer they go in a file named <code>.env.local</code>. On Vercel they go under Project Settings {'→'} Environment Variables. The README walks through it.</p>
+      </div>
+    </main>
+  );
+}
