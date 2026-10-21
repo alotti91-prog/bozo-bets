@@ -83,6 +83,23 @@ create index if not exists legs_league_idx    on public.legs (league_id);
 create index if not exists legs_week_idx      on public.legs (week_id);
 create index if not exists spins_league_idx   on public.spins (league_id, created_at);
 
+-- Reactions on picks. One of each emoji per person per pick.
+create table if not exists public.reactions (
+  leg_id     uuid not null references public.legs(id) on delete cascade,
+  league_id  uuid not null references public.leagues(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  emoji      text not null check (emoji in ('🔥','🙏','🤡','💀')),
+  created_at timestamptz not null default now(),
+  primary key (leg_id, user_id, emoji)
+);
+create index if not exists reactions_league_idx on public.reactions (league_id);
+
+-- "Bet placed": whoever's on the hook marks the slip placed, with an optional
+-- screenshot stored in the private "slips" storage bucket (set up below).
+alter table public.weeks add column if not exists placed_at timestamptz;
+alter table public.weeks add column if not exists placed_by uuid references auth.users(id) on delete set null;
+alter table public.weeks add column if not exists slip_path text;
+
 -- ---------- Helper functions used by the security rules -------------
 
 create or replace function public.is_member(lid uuid) returns boolean
@@ -185,6 +202,7 @@ alter table public.members enable row level security;
 alter table public.weeks   enable row level security;
 alter table public.legs    enable row level security;
 alter table public.spins   enable row level security;
+alter table public.reactions enable row level security;
 
 -- Leagues: members read; commish edits name/stake. Created via create_league().
 drop policy if exists "league read" on public.leagues;
@@ -235,6 +253,27 @@ create policy "leg delete" on public.legs for delete to authenticated using (
 -- Spins: members read. Only spin_wheel() writes them.
 drop policy if exists "spin read" on public.spins;
 create policy "spin read" on public.spins for select to authenticated using (public.is_member(league_id));
+
+-- Reactions: members read all; you add and remove only your own.
+create or replace function public.reactions_fill() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  select league_id into new.league_id from public.legs where id = new.leg_id;
+  if new.league_id is null then raise exception 'That pick does not exist'; end if;
+  new.user_id := auth.uid();
+  return new;
+end $$;
+drop trigger if exists reactions_fill on public.reactions;
+create trigger reactions_fill before insert on public.reactions
+  for each row execute function public.reactions_fill();
+
+drop policy if exists "reaction read" on public.reactions;
+create policy "reaction read" on public.reactions for select to authenticated using (public.is_member(league_id));
+drop policy if exists "reaction add" on public.reactions;
+create policy "reaction add" on public.reactions for insert to authenticated
+  with check (user_id = auth.uid() and public.is_member(league_id));
+drop policy if exists "reaction remove" on public.reactions;
+create policy "reaction remove" on public.reactions for delete to authenticated using (user_id = auth.uid());
 
 -- ---------- Functions the app calls ----------------------------------
 
@@ -539,6 +578,54 @@ begin
   delete from public.weeks where id = w.id;
 end $$;
 
+-- Mark this week's bet as placed (or not). Whoever's on the hook or the
+-- commish can do it. p_slip_path is the screenshot's path in the "slips"
+-- bucket, which must sit under this league's folder.
+create or replace function public.mark_placed(p_week uuid, p_placed boolean, p_slip_path text default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  w public.weeks;
+begin
+  select * into w from public.weeks where id = p_week;
+  if w.id is null then raise exception 'That week does not exist'; end if;
+  if not (public.is_admin(w.league_id) or (w.payer_id is not null and w.payer_id = public.my_player(w.league_id))) then
+    raise exception 'Only whoever is on the hook, or the commish, can mark the bet placed';
+  end if;
+  if p_slip_path is not null and p_slip_path not like w.league_id::text || '/%' then
+    raise exception 'That screenshot isn''t in this league';
+  end if;
+  if p_placed then
+    update public.weeks
+    set placed_at = coalesce(placed_at, now()), placed_by = auth.uid(), slip_path = coalesce(p_slip_path, slip_path)
+    where id = w.id;
+  else
+    update public.weeks set placed_at = null, placed_by = null, slip_path = null where id = w.id;
+  end if;
+end $$;
+
+-- Turns text into a uuid, or null if it isn't one. Used by the storage rules.
+create or replace function public.uuid_or_null(t text) returns uuid
+language sql immutable as $$
+  select case when t ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then t::uuid end
+$$;
+
+-- Slip screenshots: a private bucket. Files live at <league id>/<week id>/...
+-- Members of that league can view and upload; nobody else can see them.
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'storage') then
+    insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    values ('slips', 'slips', false, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'image/heic'])
+    on conflict (id) do nothing;
+    execute 'drop policy if exists "slips read" on storage.objects';
+    execute $p$create policy "slips read" on storage.objects for select to authenticated
+      using (bucket_id = 'slips' and public.is_member(public.uuid_or_null((storage.foldername(name))[1])))$p$;
+    execute 'drop policy if exists "slips upload" on storage.objects';
+    execute $p$create policy "slips upload" on storage.objects for insert to authenticated
+      with check (bucket_id = 'slips' and public.is_member(public.uuid_or_null((storage.foldername(name))[1])))$p$;
+  end if;
+end $$;
+
 -- ---------- Permissions on functions ---------------------------------
 
 revoke execute on function
@@ -555,6 +642,7 @@ revoke execute on function
   public.set_week_number(uuid, int),
   public.save_past_week(uuid, uuid, int, date, uuid, jsonb),
   public.delete_past_week(uuid),
+  public.mark_placed(uuid, boolean, text),
   public.new_invite_code()
 from public, anon;
 
@@ -571,7 +659,8 @@ grant execute on function
   public.new_season(uuid, int),
   public.set_week_number(uuid, int),
   public.save_past_week(uuid, uuid, int, date, uuid, jsonb),
-  public.delete_past_week(uuid)
+  public.delete_past_week(uuid),
+  public.mark_placed(uuid, boolean, text)
 to authenticated;
 
 -- ---------- Live updates ---------------------------------------------
@@ -580,7 +669,7 @@ to authenticated;
 do $$
 declare t text;
 begin
-  foreach t in array array['leagues','players','members','weeks','legs','spins'] loop
+  foreach t in array array['leagues','players','members','weeks','legs','spins','reactions'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

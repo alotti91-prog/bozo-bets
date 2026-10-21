@@ -37,7 +37,13 @@ const db = {
     { id: 's2', week_id: 'w2', league_id: L, pool: P.map((p) => p.id), landed_id: 'p3', spun_by: uid, created_at: daysAgo(20) + 'T23:00:00Z' },
     { id: 's3', week_id: 'w3', league_id: L, pool: ['p1', 'p4'], landed_id: 'p4', spun_by: uid, created_at: daysAgo(13) + 'T23:00:00Z' },
   ],
+  reactions: [],
 };
+// A few sample reactions on this week's picks (Sully is the other signed-in member).
+db.legs.filter((l) => l.week_id === 'w4').slice(0, 3).forEach((l, i) => {
+  db.reactions.push({ leg_id: l.id, league_id: L, user_id: 'u2', emoji: ['🔥', '🤡', '🙏'][i], created_at: now() });
+});
+const files = {};
 
 const listeners = [];
 function emit(table, eventType, row) {
@@ -67,6 +73,10 @@ function query(table) {
     const match = (r) => filters.every((f) => f(r));
     if (op === 'insert') {
       const rows = (Array.isArray(payload) ? payload : [payload]).map((r) => ({ id: id(), created_at: now(), active: true, result: null, ...r }));
+      if (table === 'reactions') rows.forEach((r) => { r.user_id = uid; r.league_id = L; });
+      if (table === 'reactions' && rows.some((r) => db.reactions.some((x) => x.leg_id === r.leg_id && x.user_id === r.user_id && x.emoji === r.emoji))) {
+        return { data: null, error: { message: 'duplicate key value violates unique constraint "reactions_pkey"' } };
+      }
       if (table === 'legs' && rows.some((r) => db.legs.some((l) => l.week_id === r.week_id && l.player_id === r.player_id))) {
         return { data: null, error: { message: 'duplicate key value violates unique constraint "legs_week_id_player_id_key"' } };
       }
@@ -143,6 +153,12 @@ const rpcs = {
     db.spins = db.spins.filter((s) => s.week_id !== p_week);
     emit('weeks', 'DELETE', {}); return null;
   },
+  mark_placed({ p_week, p_placed, p_slip_path }) {
+    const w = db.weeks.find((x) => x.id === p_week);
+    if (p_placed) { w.placed_at = w.placed_at || now(); w.placed_by = uid; w.slip_path = p_slip_path || w.slip_path || null; }
+    else { w.placed_at = null; w.placed_by = null; w.slip_path = null; }
+    emit('weeks', 'UPDATE', w); return null;
+  },
   join_league() { return L; },
   create_league() { return L; },
 };
@@ -151,6 +167,14 @@ const session = { user: { id: uid, email: 'you@example.com' } };
 
 export const demoClient = {
   from: query,
+  storage: {
+    from() {
+      return {
+        async upload(path, blob) { files[path] = URL.createObjectURL(blob); return { data: { path }, error: null }; },
+        async createSignedUrl(path) { return files[path] ? { data: { signedUrl: files[path] }, error: null } : { data: null, error: { message: 'Object not found' } }; },
+      };
+    },
+  },
   async rpc(name, args) {
     await new Promise((r) => setTimeout(r, 150));
     try { return { data: rpcs[name](args), error: null }; } catch (e) { return { data: null, error: { message: e.message } }; }

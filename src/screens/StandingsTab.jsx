@@ -1,7 +1,8 @@
 import { standings, hitPct } from '../lib/stats.js';
 import { amerFmt, fmtOdds, dollars, signed } from '../lib/odds.js';
+import { Belt } from '../components/common.jsx';
 
-export default function StandingsTab({ data, me }) {
+export default function StandingsTab({ data, me, belt }) {
   const s = standings(data);
   const rows = Object.values(s.rows).filter((r) => r.p.active || r.n > 0)
     .sort((a, b) => hitPct(b) - hitPct(a) || b.W - a.W || a.L - b.L || a.p.name.localeCompare(b.p.name));
@@ -13,7 +14,6 @@ export default function StandingsTab({ data, me }) {
   const net = s.totalWon - s.totalIn;
   const cls = (n) => (Math.round(n) > 0 ? 'pos' : Math.round(n) < 0 ? 'neg' : '');
   const sharp = rows.filter((r) => r.W + r.L >= 3).sort((a, b) => hitPct(b) - hitPct(a) || b.W - a.W)[0];
-  const bozo = rows.filter((r) => r.L > 0).sort((a, b) => b.L - a.L || hitPct(a) - hitPct(b))[0];
   const shot = rows.filter((r) => r.best).sort((a, b) => b.best.odds - a.best.odds)[0];
   const magnet = rows.filter((r) => r.landed > 0).sort((a, b) => b.landed - a.landed)[0];
   const hot = rows.filter((r) => r.streakType === 'W' && r.streak >= 2).sort((a, b) => b.streak - a.streak)[0];
@@ -40,7 +40,7 @@ export default function StandingsTab({ data, me }) {
                 const mynet = r.share - r.paid;
                 return (
                   <tr key={r.p.id}>
-                    <td>{r.p.name}{r.p.id === me ? ' (you)' : ''}{!r.p.active && <span className="benched"> benched</span>}</td>
+                    <td>{r.p.name}<Belt on={belt?.id === r.p.id} />{r.p.id === me ? ' (you)' : ''}{!r.p.active && <span className="benched"> benched</span>}</td>
                     <td>{r.W}-{r.L}-{r.P}</td>
                     <td>{h < 0 ? '—' : Math.round(h * 100) + '%'}</td>
                     <td>{r.nOdds ? amerFmt(r.decSum / r.nOdds) : '—'}</td>
@@ -56,7 +56,7 @@ export default function StandingsTab({ data, me }) {
         <p className="fine" style={{ marginTop: 10 }}>Solo $100 is what you'd be up or down betting $100 on just your own leg each week. Paid and Net count settled weeks only: Net is your share of parlay payouts minus what you put in.</p>
         <div className="supers">
           <Sup label="Sharpest" who={sharp?.p.name} detail={sharp && `${sharp.W}-${sharp.L}, ${Math.round(hitPct(sharp) * 100)}% (3+ legs)`} />
-          <Sup label="Head bozo" who={bozo?.p.name} detail={bozo && `${bozo.L} miss${bozo.L > 1 ? 'es' : ''}`} />
+          <Sup label="Bozo Belt 🤡" who={belt && s.rows[belt.id]?.p.name} detail={belt && `${belt.misses} miss${belt.misses > 1 ? 'es' : ''}. Wears the clown nose until someone passes him.`} />
           <Sup label="Longest shot hit" who={shot?.p.name} detail={shot && `${fmtOdds(shot.best.odds)} · ${shot.best.pick} (Wk ${shot.best.n})`} />
           <Sup label="Wheel magnet" who={magnet?.p.name} detail={magnet && `Landed on ${magnet.landed}×`} />
           <Sup label="On a heater" who={hot?.p.name} detail={hot && `${hot.streak} straight hits`} none="Nobody right now" />

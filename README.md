@@ -5,7 +5,10 @@ A weekly group-parlay tracker. Everyone adds one leg. If the parlay hits, you sp
 - **This week:** the parlay as a bet slip, with combined odds and payout. Everyone adds their own leg from their phone.
 - **Wheel:** the commish spins. The server picks the result, so nobody can rig it, and every open phone watches the same spin live.
 - **Standings:** records, hit %, money in and out, and superlatives.
-- **History:** every week, who sank it, and where the wheel landed.
+- **History:** every week, who sank it, and where the wheel landed. The commish can add weeks from before the league joined the app.
+- **Bozo Belt 🤡:** most misses this season wears the clown nose next to their name until someone passes him.
+- **Reactions:** 🔥 🙏 🤡 💀 on anyone's pick, live.
+- **Bet placed:** whoever's on the hook marks the slip placed and can attach the DraftKings screenshot.
 
 Built with React (Vite), Supabase (database, login, live updates), and Vercel (hosting). The free tiers of both cover a group this size.
 

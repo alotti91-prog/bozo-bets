@@ -61,3 +61,29 @@ export function standings({ players, weeks, legs, spins }) {
   }
   return { rows, sport, hits, settled, totalIn, totalWon };
 }
+
+/**
+ * The Bozo Belt: whoever has the most misses this season. Ties go to whoever
+ * missed most recently (latest week, then latest graded pick that week).
+ * Returns { id, misses } or null if nobody has missed yet.
+ */
+export function bozoBelt({ weeks, legs }) {
+  const weekN = new Map(weeks.map((w) => [w.id, w.n]));
+  const tally = new Map();
+  for (const l of legs) {
+    if (l.result !== 'L' || !weekN.has(l.week_id)) continue;
+    const when = [weekN.get(l.week_id), String(l.updated_at || l.created_at || '')];
+    const t = tally.get(l.player_id) || { misses: 0, last: [-1, ''] };
+    t.misses++;
+    if (when[0] > t.last[0] || (when[0] === t.last[0] && when[1] > t.last[1])) t.last = when;
+    tally.set(l.player_id, t);
+  }
+  let best = null;
+  for (const [id, t] of tally) {
+    if (!best || t.misses > best.misses
+      || (t.misses === best.misses && (t.last[0] > best.last[0] || (t.last[0] === best.last[0] && t.last[1] > best.last[1])))) {
+      best = { id, ...t };
+    }
+  }
+  return best && { id: best.id, misses: best.misses };
+}

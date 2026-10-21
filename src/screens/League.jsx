@@ -4,6 +4,7 @@ import { useLeague } from '../lib/useLeague.js';
 import { store, toast } from '../lib/ui.js';
 import { Brand, IconGear } from '../components/common.jsx';
 import Claim from './Claim.jsx';
+import { bozoBelt } from '../lib/stats.js';
 import WeekTab from './WeekTab.jsx';
 import WheelTab from './WheelTab.jsx';
 import StandingsTab from './StandingsTab.jsx';
@@ -68,7 +69,12 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
     reload();
   }
 
-  const props = { data, me, isAdmin, reload, pname };
+  const belt = bozoBelt(data);
+  const nameOfUser = (uid) => {
+    const m = data.members.find((x) => x.user_id === uid);
+    return (m && m.player_id && pname(m.player_id)) || 'Someone';
+  };
+  const props = { data, me, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, nameOfUser };
   return (
     <>
       <header className="top">

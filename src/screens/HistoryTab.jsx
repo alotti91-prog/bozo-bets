@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { weekInfo, amerFmt, fmtOdds, money } from '../lib/odds.js';
 import { fmtDate, listNames, toast } from '../lib/ui.js';
-import { IconChev } from '../components/common.jsx';
+import { IconChev, Belt } from '../components/common.jsx';
+import Reactions from '../components/Reactions.jsx';
 import PastWeekSheet from './PastWeekSheet.jsx';
 import { supabase, friendly } from '../lib/supabase.js';
 import { nflWeek } from '../lib/nfl.js';
 
-export default function HistoryTab({ data, pname, isAdmin, reload }) {
+export default function HistoryTab({ data, pname, isAdmin, reload, beltId, nameOfUser, userId }) {
   const [open, setOpen] = useState({});
   const [editing, setEditing] = useState(null); // null, 'new', or a week row
   if (!data.weeks.length) {
@@ -52,7 +53,7 @@ export default function HistoryTab({ data, pname, isAdmin, reload }) {
         const spins = data.spins.filter((s) => s.week_id === w.id);
         const losers = [...new Set(info.losers.map((l) => l.player_id))].sort((a, b) => order[a] - order[b]).map(pname);
         const subs = [];
-        if (w.payer_id) subs.push(`Put in by ${pname(w.payer_id)}`);
+        if (w.payer_id) subs.push(`Put in by ${pname(w.payer_id)}${w.placed_at ? ' ✓' : ''}`);
         if (losers.length) subs.push(`Sunk by ${listNames(losers)}`);
         if (info.status === 'hit') subs.push(`Paid ${money(info.payout)}`);
         if (spins.length) {
@@ -76,8 +77,8 @@ export default function HistoryTab({ data, pname, isAdmin, reload }) {
               <ol className="hist-legs">
                 {legs.length ? legs.map((l) => (
                   <li key={l.id} className={l.result ? 'r-' + l.result : ''}>
-                    <span className="hl-who">{pname(l.player_id)} · {l.sport}</span>
-                    <span className="hl-pick">{l.pick}</span>
+                    <span className="hl-who">{pname(l.player_id)}<Belt on={beltId === l.player_id} /> · {l.sport}</span>
+                    <span className="hl-pick">{l.pick} <Reactions readOnly leg={l} reactions={data.reactions || []} userId={userId} nameOfUser={nameOfUser} reload={reload} /></span>
                     <span className="hl-odds">{fmtOdds(l.odds)}</span>
                     <span className="hl-r">{l.result || '–'}</span>
                   </li>

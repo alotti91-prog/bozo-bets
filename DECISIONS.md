@@ -51,3 +51,9 @@ New leagues start at the current NFL week (worked out in `src/lib/nfl.js`: weeks
 
 **2026-10-21 · Optional password after the first email sign-in**
 People sign in the first time with an emailed code, then can set a password in Settings and sign in with email + password, with no email sent. Email alone was ruled out: anyone who knew a friend's email, or the commish's, could act as them. Sessions already persist per device, so most people rarely sign in at all. The sign-in screen remembers which method you used last on that device. Forgot your password? Use an email code, then set a new one; there's no separate reset flow. 8-character minimum, checked in the app.
+
+**2026-10-21 · Bozo Belt, reactions, and "bet placed"**
+- *Bozo Belt:* the most misses this season, ties to the most recent miss (`bozoBelt()` in `stats.js`). It's computed, not stored, so it changes hands on its own and fixes itself when a grade is corrected. Shown as 🤡 next to the name everywhere.
+- *Reactions:* a fixed set (🔥 🙏 🤡 💀) so the row stays tidy on a phone; one of each per person per pick. A trigger fills in league and user, so people can't react as someone else.
+- *Bet placed:* `mark_placed()` lets whoever's on the hook, or the commish, mark it, with an optional screenshot in a private Storage bucket (`slips`, 5 MB, images only). Files sit under `<league id>/`, and Storage rules check league membership. Photos are shrunk in the browser first (≤2000 px JPEG). Replaced screenshots aren't deleted; there's little reason to bother at this size.
+- Supabase can't filter delete events by league, so the app listens for deletes on a few tables unfiltered and reloads.

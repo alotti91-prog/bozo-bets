@@ -189,6 +189,42 @@ await as(A, `select public.new_season($1, 1)`, [lid2]);
 assert.deepEqual((await as(A, `select n from public.weeks where league_id = $1`, [lid2])).rows.map((r) => r.n), [1]);
 ok('new season can start at any week');
 
+// ---- Reactions and "bet placed" -----------------------------------------
+const C2 = '00000000-0000-4000-8000-0000000000c2';
+await db.exec(`insert into auth.users values ('${C2}','c2@x.com')`);
+const lid3 = (await as(A, `select public.create_league('Reacts', 10, array['Lotti','Sully','Mikey'], 'Lotti', 7) as id`)).rows[0].id;
+const p3 = Object.fromEntries((await as(A, `select id, name from public.players where league_id = $1`, [lid3])).rows.map((r) => [r.name, r.id]));
+const code3 = (await as(A, `select invite_code from public.leagues where id = $1`, [lid3])).rows[0].invite_code;
+await as(B, `select public.join_league($1)`, [code3]);
+await as(B, `select public.claim_player($1, $2)`, [lid3, p3.Sully]);
+const wk7 = (await as(A, `select id from public.weeks where league_id = $1`, [lid3])).rows[0].id;
+const legL = (await as(A, `insert into public.legs (week_id, league_id, player_id, pick, odds) values ($1,$2,$3,'Bills -3',-110) returning id`, [wk7, lid3, p3.Lotti])).rows[0].id;
+
+await as(B, `insert into public.reactions (leg_id, emoji) values ($1, '🤡')`, [legL]);
+await as(A, `insert into public.reactions (leg_id, emoji) values ($1, '🔥')`, [legL]);
+const rx = (await as(A, `select emoji, user_id, league_id from public.reactions where leg_id = $1 order by emoji`, [legL])).rows;
+assert.equal(rx.length, 2);
+assert.ok(rx.every((r) => r.league_id === lid3));
+assert.equal(rx.find((r) => r.emoji === '🤡').user_id, B);
+await fails(B, `insert into public.reactions (leg_id, emoji) values ($1, '🤡')`, [legL], /duplicate/);
+await fails(B, `insert into public.reactions (leg_id, emoji) values ($1, '🍕')`, [legL]);
+await fails(C2, `insert into public.reactions (leg_id, emoji) values ($1, '💀')`, [legL]);
+assert.equal((await as(C2, `select count(*)::int c from public.reactions`)).rows[0].c, 0);
+await as(B, `delete from public.reactions where leg_id = $1`, [legL]); // only removes B's own
+assert.deepEqual((await as(A, `select emoji from public.reactions where leg_id = $1`, [legL])).rows.map((r) => r.emoji), ['🔥']);
+ok('reactions: members react and un-react with their own, strangers can’t see or add');
+
+await fails(B, `select public.mark_placed($1, true, null)`, [wk7], /on the hook/);
+await as(A, `update public.weeks set payer_id = $2 where id = $1`, [wk7, p3.Sully]);
+await fails(B, `select public.mark_placed($1, true, 'some-other-league/x.jpg')`, [wk7], /isn't in this league/);
+await as(B, `select public.mark_placed($1, true, $2)`, [wk7, `${lid3}/${wk7}/slip.jpg`]);
+let pw = (await as(A, `select placed_at, placed_by, slip_path from public.weeks where id = $1`, [wk7])).rows[0];
+assert.ok(pw.placed_at); assert.equal(pw.placed_by, B); assert.equal(pw.slip_path, `${lid3}/${wk7}/slip.jpg`);
+await as(A, `select public.mark_placed($1, false, null)`, [wk7]);
+pw = (await as(A, `select placed_at, slip_path from public.weeks where id = $1`, [wk7])).rows[0];
+assert.equal(pw.placed_at, null); assert.equal(pw.slip_path, null);
+ok('bet placed: the payer or commish marks it (with a screenshot path in their league); others can’t');
+
 // ---- Re-running the setup file, and upgrading from the first version ----
 const before = (await db.query(`select (select count(*) from public.legs)::int legs, (select count(*) from public.weeks)::int weeks`)).rows[0];
 await db.exec(schema);
@@ -218,5 +254,41 @@ assert.deepEqual((await asOld(A, `select n from public.weeks where league_id = $
 const fns = (await old.query(`select count(*)::int c from pg_proc where proname = 'create_league'`)).rows[0].c;
 assert.equal(fns, 1);
 ok('upgrading a database set up with the first version works, with no duplicate functions');
+
+// ---- Slip screenshot storage rules, against a stand-in for Supabase Storage ----
+const st = new PGlite();
+await st.exec(`
+  create role anon nologin; create role authenticated nologin; create schema auth;
+  create table auth.users (id uuid primary key, email text);
+  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+  create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+  grant usage on schema auth to authenticated, anon; create publication supabase_realtime;
+  create schema storage;
+  create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
+  alter table storage.objects enable row level security;
+  create function storage.foldername(name text) returns text[] language plpgsql as $$
+    declare _parts text[]; begin select string_to_array(name, '/') into _parts; return _parts[1:array_length(_parts,1)-1]; end $$;
+  grant usage on schema storage to authenticated; grant select, insert on storage.objects to authenticated;`);
+await st.exec(schema);
+await st.exec(schema); // re-runnable, including the storage block
+await st.exec(`grant usage on schema public to authenticated, anon; grant select, insert, update, delete on all tables in schema public to authenticated;
+  insert into auth.users values ('${A}','a@x.com'), ('${C2}','c2@x.com');`);
+const asSt = (uid, sql, params = []) => st.transaction(async (tx) => {
+  await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [uid]);
+  await tx.exec('set local role authenticated');
+  return tx.query(sql, params);
+});
+const bucket = (await st.query(`select public, file_size_limit from storage.buckets where id = 'slips'`)).rows[0];
+assert.equal(bucket.public, false);
+const sl = (await asSt(A, `select public.create_league('S', 10, array['a','b'], 'a') as id`)).rows[0].id;
+await asSt(A, `insert into storage.objects (bucket_id, name) values ('slips', $1)`, [`${sl}/w/slip.jpg`]);
+let stErr = null; try { await asSt(C2, `insert into storage.objects (bucket_id, name) values ('slips', $1)`, [`${sl}/w/evil.jpg`]); } catch (e) { stErr = e; }
+assert.ok(stErr, 'stranger upload should be refused');
+stErr = null; try { await asSt(A, `insert into storage.objects (bucket_id, name) values ('slips', 'not-a-uuid/x.jpg')`); } catch (e) { stErr = e; }
+assert.ok(stErr, 'upload outside a league folder should be refused');
+assert.equal((await asSt(A, `select count(*)::int c from storage.objects`)).rows[0].c, 1);
+assert.equal((await asSt(C2, `select count(*)::int c from storage.objects`)).rows[0].c, 0);
+ok('slip screenshots: private bucket; only league members can upload or view, and only in their league’s folder');
 
 console.log(`\n${passed} checks passed.`);

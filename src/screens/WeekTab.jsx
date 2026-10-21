@@ -2,15 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase, friendly } from '../lib/supabase.js';
 import { weekInfo, amerFmt, fmtOdds, money, dollars, parseOdds } from '../lib/odds.js';
 import { toast, shareText, fmtDate, listNames, store } from '../lib/ui.js';
-import { IconShare } from '../components/common.jsx';
+import { IconShare, Belt } from '../components/common.jsx';
+import Reactions from '../components/Reactions.jsx';
+import PlacedSheet from './PlacedSheet.jsx';
 
 const SPORTS = ['NFL', 'NCAAF', 'NBA', 'NHL', 'MLB', 'Soccer', 'Other'];
 const HINT = 'American odds, as the book shows them. Tap the sign to switch between minus and plus.';
 
-export default function WeekTab({ data, me, isAdmin, reload, pname }) {
+export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, nameOfUser }) {
   const week = data.weeks[data.weeks.length - 1];
   const [confirmRm, setConfirmRm] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [slipOpen, setSlipOpen] = useState(false);
 
   if (!week) {
     return (
@@ -46,7 +49,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname }) {
       lines.push(`${mark}${pname(l.player_id)}: ${l.pick} (${fmtOdds(l.odds, true)})`);
     });
     if (legs.length) lines.push('', `${legs.length} legs · ${amerFmt(info.d, true)} · ${money(info.stake)} pays ${money(info.projected)}`);
-    if (week.payer_id) lines.push(`On the hook: ${pname(week.payer_id)}`);
+    if (week.payer_id) lines.push(`On the hook: ${pname(week.payer_id)}${week.placed_at ? ' · Placed ✅' : ''}`);
     if (missing.length) lines.push(`Waiting on: ${missing.map((p) => p.name).join(', ')}`);
     return lines.join('\n');
   }
@@ -54,6 +57,8 @@ export default function WeekTab({ data, me, isAdmin, reload, pname }) {
   const stamp = { live: 'Live', hit: 'Hit', busted: 'Busted' }[info.status];
   const ways = new Set(legs.map((l) => l.player_id)).size;
   const sunk = [...new Set(info.losers.map((l) => l.player_id))].sort((a, b) => order[a] - order[b]).map(pname);
+  const placed = !!week.placed_at;
+  const canMark = isAdmin || (!!me && week.payer_id === me);
 
   return (
     <>
@@ -85,6 +90,9 @@ export default function WeekTab({ data, me, isAdmin, reload, pname }) {
         <div className="t-head">
           <span className="t-kicker">Parlay slip</span>
           <span className="t-meta">Week {week.n} {'·'} {legs.length} leg{legs.length === 1 ? '' : 's'} {'·'} {fmtDate(week.start_date)}</span>
+          {placed ? (
+            <button type="button" className="placed yes" onClick={() => setSlipOpen(true)}>Placed ✓{week.slip_path ? ' · View slip' : ''}</button>
+          ) : legs.length > 0 ? <span className="placed">Not placed yet</span> : null}
         </div>
         {stamp && <div className={`stamp stamp-${info.status}`}>{stamp}</div>}
         <ol className="legs">
@@ -94,7 +102,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname }) {
             const canEdit = isAdmin || (mine && !l.result);
             return (
               <li key={l.id} className={`leg${l.result ? ' is-' + l.result : ''}`}>
-                <span className="leg-who">{pname(l.player_id)}{mine && <span className="you"> {'·'} you</span>}</span>
+                <span className="leg-who">{pname(l.player_id)}<Belt on={beltId === l.player_id} />{mine && <span className="you"> {'·'} you</span>}</span>
                 <span className="leg-odds">{fmtOdds(l.odds)}</span>
                 <span className="leg-pick">{l.pick}</span>
                 <div className="leg-meta">
@@ -121,6 +129,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname }) {
                   ))}
                   {l.result === 'L' && <span className="bozo-mark">Bozo</span>}
                 </div>
+                <Reactions leg={l} reactions={data.reactions || []} userId={userId} nameOfUser={nameOfUser} reload={reload} />
               </li>
             );
           })}
@@ -148,7 +157,14 @@ export default function WeekTab({ data, me, isAdmin, reload, pname }) {
 
       <div className="actions-row">
         <button className="btn" onClick={() => shareText(slipText(), { title: `Week ${week.n} slip` })}><IconShare />Share the slip</button>
+        {canMark && !placed && legs.length > 0 && (
+          <button className="btn primary" onClick={() => setSlipOpen(true)}>I placed it</button>
+        )}
+        {canMark && placed && (
+          <button className="btn" onClick={() => setSlipOpen(true)}>Edit placed slip</button>
+        )}
       </div>
+      {slipOpen && <PlacedSheet data={data} week={week} canMark={canMark} reload={reload} nameOfUser={nameOfUser} onClose={() => setSlipOpen(false)} />}
 
       {info.status === 'hit' && isAdmin && <PayoutForm week={week} projected={info.projected} act={act} />}
 

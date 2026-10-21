@@ -283,3 +283,17 @@ tr:last-child td { border-bottom: 0; }
 .seg .s-L[aria-pressed="true"] { background: var(--nose); color: var(--on-nose); }
 .seg .s-P[aria-pressed="true"] { background: var(--muted); color: var(--surface); }
 .hist-actions { padding: 0 16px 12px; margin-top: -6px; }
+
+/* Bozo Belt, reactions, placed */
+:root { --p-pick: #FCEBB6; --p-pick-line: #D9A93A; }
+.belt { margin-left: 5px; font-size: 1.05em; letter-spacing: 0; text-transform: none; }
+.reacts { grid-column: 1 / -1; grid-row: 4; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.react { appearance: none; display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 3px 9px; border: 1px solid var(--paper-line); border-radius: 999px; background: transparent; color: var(--paper-ink); font: 600 14px/1 var(--body); cursor: pointer; }
+.react b { font: 600 12px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.react[aria-pressed="true"] { background: var(--p-pick); border-color: var(--p-pick-line); }
+.react:disabled { opacity: .6; }
+.hl-reacts { font-weight: 500; font-size: 13px; white-space: nowrap; }
+.placed { align-self: flex-start; margin-top: 6px; font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--paper-muted); padding: 5px 0; border: 0; background: none; }
+button.placed.yes { appearance: none; cursor: pointer; color: var(--p-win); background: var(--p-win-soft); border-radius: 4px; padding: 6px 8px; }
+.slip-img { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--sunk); max-height: 70vh; overflow-y: auto; }
+.slip-img img { display: block; width: 100%; height: auto; }

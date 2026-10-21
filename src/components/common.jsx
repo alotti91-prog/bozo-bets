@@ -14,6 +14,11 @@ export function Brand({ name }) {
   );
 }
 
+export function Belt({ on }) {
+  if (!on) return null;
+  return <span className="belt" title="Bozo Belt: most misses this season" aria-label="(Bozo Belt holder)" role="img">🤡</span>;
+}
+
 export function Toaster() {
   const [msg, setMsg] = useState(null);
   useEffect(() => {

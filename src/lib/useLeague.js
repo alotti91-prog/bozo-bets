@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, friendly } from './supabase.js';
 
-const TABLES = ['players', 'members', 'weeks', 'legs', 'spins'];
+const TABLES = ['players', 'members', 'weeks', 'legs', 'spins', 'reactions'];
 
 /**
  * Loads everything for one league and keeps it live. Any change by anyone
@@ -18,19 +18,20 @@ export function useLeague(leagueId, onSpin) {
 
   const load = useCallback(async () => {
     if (!leagueId) return;
-    const [lg, pl, mb, wk, lgs, sp] = await Promise.all([
+    const [lg, pl, mb, wk, lgs, sp, rx] = await Promise.all([
       supabase.from('leagues').select('*').eq('id', leagueId).maybeSingle(),
       supabase.from('players').select('*').eq('league_id', leagueId).order('sort').order('created_at'),
       supabase.from('members').select('*').eq('league_id', leagueId).order('joined_at'),
       supabase.from('weeks').select('*').eq('league_id', leagueId).order('n'),
       supabase.from('legs').select('*').eq('league_id', leagueId).order('created_at'),
       supabase.from('spins').select('*').eq('league_id', leagueId).order('created_at'),
+      supabase.from('reactions').select('*').eq('league_id', leagueId).order('created_at'),
     ]);
-    const err = [lg, pl, mb, wk, lgs, sp].find((r) => r.error);
+    const err = [lg, pl, mb, wk, lgs, sp, rx].find((r) => r.error);
     if (err) { setError(friendly(err.error)); return; }
     if (!lg.data) { setError('That league doesn’t exist or you’re not in it.'); return; }
     setError('');
-    setData({ league: lg.data, players: pl.data, members: mb.data, weeks: wk.data, legs: lgs.data, spins: sp.data });
+    setData({ league: lg.data, players: pl.data, members: mb.data, weeks: wk.data, legs: lgs.data, spins: sp.data, reactions: rx.data });
   }, [leagueId]);
 
   const reload = useCallback(() => {
@@ -49,6 +50,11 @@ export function useLeague(leagueId, onSpin) {
       });
     });
     ch.on('postgres_changes', { event: '*', schema: 'public', table: 'leagues', filter: `id=eq.${leagueId}` }, reload);
+    // Supabase can't filter delete events by league, so listen for all of them
+    // (a removed pick or reaction) and reload. With one group, that's cheap.
+    ['legs', 'reactions', 'weeks', 'players'].forEach((t) => {
+      ch.on('postgres_changes', { event: 'DELETE', schema: 'public', table: t }, reload);
+    });
     ch.subscribe();
 
     // Phones drop live connections in the background; catch up when the app comes back.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dec, amerFmt, fmtOdds, parseOdds, weekInfo, money, signed } from './odds.js';
-import { standings, hitPct } from './stats.js';
+import { standings, hitPct, bozoBelt } from './stats.js';
 import { indexAt, targetRotation, restRotation, wheelContext, TAU } from './wheel.js';
 import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
 
@@ -107,6 +107,21 @@ describe('solo $100 stat matches the old spreadsheet', () => {
     expect(s.rows.Chris.nOdds).toBe(2);
     expect(s.settled).toBe(3);
     expect(s.hits).toBe(0);
+  });
+});
+
+describe('Bozo Belt', () => {
+  const weeks = [W('w1', 1), W('w2', 2), W('w3', 3)];
+  it('goes to the most misses', () => {
+    const legs = [L('w1', 'a', -110, 'L'), L('w2', 'a', -110, 'L'), L('w3', 'b', -110, 'L'), L('w3', 'c', -110, 'W')];
+    expect(bozoBelt({ weeks, legs })).toEqual({ id: 'a', misses: 2 });
+  });
+  it('breaks ties by the most recent miss', () => {
+    const legs = [L('w1', 'a', -110, 'L'), L('w3', 'b', -110, 'L')];
+    expect(bozoBelt({ weeks, legs }).id).toBe('b');
+  });
+  it('nobody holds it before the first miss', () => {
+    expect(bozoBelt({ weeks, legs: [L('w1', 'a', -110, 'W'), L('w1', 'b', -110, null)] })).toBe(null);
   });
 });
 
