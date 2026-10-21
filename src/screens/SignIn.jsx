@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { siteUrl } from '../lib/site.js';
 import { supabase, friendly } from '../lib/supabase.js';
 import { store } from '../lib/ui.js';
 import { Brand } from '../components/common.jsx';
@@ -34,7 +35,7 @@ export default function SignIn({ joinCode }) {
     const addr = validEmail();
     if (!addr) return;
     setBusy(true); setErr('');
-    const redirect = window.location.origin + window.location.pathname + (joinCode ? `?join=${encodeURIComponent(joinCode)}` : '');
+    const redirect = siteUrl() + window.location.pathname + (joinCode ? `?join=${encodeURIComponent(joinCode)}` : '');
     const { error } = await supabase.auth.signInWithOtp({ email: addr, options: { emailRedirectTo: redirect } });
     setBusy(false);
     if (error) { setErr(/rate|seconds/i.test(error.message) ? 'Hold on a minute before asking for another email.' : friendly(error)); return; }

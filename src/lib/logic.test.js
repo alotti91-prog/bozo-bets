@@ -4,6 +4,7 @@ import { standings, hitPct, bozoBelt } from './stats.js';
 import { indexAt, targetRotation, restRotation, wheelContext, TAU } from './wheel.js';
 import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
 import { countdown, lockState, toLocalInput } from './deadline.js';
+import { isPrivateAddress } from './site.js';
 
 describe('odds', () => {
   it('converts American odds to decimal', () => {
@@ -147,6 +148,16 @@ describe('deadline', () => {
     const d = new Date(2026, 9, 25, 12, 55);
     expect(toLocalInput(d)).toBe('2026-10-25T12:55');
     expect(new Date(toLocalInput(d)).getTime()).toBe(d.getTime());
+  });
+});
+
+describe('public address', () => {
+  it('flags Vercel’s private deployment addresses', () => {
+    const pub = 'https://bozo-bets-psi.vercel.app';
+    expect(isPrivateAddress(pub, 'bozo-bets-psi.vercel.app')).toBe(false);
+    expect(isPrivateAddress(pub, 'bozo-bets-k3j2h1g9f-lotti.vercel.app')).toBe(true);
+    expect(isPrivateAddress(pub, 'bozo-bets-git-main-lotti.vercel.app')).toBe(true);
+    expect(isPrivateAddress('', 'localhost:5173')).toBe(false);
   });
 });
 

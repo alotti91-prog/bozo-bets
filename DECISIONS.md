@@ -65,3 +65,6 @@ People sign in the first time with an emailed code, then can set a password in S
 - Anyone with no leg in the current week goes in the wheel by default along with the losers (the admin can still change the pool before spinning). Without this, skipping your pick would be a free pass out of the wheel.
 - The button and role label say "Admin" because that's the word people look for. The rights are the same as before.
 
+**2026-10-21 · Invite and sign-in links always use the public address**
+Vercel serves each deployment at extra addresses (`bozo-bets-<id>-<you>.vercel.app`, `bozo-bets-git-main-…`) that Standard Protection hides behind a Vercel login. The app used to build invite links from whatever address it was open on, so opening it from the Vercel dashboard produced invites friends couldn't open. Production builds now bake in `VERCEL_PROJECT_PRODUCTION_URL` (or `VITE_SITE_URL` if set) and use it for invites and sign-in email links. A yellow bar on any other address links to the public one. We chose not to redirect automatically: if Vercel ever reports a different domain than the one people use, a redirect would sign everyone out, while the bar only nags.
+

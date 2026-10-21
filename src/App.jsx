@@ -5,6 +5,7 @@ import { Toaster, Brand } from './components/common.jsx';
 import SignIn from './screens/SignIn.jsx';
 import Onboard from './screens/Onboard.jsx';
 import League from './screens/League.jsx';
+import { siteUrl, isPrivateAddress } from './lib/site.js';
 
 // An invite link looks like https://your-site/?join=ABC123. Remember the code
 // across the sign-in round trip, then tidy the address bar.
@@ -24,6 +25,7 @@ export default function App() {
   if (!configured) return <SetupNeeded />;
   return (
     <>
+      <PrivateAddressBar />
       <Main />
       <Toaster />
     </>
@@ -76,6 +78,17 @@ function Home({ userId }) {
   return (
     <League key={active} leagueId={active} userId={userId} leagues={leagues}
       onSwitchLeague={pick} onAddLeague={() => setAdding(true)} onSignOut={signOut} />
+  );
+}
+
+// Shown on Vercel's private deployment addresses, which friends can't open.
+function PrivateAddressBar() {
+  if (!isPrivateAddress()) return null;
+  return (
+    <div className="offsite" role="status">
+      This is a private Vercel address, so friends can{'’'}t open it.{' '}
+      <a href={siteUrl() + window.location.pathname + window.location.search}>Go to the public site</a>
+    </div>
   );
 }
 

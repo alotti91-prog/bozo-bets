@@ -3,13 +3,14 @@ import { supabase, friendly } from '../lib/supabase.js';
 import { toast, shareText, store } from '../lib/ui.js';
 import { Sheet, IconShare } from '../components/common.jsx';
 import { nflWeek } from '../lib/nfl.js';
+import { siteUrl } from '../lib/site.js';
 import { DAYS, lockState, toLocalInput } from '../lib/deadline.js';
 
 export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, reload, onClose, onChangePlayer, leagues, onSwitchLeague, onAddLeague, onSignOut }) {
   const [confirm, setConfirm] = useState(null);
   const league = data.league;
   const pname = (id) => data.players.find((p) => p.id === id)?.name || 'Unknown';
-  const inviteLink = `${window.location.origin}${window.location.pathname}?join=${league.invite_code}`;
+  const inviteLink = `${siteUrl()}${window.location.pathname}?join=${league.invite_code}`;
 
   async function rpc(fn, args, okMsg) {
     const { data: out, error } = await supabase.rpc(fn, args);

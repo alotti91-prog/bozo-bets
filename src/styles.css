@@ -307,3 +307,7 @@ button.placed.yes { appearance: none; cursor: pointer; color: var(--p-win); back
 .chip.late { background: var(--nose-soft); border-color: var(--nose); color: var(--nose); }
 .dl-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .dl-row select, .dl-row input { width: auto; min-width: 0; }
+
+/* private Vercel address warning */
+.offsite { background: var(--gold-soft); color: var(--ink); border-bottom: 1px solid var(--gold); padding: 10px 16px; font-size: 13px; line-height: 1.4; text-align: center; }
+.offsite a { color: var(--ink); font-weight: 700; text-underline-offset: 3px; white-space: nowrap; }

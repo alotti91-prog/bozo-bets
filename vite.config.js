@@ -16,11 +16,18 @@ export default defineConfig(({ mode }) => {
   const key = env.VITE_SUPABASE_PUBLISHABLE_KEY || env.SUPABASE_PUBLISHABLE_KEY
     || env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || ''
 
+  // The public address for invite and sign-in links. Vercel sets
+  // VERCEL_PROJECT_PRODUCTION_URL (e.g. bozo-bets-psi.vercel.app) on every build.
+  // Only production builds use it, so preview links still point at the preview.
+  const site = env.VITE_SITE_URL
+    || (env.VERCEL_ENV === 'production' && env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
+
   return {
     plugins: [react()],
     define: isDemo
-      ? { 'import.meta.env.VITE_DEMO': JSON.stringify('1') }
+      ? { 'import.meta.env.VITE_DEMO': JSON.stringify('1'), 'import.meta.env.VITE_SITE_URL': JSON.stringify(site) }
       : {
+          'import.meta.env.VITE_SITE_URL': JSON.stringify(site),
           'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(url),
           'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(key),
         },
