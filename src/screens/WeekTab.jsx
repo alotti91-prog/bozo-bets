@@ -10,7 +10,7 @@ import PlacedSheet from './PlacedSheet.jsx';
 const SPORTS = ['NFL', 'NCAAF', 'NBA', 'NHL', 'MLB', 'Soccer', 'Other'];
 const HINT = 'American odds, as the book shows them. Tap the sign to switch between minus and plus.';
 
-export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, nameOfUser, openSettings }) {
+export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, nameOfUser, openSettings, openWheel }) {
   const week = data.weeks[data.weeks.length - 1];
   const [confirmRm, setConfirmRm] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -85,7 +85,12 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         </div>
         <div className="payer">
           <span className="dot" aria-hidden="true" />
-          {isAdmin ? (
+          {week.payer_hidden ? (
+            <span>On the hook:{' '}
+              <button type="button" className="link hook-hidden" onClick={openWheel}>Watch the spin to find out</button>
+              {' '}{'·'} {dollars(info.stake)}
+            </span>
+          ) : isAdmin ? (
             <>
               <label htmlFor="payer">On the hook</label>
               <select id="payer" value={week.payer_id || ''} onChange={(e) => setPayer(e.target.value)}>

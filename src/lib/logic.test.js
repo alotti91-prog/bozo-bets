@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { dec, amerFmt, fmtOdds, parseOdds, weekInfo, money, signed } from './odds.js';
 import { standings, hitPct, bozoBelt } from './stats.js';
-import { indexAt, targetRotation, restRotation, wheelContext, TAU } from './wheel.js';
+import { indexAt, targetRotation, restRotation, wheelContext, unwatchedSpin, hideSpin, TAU } from './wheel.js';
 import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
 import { countdown, lockState, toLocalInput, ago } from './deadline.js';
 import { isPrivateAddress } from './site.js';
@@ -219,6 +219,26 @@ describe('wheel', () => {
     expect(withShows.noShows).toEqual(['c']);
     expect(ready.target.id).toBe('w2');
     expect(ready.nextN).toBe(3);
+  });
+  it('hides the latest bozo until you watch it', () => {
+    const weeks = [W('w6', 6), W('w7', 7, { payer_id: 'b' })];
+    const spins = [
+      { id: 's1', week_id: 'w6', landed_id: 'a', pool: ['a', 'b'], spun_by: 'admin' },
+      { id: 's2', week_id: 'w6', landed_id: 'b', pool: ['a', 'b'], spun_by: 'admin' }, // re-spin, counts
+    ];
+    const data = { weeks, spins, legs: [], views: ['s1'] };
+    expect(unwatchedSpin(data, 'me')?.id).toBe('s2');
+    expect(unwatchedSpin(data, 'admin')).toBe(null); // the spinner saw it
+    expect(unwatchedSpin({ ...data, views: ['s2'] }, 'me')).toBe(null);
+    expect(unwatchedSpin(data, 'me', new Set(['s2']))).toBe(null);
+    expect(unwatchedSpin({ ...data, views: null }, 'me')).toBe(null); // not set up yet
+    const masked = hideSpin(data, spins[1]);
+    expect(masked.weeks[1].payer_id).toBe(null);
+    expect(masked.weeks[1].payer_hidden).toBe(true);
+    expect(masked.spins[1].hidden).toBe(true);
+    expect(masked.spins[0].hidden).toBe(true); // the replaced spin too, no working it out by elimination
+    const s = standings({ players: [{ id: 'a' }, { id: 'b' }], weeks: masked.weeks, legs: [], spins: masked.spins });
+    expect(s.rows.b.landed).toBe(0);
   });
   it('spins last week when it settled but was never spun', () => {
     const weeks = [W('w6', 6), W('w7', 7)];

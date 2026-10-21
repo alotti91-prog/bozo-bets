@@ -56,7 +56,7 @@ export function standings({ players, weeks, legs, spins }) {
     const ws = spins.filter((s) => s.week_id === w.id);
     if (ws.length) {
       const last = ws[ws.length - 1];
-      if (rows[last.landed_id]) rows[last.landed_id].landed++;
+      if (rows[last.landed_id] && !last.hidden) rows[last.landed_id].landed++; // hidden: not watched yet
     }
   }
   return { rows, sport, hits, settled, totalIn, totalWon };

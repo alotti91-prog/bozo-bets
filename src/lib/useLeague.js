@@ -19,7 +19,7 @@ export function useLeague(leagueId, onSpin) {
 
   const load = useCallback(async () => {
     if (!leagueId) return;
-    const [lg, pl, mb, wk, lgs, sp, rx, cm] = await Promise.all([
+    const [lg, pl, mb, wk, lgs, sp, rx, cm, vw] = await Promise.all([
       supabase.from('leagues').select('*').eq('id', leagueId).maybeSingle(),
       supabase.from('players').select('*').eq('league_id', leagueId).order('sort').order('created_at'),
       supabase.from('members').select('*').eq('league_id', leagueId).order('joined_at'),
@@ -28,13 +28,14 @@ export function useLeague(leagueId, onSpin) {
       supabase.from('spins').select('*').eq('league_id', leagueId).order('created_at'),
       supabase.from('reactions').select('*').eq('league_id', leagueId).order('created_at'),
       supabase.from('comments').select('*').eq('league_id', leagueId).order('created_at'),
+      supabase.from('spin_views').select('spin_id').eq('league_id', leagueId), // only your own come back
     ]);
-    // Comments are optional: if the database hasn't been updated yet, show none instead of failing.
+    // Comments and spin views are optional: if the database hasn't been updated yet, carry on without them.
     const err = [lg, pl, mb, wk, lgs, sp, rx].find((r) => r.error);
     if (err) { setError(friendly(err.error)); return; }
     if (!lg.data) { setError('That league doesn’t exist or you’re not in it.'); return; }
     setError('');
-    setData({ league: lg.data, players: pl.data, members: mb.data, weeks: wk.data, legs: lgs.data, spins: sp.data, reactions: rx.data, comments: cm.error ? [] : cm.data });
+    setData({ league: lg.data, players: pl.data, members: mb.data, weeks: wk.data, legs: lgs.data, spins: sp.data, reactions: rx.data, comments: cm.error ? [] : cm.data, views: vw.error ? null : vw.data.map((v) => v.spin_id) });
   }, [leagueId]);
 
   const reload = useCallback(() => {

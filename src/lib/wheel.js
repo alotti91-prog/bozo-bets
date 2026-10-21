@@ -42,6 +42,36 @@ export function wheelContext({ weeks, legs, spins, players = [] }) {
   return { mode: 'ready', week: cur, target, nextN, info, legs: legsT, losers, noShows, last };
 }
 
+/**
+ * The spin this person hasn't seen: the latest one, if it was for last week
+ * (so it decided this week's bozo) and they didn't spin it or watch it.
+ * views is the list of spin ids they've watched, or null if that isn't set up
+ * (then nothing is hidden). watched holds spins watched since the last load.
+ */
+export function unwatchedSpin({ weeks, spins, views }, userId, watched = new Set()) {
+  if (!views) return null;
+  const last = spins[spins.length - 1];
+  const prev = weeks[weeks.length - 2];
+  if (!last || !prev || last.week_id !== prev.id) return null;
+  if (last.spun_by === userId || views.includes(last.id) || watched.has(last.id)) return null;
+  return last;
+}
+
+/**
+ * League data with that spin's result hidden: that week's spins are flagged
+ * (replaced ones too, so you can't work it out by elimination) and the payer
+ * it set is blanked.
+ */
+export function hideSpin(data, spin) {
+  const w = data.weeks.find((x) => x.id === spin.week_id);
+  const next = w && data.weeks.filter((x) => x.n > w.n).sort((a, b) => a.n - b.n)[0];
+  return {
+    ...data,
+    spins: data.spins.map((s) => (s.week_id === spin.week_id ? { ...s, hidden: true } : s)),
+    weeks: data.weeks.map((x) => (x === next && x.payer_id === spin.landed_id ? { ...x, payer_id: null, payer_hidden: true } : x)),
+  };
+}
+
 /** Which segment sits under the pointer (top) at rotation r. */
 export function indexAt(r, n) {
   const a = (((-r) % TAU) + TAU) % TAU;

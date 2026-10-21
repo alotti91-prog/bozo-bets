@@ -47,10 +47,11 @@ const db = {
     { id: 's1', week_id: 'w1', league_id: L, pool: ['p3', 'p5'], landed_id: 'p5', spun_by: uid, created_at: daysAgo(27) + 'T23:00:00Z' },
     { id: 's2', week_id: 'w2', league_id: L, pool: P.map((p) => p.id), landed_id: 'p3', spun_by: uid, created_at: daysAgo(20) + 'T23:00:00Z' },
     { id: 's3a', week_id: 'w3', league_id: L, pool: ['p1', 'p4'], landed_id: 'p1', spun_by: uid, created_at: daysAgo(13) + 'T22:58:00Z' },
-    { id: 's3', week_id: 'w3', league_id: L, pool: ['p1', 'p4'], landed_id: 'p4', spun_by: uid, created_at: daysAgo(13) + 'T23:00:00Z' },
+    { id: 's3', week_id: 'w3', league_id: L, pool: ['p1', 'p4'], landed_id: 'p4', spun_by: 'u2', created_at: daysAgo(13) + 'T23:00:00Z' }, // Sully spun it; you haven't watched
   ],
   reactions: [],
   comments: [],
+  spin_views: [],
 };
 // A few sample reactions on this week's picks (Sully is the other signed-in member).
 W[3].lock_at = nextLock(0, '12:55');
@@ -98,7 +99,8 @@ function query(table) {
     const match = (r) => filters.every((f) => f(r));
     if (op === 'insert') {
       const rows = (Array.isArray(payload) ? payload : [payload]).map((r) => ({ id: id(), created_at: now(), active: true, result: null, ...r }));
-      if (table === 'reactions' || table === 'comments') rows.forEach((r) => { r.user_id = uid; r.league_id = L; });
+      if (table === 'reactions' || table === 'comments' || table === 'spin_views') rows.forEach((r) => { r.user_id = uid; r.league_id = L; });
+      if (table === 'spin_views' && rows.some((r) => db.spin_views.some((v) => v.spin_id === r.spin_id))) return { data: null, error: { message: 'duplicate key value violates unique constraint "spin_views_pkey"' } };
       if (table === 'comments') rows.forEach((r) => { r.body = String(r.body || '').trim(); });
       if (table === 'comments' && rows.some((r) => !r.body)) return { data: null, error: { message: 'Write something first' } };
       if (table === 'reactions' && rows.some((r) => db.reactions.some((x) => x.leg_id === r.leg_id && x.user_id === r.user_id && x.emoji === r.emoji))) {

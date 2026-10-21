@@ -106,6 +106,17 @@ create table if not exists public.comments (
 create index if not exists comments_league_idx on public.comments (league_id);
 create index if not exists comments_leg_idx on public.comments (leg_id, created_at);
 
+-- Who has watched each spin. Until you watch the latest one (live or as a
+-- replay), the app hides who it landed on.
+create table if not exists public.spin_views (
+  spin_id    uuid not null references public.spins(id) on delete cascade,
+  league_id  uuid not null references public.leagues(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  seen_at    timestamptz not null default now(),
+  primary key (spin_id, user_id)
+);
+create index if not exists spin_views_league_idx on public.spin_views (league_id, user_id);
+
 -- "Bet placed": whoever's on the hook marks the slip placed, with an optional
 -- screenshot stored in the private "slips" storage bucket (set up below).
 alter table public.weeks add column if not exists placed_at timestamptz;
@@ -251,6 +262,7 @@ alter table public.legs    enable row level security;
 alter table public.spins   enable row level security;
 alter table public.reactions enable row level security;
 alter table public.comments enable row level security;
+alter table public.spin_views enable row level security;
 
 -- Leagues: members read; commish edits name/stake. Created via create_league().
 drop policy if exists "league read" on public.leagues;
@@ -323,6 +335,25 @@ create policy "reaction add" on public.reactions for insert to authenticated
   with check (user_id = auth.uid() and public.is_member(league_id));
 drop policy if exists "reaction remove" on public.reactions;
 create policy "reaction remove" on public.reactions for delete to authenticated using (user_id = auth.uid());
+
+-- Spin views: you record and read only your own.
+create or replace function public.spin_views_fill() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  select league_id into new.league_id from public.spins where id = new.spin_id;
+  if new.league_id is null then raise exception 'That spin does not exist'; end if;
+  new.user_id := auth.uid();
+  return new;
+end $$;
+drop trigger if exists spin_views_fill on public.spin_views;
+create trigger spin_views_fill before insert on public.spin_views
+  for each row execute function public.spin_views_fill();
+
+drop policy if exists "view read" on public.spin_views;
+create policy "view read" on public.spin_views for select to authenticated using (user_id = auth.uid());
+drop policy if exists "view add" on public.spin_views;
+create policy "view add" on public.spin_views for insert to authenticated
+  with check (user_id = auth.uid() and public.is_member(league_id));
 
 -- Comments: members read all and post as themselves. You delete your own; the
 -- commish can delete anyone's. No editing, so what was said stays said.

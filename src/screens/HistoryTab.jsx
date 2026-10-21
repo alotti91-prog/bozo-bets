@@ -59,7 +59,7 @@ export default function HistoryTab({ data, pname, isAdmin, reload, beltId, nameO
         if (info.status === 'hit') subs.push(`Paid ${money(info.payout)}`);
         if (spins.length) {
           const last = spins[spins.length - 1];
-          subs.push(`Wheel → ${pname(last.landed_id)}${spins.length > 1 ? ` (re-spun ${spins.length - 1}×)` : ''}`);
+          subs.push(`Wheel → ${last.hidden ? 'watch the spin to find out' : pname(last.landed_id)}${spins.length > 1 ? ` (re-spun ${spins.length - 1}×)` : ''}`);
         }
         const isOpen = !!open[w.id];
         const isPast = w.id !== cur.id;

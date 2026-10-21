@@ -123,6 +123,14 @@ assert.deepEqual((await as(B, `select id from public.spins where week_id = $1`, 
 assert.equal((await as(A, `select payer_id from public.weeks where id = $1`, [w2.id])).rows[0].payer_id, spin2.landed_id);
 ok('commish can delete a replaced spin; the one that counts stays, and so does the payer');
 
+// Watched spins: you record and see only your own.
+await as(B, `insert into public.spin_views (spin_id, user_id) values ($1, $2)`, [newSpin.id, A]); // tries to record for A
+assert.deepEqual((await as(B, `select user_id, league_id from public.spin_views`)).rows, [{ user_id: B, league_id: lid }]);
+assert.equal((await as(A, `select count(*)::int c from public.spin_views`)).rows[0].c, 0);
+await fails(B, `insert into public.spin_views (spin_id) values ($1)`, [newSpin.id], /duplicate/);
+await fails(C, `insert into public.spin_views (spin_id) values ($1)`, [newSpin.id]);
+ok('watched spins: you record and read only your own; strangers can’t');
+
 // Wheel fairness smoke test: 600 spins over 3 names, each lands a fair share
 const pool3 = [players.Lotti, players.Sully, players.Mikey];
 const counts = { [players.Lotti]: 0, [players.Sully]: 0, [players.Mikey]: 0 };

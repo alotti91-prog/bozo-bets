@@ -80,3 +80,6 @@ The group chat already handles general trash talk, and the app has no notificati
 **2026-10-21 · Replaced spins are crossed out and can be deleted**
 When a week is re-spun, only the latest spin counts. Earlier ones stay in the Wheel log crossed out (and on replay) so everyone can see a re-spin happened. Admins can delete a replaced spin with `delete_spin()`; the spin that counts can't be deleted, so the payer never changes by accident. Trade-off: deleting replaced spins erases the record that a week was re-spun, which was the main check on an admin re-spinning until they like the result.
 
+**2026-10-21 · The bozo stays hidden until you watch the spin**
+If you miss the live spin, who it landed on is hidden on every tab (Wheel result and log, "On the hook", History, the Standings wheel count) until you watch it, live or as a replay. Watching is saved per account in `spin_views`, not per phone, because an iPhone home screen app and Safari don't share storage. Only the latest spin, the one that set this week's payer, is hidden, so people who join late don't have to sit through old weeks. The person who spun it never has it hidden. All of that week's spins are hidden, re-spun ones included, so nobody can work it out by elimination. Hiding is done in the app, not the database: anyone determined could still find the name. It's for fun, not secrecy.
+

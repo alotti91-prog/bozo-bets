@@ -10,7 +10,7 @@ import WheelCanvas from '../components/WheelCanvas.jsx';
  * When anyone spins, every phone with this tab open animates the same spin, once.
  * Any past spin can be replayed; it always lands on the same name.
  */
-export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seenSpins }) {
+export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seenSpins, markWatched }) {
   const wheelRef = useRef(null);
   const cardRef = useRef(null);
   const animating = useRef(false);
@@ -53,6 +53,7 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
     animating.current = false;
     setActive(null);
     setRevealed(spin.id);
+    if (!replay || isLatest) markWatched?.(spin.id);
     if (!replay) reload();
     else if (!isLatest) setFocus(spin);
   }
@@ -102,8 +103,10 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
     names = pool.map(pname);
   } else if (ctx.last) {
     names = ctx.last.spin.pool.map(pname);
-    restAt = ctx.last.spin.pool.indexOf(ctx.last.spin.landed_id);
-    restKey = ctx.last.spin.id;
+    if (!ctx.last.spin.hidden) { // don't park the wheel on a result they haven't watched
+      restAt = ctx.last.spin.pool.indexOf(ctx.last.spin.landed_id);
+      restKey = ctx.last.spin.id;
+    }
   } else {
     names = sortIds(activeIds).map(pname);
   }
@@ -150,7 +153,16 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
           </div>
         )}
 
-        {idle && ctx.mode === 'waiting' && ctx.last && (
+        {idle && ctx.mode === 'waiting' && ctx.last?.spin.hidden && (
+          <div className="result" role="status">
+            <span className="label-sm">Week {ctx.last.week.n} wheel has been spun</span>
+            <strong className="result-name is-hidden" aria-label="Hidden until you watch">???</strong>
+            <span className="result-sub">You missed it. Watch to see who puts in {dollars(ctx.week.stake)} for Week {ctx.week.n}.</span>
+            <button className="btn nose" onClick={() => play(ctx.last.spin, true)}>Watch the spin</button>
+          </div>
+        )}
+
+        {idle && ctx.mode === 'waiting' && ctx.last && !ctx.last.spin.hidden && (
           <div className={`result${revealed === ctx.last.spin.id ? ' reveal' : ''}`} role="status">
             <span className="label-sm">Week {ctx.last.week.n} wheel landed on</span>
             <strong className="result-name">{pname(ctx.last.spin.landed_id)}</strong>
@@ -220,8 +232,8 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
                 <li key={s.id} className={old ? 'is-replaced' : ''}>
                   <span className="log-wk">Wk {n ?? '?'}</span>
                   <span className="log-who">
-                    {old ? <s>{pname(s.landed_id)}</s> : pname(s.landed_id)}{' '}
-                    <small>out of {s.pool.length}{old ? ' · replaced' : idx > 0 ? ' · re-spin' : ''}</small>
+                    {s.hidden ? <span className="is-hidden">???</span> : old ? <s>{pname(s.landed_id)}</s> : pname(s.landed_id)}{' '}
+                    <small>{s.hidden ? 'tap ▶ to find out' : `out of ${s.pool.length}${old ? ' · replaced' : idx > 0 ? ' · re-spin' : ''}`}</small>
                   </span>
                   <time dateTime={s.created_at}>{fmtWhen(s.created_at)}</time>
                   <span className="log-acts">

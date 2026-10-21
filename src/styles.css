@@ -345,3 +345,7 @@ button.placed.yes { appearance: none; cursor: pointer; color: var(--p-win); back
 .toast { display: flex; align-items: center; gap: 12px; }
 .toast-act { appearance: none; flex-shrink: 0; border: 0; border-radius: 8px; padding: 7px 12px; background: var(--nose); color: var(--on-nose); font: 700 13px/1 var(--body); cursor: pointer; }
 .log-who small { white-space: nowrap; }
+
+/* result hidden until you watch the spin */
+.result-name.is-hidden, .log-who .is-hidden { color: var(--muted); letter-spacing: .12em; }
+.hook-hidden { padding: 0; font-weight: 700; color: var(--nose); }

@@ -5,6 +5,7 @@ import { store, toast } from '../lib/ui.js';
 import { Brand, IconGear } from '../components/common.jsx';
 import Claim from './Claim.jsx';
 import { bozoBelt } from '../lib/stats.js';
+import { unwatchedSpin, hideSpin } from '../lib/wheel.js';
 import WeekTab from './WeekTab.jsx';
 import WheelTab from './WheelTab.jsx';
 import StandingsTab from './StandingsTab.jsx';
@@ -23,6 +24,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   const [pwNudgeHidden, setPwNudgeHidden] = useState(() => store.get('bz-has-pw', false) || store.get('bz-pw-nudge-off', false));
   const [skipClaim, setSkipClaim] = useState(() => store.get('bz-skip-claim-' + leagueId, false));
   const [seenSpins] = useState(() => new Set()); // live spins already played, so each plays once
+  const [watched, setWatched] = useState(() => new Set()); // spins watched since the last load
 
   const go = (t) => { setTab(t); store.set('bz-tab', t); window.scrollTo(0, 0); };
 
@@ -68,12 +70,24 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
     reload();
   }
 
+  // Watched a spin to the end (live or replay): remember it on this account so
+  // the result shows everywhere, on every device.
+  function markWatched(spinId) {
+    if (watched.has(spinId)) return;
+    setWatched((prev) => new Set(prev).add(spinId));
+    supabase.from('spin_views').insert({ spin_id: spinId }).then(() => {}); // a repeat is harmless
+  }
+  // Until you've watched the latest spin, hide who it landed on on every tab.
+  const hidden = unwatchedSpin(data, userId, watched);
+  const view = hidden ? hideSpin(data, hidden) : data;
+
   const belt = bozoBelt(data);
   const nameOfUser = (uid) => {
     const m = data.members.find((x) => x.user_id === uid);
     return (m && m.player_id && pname(m.player_id)) || 'Someone';
   };
-  const props = { data, me, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, nameOfUser, openSettings: () => setSettings(true) };
+  const props = { data: view, me, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, nameOfUser,
+    openSettings: () => setSettings(true), openWheel: () => go('wheel'), markWatched };
   return (
     <>
       <header className="top">
