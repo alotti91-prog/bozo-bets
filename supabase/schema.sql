@@ -100,6 +100,14 @@ alter table public.weeks add column if not exists placed_at timestamptz;
 alter table public.weeks add column if not exists placed_by uuid references auth.users(id) on delete set null;
 alter table public.weeks add column if not exists slip_path text;
 
+-- Pick deadline. The league sets a weekly rule (day, time, time zone); each
+-- week gets its own lock_at, filled in when the week opens and editable by
+-- the commish for one-off weeks. lock_at null = no deadline that week.
+alter table public.leagues add column if not exists lock_dow int check (lock_dow between 0 and 6);
+alter table public.leagues add column if not exists lock_time time;
+alter table public.leagues add column if not exists lock_tz text not null default 'America/New_York';
+alter table public.weeks add column if not exists lock_at timestamptz;
+
 -- ---------- Helper functions used by the security rules -------------
 
 create or replace function public.is_member(lid uuid) returns boolean
@@ -128,6 +136,30 @@ create or replace function public.latest_week_id(lid uuid) returns uuid
 language sql stable security definer set search_path = public as $$
   select id from public.weeks where league_id = lid order by n desc limit 1;
 $$;
+
+-- True until a week's pick deadline passes (always true with no deadline).
+create or replace function public.week_open(wid uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select lock_at is null or now() < lock_at from public.weeks where id = wid), true);
+$$;
+
+-- The league's next deadline on or after a date, never in the past.
+create or replace function public.next_lock(lid uuid, from_date date) returns timestamptz
+language plpgsql stable security definer set search_path = public as $$
+declare
+  l public.leagues;
+  d date;
+  t timestamptz;
+begin
+  select * into l from public.leagues where id = lid;
+  if l.id is null or l.lock_dow is null or l.lock_time is null then return null; end if;
+  d := from_date + ((l.lock_dow - extract(dow from from_date)::int + 7) % 7);
+  t := (d + l.lock_time) at time zone coalesce(nullif(l.lock_tz, ''), 'America/New_York');
+  while t <= now() loop
+    t := t + interval '7 days';
+  end loop;
+  return t;
+end $$;
 
 -- Six-character invite code, no look-alike characters (no 0/O, 1/I/L).
 create or replace function public.new_invite_code() returns text
@@ -185,6 +217,9 @@ begin
     select max(n) into latest from public.weeks where league_id = w_league;
     if w_n <> latest then
       raise exception 'That week is closed';
+    end if;
+    if not public.week_open(new.week_id) then
+      raise exception 'Picks are locked for this week. Ask the commish if you need a change.';
     end if;
   end if;
   return new;
@@ -247,7 +282,8 @@ create policy "leg update" on public.legs for update to authenticated
 drop policy if exists "leg delete" on public.legs;
 create policy "leg delete" on public.legs for delete to authenticated using (
   public.is_admin(league_id)
-  or (player_id = public.my_player(league_id) and result is null and week_id = public.latest_week_id(league_id))
+  or (player_id = public.my_player(league_id) and result is null and week_id = public.latest_week_id(league_id)
+      and public.week_open(week_id))
 );
 
 -- Spins: members read. Only spin_wheel() writes them.
@@ -626,6 +662,58 @@ begin
   end if;
 end $$;
 
+-- New current weeks pick up the league's deadline automatically.
+create or replace function public.weeks_fill_lock() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.lock_at is null
+     and not exists (select 1 from public.weeks where league_id = new.league_id and n > new.n) then
+    new.lock_at := public.next_lock(new.league_id, new.start_date);
+  end if;
+  return new;
+end $$;
+drop trigger if exists weeks_fill_lock on public.weeks;
+create trigger weeks_fill_lock before insert on public.weeks
+  for each row execute function public.weeks_fill_lock();
+
+-- Commish tool: set (or turn off, with p_dow null) the weekly pick deadline.
+-- Also re-times the current week.
+create or replace function public.set_deadline(p_league uuid, p_dow int, p_time time, p_tz text)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  cur_id uuid;
+  cur_start date;
+begin
+  if not public.is_admin(p_league) then raise exception 'Only the commish can set the deadline'; end if;
+  if p_dow is null then
+    update public.leagues set lock_dow = null, lock_time = null where id = p_league;
+  else
+    if p_dow < 0 or p_dow > 6 or p_time is null then raise exception 'Pick a day and a time'; end if;
+    begin
+      perform now() at time zone p_tz;
+    exception when others then
+      raise exception 'Unknown time zone: %', p_tz;
+    end;
+    update public.leagues set lock_dow = p_dow, lock_time = p_time, lock_tz = p_tz where id = p_league;
+  end if;
+  select id, start_date into cur_id, cur_start from public.weeks where league_id = p_league order by n desc limit 1;
+  if cur_id is not null then
+    update public.weeks set lock_at = public.next_lock(p_league, cur_start) where id = cur_id;
+  end if;
+end $$;
+
+-- Commish tool: change one week's deadline (null = no deadline that week).
+create or replace function public.set_week_lock(p_week uuid, p_lock_at timestamptz)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  w public.weeks;
+begin
+  select * into w from public.weeks where id = p_week;
+  if w.id is null then raise exception 'That week does not exist'; end if;
+  if not public.is_admin(w.league_id) then raise exception 'Only the commish can change the deadline'; end if;
+  update public.weeks set lock_at = p_lock_at where id = w.id;
+end $$;
+
 -- ---------- Permissions on functions ---------------------------------
 
 revoke execute on function
@@ -643,6 +731,8 @@ revoke execute on function
   public.save_past_week(uuid, uuid, int, date, uuid, jsonb),
   public.delete_past_week(uuid),
   public.mark_placed(uuid, boolean, text),
+  public.set_deadline(uuid, int, time, text),
+  public.set_week_lock(uuid, timestamptz),
   public.new_invite_code()
 from public, anon;
 
@@ -660,7 +750,9 @@ grant execute on function
   public.set_week_number(uuid, int),
   public.save_past_week(uuid, uuid, int, date, uuid, jsonb),
   public.delete_past_week(uuid),
-  public.mark_placed(uuid, boolean, text)
+  public.mark_placed(uuid, boolean, text),
+  public.set_deadline(uuid, int, time, text),
+  public.set_week_lock(uuid, timestamptz)
 to authenticated;
 
 -- ---------- Live updates ---------------------------------------------

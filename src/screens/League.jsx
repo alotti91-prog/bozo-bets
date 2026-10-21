@@ -74,7 +74,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
     const m = data.members.find((x) => x.user_id === uid);
     return (m && m.player_id && pname(m.player_id)) || 'Someone';
   };
-  const props = { data, me, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, nameOfUser };
+  const props = { data, me, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, nameOfUser, openSettings: () => setSettings(true) };
   return (
     <>
       <header className="top">

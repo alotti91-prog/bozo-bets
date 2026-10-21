@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase, friendly } from '../lib/supabase.js';
 import { weekInfo, amerFmt, fmtOdds, money, dollars, parseOdds } from '../lib/odds.js';
 import { toast, shareText, fmtDate, listNames, store } from '../lib/ui.js';
+import { lockState } from '../lib/deadline.js';
 import { IconShare, Belt } from '../components/common.jsx';
 import Reactions from '../components/Reactions.jsx';
 import PlacedSheet from './PlacedSheet.jsx';
@@ -9,11 +10,16 @@ import PlacedSheet from './PlacedSheet.jsx';
 const SPORTS = ['NFL', 'NCAAF', 'NBA', 'NHL', 'MLB', 'Soccer', 'Other'];
 const HINT = 'American odds, as the book shows them. Tap the sign to switch between minus and plus.';
 
-export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, nameOfUser }) {
+export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, nameOfUser, openSettings }) {
   const week = data.weeks[data.weeks.length - 1];
   const [confirmRm, setConfirmRm] = useState(null);
   const [editing, setEditing] = useState(null);
   const [slipOpen, setSlipOpen] = useState(false);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((x) => x + 1), 30000); // keeps the countdown fresh
+    return () => clearInterval(t);
+  }, []);
 
   if (!week) {
     return (
@@ -50,6 +56,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
     });
     if (legs.length) lines.push('', `${legs.length} legs · ${amerFmt(info.d, true)} · ${money(info.stake)} pays ${money(info.projected)}`);
     if (week.payer_id) lines.push(`On the hook: ${pname(week.payer_id)}${week.placed_at ? ' · Placed ✅' : ''}`);
+    if (lock) lines.push(locked ? `Picks locked ${lock.label}` : `⏰ Picks lock ${lock.label} (${lock.countdown} left)`);
     if (missing.length) lines.push(`Waiting on: ${missing.map((p) => p.name).join(', ')}`);
     return lines.join('\n');
   }
@@ -58,6 +65,8 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
   const ways = new Set(legs.map((l) => l.player_id)).size;
   const sunk = [...new Set(info.losers.map((l) => l.player_id))].sort((a, b) => order[a] - order[b]).map(pname);
   const placed = !!week.placed_at;
+  const lock = lockState(week.lock_at);
+  const locked = !!lock?.locked;
   const canMark = isAdmin || (!!me && week.payer_id === me);
 
   return (
@@ -66,6 +75,13 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         <div>
           <h2 className="week-title">Week {week.n}</h2>
           <p className="sub">Started {fmtDate(week.start_date)}</p>
+          {lock ? (
+            <p className={`lock-line${locked ? ' is-locked' : lock.soon ? ' is-soon' : ''}`}>
+              {locked ? `Picks locked ${lock.label}` : `Picks lock ${lock.label} · ${lock.countdown} left`}
+            </p>
+          ) : isAdmin && openSettings ? (
+            <button type="button" className="link" style={{ padding: 0 }} onClick={openSettings}>Set a pick deadline</button>
+          ) : null}
         </div>
         <div className="payer">
           <span className="dot" aria-hidden="true" />
@@ -99,7 +115,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
           {legs.length === 0 && <li className="leg-empty">No legs yet. First one in sets the tone.</li>}
           {legs.map((l) => {
             const mine = me && l.player_id === me;
-            const canEdit = isAdmin || (mine && !l.result);
+            const canEdit = isAdmin || (mine && !l.result && !locked);
             return (
               <li key={l.id} className={`leg${l.result ? ' is-' + l.result : ''}`}>
                 <span className="leg-who">{pname(l.player_id)}<Belt on={beltId === l.player_id} />{mine && <span className="you"> {'·'} you</span>}</span>
@@ -170,8 +186,9 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
 
       {missing.length > 0 ? (
         <div className="waiting">
-          <span className="label-sm">Still waiting on</span>
-          <div className="chips">{missing.map((p) => <span key={p.id} className="chip">{p.name}</span>)}</div>
+          <span className="label-sm">{locked ? 'Missed the deadline' : 'Still waiting on'}</span>
+          <div className="chips">{missing.map((p) => <span key={p.id} className={`chip${locked ? ' late' : ''}`}>{p.name}</span>)}</div>
+          {locked && <p className="hint">They go in the wheel with anyone who misses.</p>}
         </div>
       ) : legs.length > 0 ? <p className="allin">Everyone{'’'}s in. Time to place it.</p> : null}
 
@@ -182,6 +199,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         options={editing ? [] : (isAdmin ? missing : missing.filter((p) => p.id === me))}
         me={me}
         isAdmin={isAdmin}
+        locked={locked}
         pname={pname}
         onDone={() => { setEditing(null); reload(); }}
         onCancel={() => setEditing(null)}
@@ -214,7 +232,7 @@ function PayoutForm({ week, projected, act }) {
   );
 }
 
-function LegForm({ week, editing, options, me, isAdmin, pname, onDone, onCancel }) {
+function LegForm({ week, editing, options, me, isAdmin, locked, pname, onDone, onCancel }) {
   const draftKey = 'bz-draft-' + week.id;
   const draft = editing ? null : store.get(draftKey, null);
   const [player, setPlayer] = useState(editing ? editing.player_id : (draft && options.some((p) => p.id === draft.player) ? draft.player : options[0]?.id || ''));
@@ -232,6 +250,9 @@ function LegForm({ week, editing, options, me, isAdmin, pname, onDone, onCancel 
     }
   }, [editing]);
 
+  if (locked && !isAdmin) {
+    return options.length ? <p className="note">Picks are locked for this week. Ask the commish if you need a change.</p> : null;
+  }
   if (!editing && !options.length) {
     if (!isAdmin && !me) return <p className="note">Pick your name in Settings to add your own leg.</p>;
     return null;
@@ -260,6 +281,7 @@ function LegForm({ week, editing, options, me, isAdmin, pname, onDone, onCancel 
   return (
     <form ref={formRef} className="card stack" onSubmit={submit} noValidate>
       <h3 className="sec-title-sm">{editing ? `Edit ${pname(editing.player_id)}’s leg` : player === me ? 'Add your leg' : 'Add a leg'}</h3>
+      {locked && <p className="hint">Picks are locked. As an admin you can still add or fix legs.</p>}
       {!editing && options.length > 1 && (
         <div className="field">
           <label htmlFor="f-player">Whose leg</label>

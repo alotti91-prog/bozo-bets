@@ -8,6 +8,16 @@ const now = () => new Date().toISOString();
 const daysAgo = (d) => new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
 
 const L = 'demo-league';
+// Next time the weekly deadline comes around (viewer's local time is fine for the demo).
+function nextLock(dow, hhmm) {
+  if (dow == null) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  const t = new Date(); t.setHours(h, m, 0, 0);
+  t.setDate(t.getDate() + ((dow - t.getDay() + 7) % 7));
+  if (t <= new Date()) t.setDate(t.getDate() + 7);
+  return t.toISOString();
+}
+const lockAt = () => nextLock(db.leagues[0].lock_dow, db.leagues[0].lock_time || '12:55');
 const names = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris', 'T-Bone'];
 const P = names.map((n, i) => ({ id: 'p' + (i + 1), league_id: L, name: n, active: true, sort: i, created_at: now() }));
 const W = [1, 2, 3, 4].map((n) => ({ id: 'w' + n, league_id: L, n: n + 3, start_date: daysAgo(35 - n * 7), stake: 10, payer_id: null, actual_payout: null, created_at: now() }));
@@ -15,7 +25,7 @@ W[0].payer_id = 'p1'; W[1].payer_id = 'p5'; W[2].payer_id = 'p3'; W[3].payer_id 
 const leg = (w, p, pick, odds, sport, result) => ({ id: id(), week_id: w, league_id: L, player_id: p, pick, odds, sport, result, created_by: uid, created_at: now(), updated_at: now() });
 
 const db = {
-  leagues: [{ id: L, name: 'Bozo Bets', stake: 10, invite_code: 'DEMO42', created_by: uid, created_at: now() }],
+  leagues: [{ id: L, name: 'Bozo Bets', stake: 10, invite_code: 'DEMO42', created_by: uid, created_at: now(), lock_dow: 0, lock_time: '12:55:00', lock_tz: 'America/New_York' }],
   players: P,
   members: [
     { league_id: L, user_id: uid, role: 'owner', player_id: 'p1', email: 'you@example.com', joined_at: now() },
@@ -40,6 +50,7 @@ const db = {
   reactions: [],
 };
 // A few sample reactions on this week's picks (Sully is the other signed-in member).
+W[3].lock_at = nextLock(0, '12:55');
 db.legs.filter((l) => l.week_id === 'w4').slice(0, 3).forEach((l, i) => {
   db.reactions.push({ leg_id: l.id, league_id: L, user_id: 'u2', emoji: ['🔥', '🤡', '🙏'][i], created_at: now() });
 });
@@ -116,7 +127,7 @@ const rpcs = {
     emit('spins', 'INSERT', s);
     const next = [...db.weeks].filter((x) => x.n > w.n).sort((a, b) => a.n - b.n)[0];
     if (next) { next.payer_id = landed; emit('weeks', 'UPDATE', next); }
-    else { const nw = { id: id(), league_id: L, n: w.n + 1, start_date: new Date().toISOString().slice(0, 10), stake: db.leagues[0].stake, payer_id: landed, actual_payout: null, created_at: now() }; db.weeks.push(nw); emit('weeks', 'INSERT', nw); }
+    else { const nw = { id: id(), league_id: L, n: w.n + 1, start_date: new Date().toISOString().slice(0, 10), stake: db.leagues[0].stake, payer_id: landed, actual_payout: null, lock_at: lockAt(), created_at: now() }; db.weeks.push(nw); emit('weeks', 'INSERT', nw); }
     return s;
   },
   claim_player({ p_player }) { db.members[0].player_id = p_player; emit('members', 'UPDATE', db.members[0]); return null; },
@@ -124,8 +135,8 @@ const rpcs = {
   set_member_role({ p_user, p_role }) { const m = db.members.find((x) => x.user_id === p_user); if (m) m.role = p_role; emit('members', 'UPDATE', m); return null; },
   remove_member({ p_user }) { db.members = db.members.filter((x) => x.user_id !== p_user); emit('members', 'DELETE', {}); return null; },
   regenerate_invite() { db.leagues[0].invite_code = 'NEW' + Math.floor(Math.random() * 900 + 100); emit('leagues', 'UPDATE', db.leagues[0]); return db.leagues[0].invite_code; },
-  start_next_week() { const n = Math.max(...db.weeks.map((x) => x.n)) + 1; const nw = { id: id(), league_id: L, n, start_date: new Date().toISOString().slice(0, 10), stake: db.leagues[0].stake, payer_id: null, actual_payout: null, created_at: now() }; db.weeks.push(nw); emit('weeks', 'INSERT', nw); return nw.id; },
-  new_season() { db.weeks = [{ id: id(), league_id: L, n: 1, start_date: new Date().toISOString().slice(0, 10), stake: db.leagues[0].stake, payer_id: null, actual_payout: null, created_at: now() }]; db.legs = []; db.spins = []; emit('weeks', 'INSERT', db.weeks[0]); return null; },
+  start_next_week() { const n = Math.max(...db.weeks.map((x) => x.n)) + 1; const nw = { id: id(), league_id: L, n, start_date: new Date().toISOString().slice(0, 10), stake: db.leagues[0].stake, payer_id: null, actual_payout: null, lock_at: lockAt(), created_at: now() }; db.weeks.push(nw); emit('weeks', 'INSERT', nw); return nw.id; },
+  new_season() { db.weeks = [{ id: id(), league_id: L, n: 1, start_date: new Date().toISOString().slice(0, 10), stake: db.leagues[0].stake, payer_id: null, actual_payout: null, lock_at: lockAt(), created_at: now() }]; db.legs = []; db.spins = []; emit('weeks', 'INSERT', db.weeks[0]); return null; },
   set_week_number({ p_n }) {
     const cur = [...db.weeks].sort((a, b) => b.n - a.n)[0];
     const others = db.weeks.filter((w) => w !== cur).map((w) => w.n);
@@ -158,6 +169,18 @@ const rpcs = {
     if (p_placed) { w.placed_at = w.placed_at || now(); w.placed_by = uid; w.slip_path = p_slip_path || w.slip_path || null; }
     else { w.placed_at = null; w.placed_by = null; w.slip_path = null; }
     emit('weeks', 'UPDATE', w); return null;
+  },
+  set_deadline({ p_dow, p_time, p_tz }) {
+    const lg = db.leagues[0];
+    lg.lock_dow = p_dow; lg.lock_time = p_dow == null ? null : p_time + ':00'; if (p_tz) lg.lock_tz = p_tz;
+    emit('leagues', 'UPDATE', lg);
+    const cur = [...db.weeks].sort((a, b) => b.n - a.n)[0];
+    if (cur) { cur.lock_at = lockAt(); emit('weeks', 'UPDATE', cur); }
+    return null;
+  },
+  set_week_lock({ p_week, p_lock_at }) {
+    const w = db.weeks.find((x) => x.id === p_week);
+    w.lock_at = p_lock_at; emit('weeks', 'UPDATE', w); return null;
   },
   join_league() { return L; },
   create_league() { return L; },

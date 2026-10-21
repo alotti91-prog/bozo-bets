@@ -93,15 +93,19 @@ The first few emails from a new Gmail sender can land in spam, so tell the group
 
 ## Who can do what
 
-| | Member | Co-commish | Owner |
+| | Member | Admin | Owner |
 |---|---|---|---|
 | See everything | ✓ | ✓ | ✓ |
-| Add, edit, or remove **their own** leg (current week, before it's graded) | ✓ | ✓ | ✓ |
-| Add or edit anyone's leg, grade legs, set the payer, enter the actual payout | | ✓ | ✓ |
-| Spin and re-spin the wheel, add or bench players, open the next week | | ✓ | ✓ |
-| Make someone a co-commish, remove a login, new invite code, new season | | | ✓ |
+| Add, edit, or remove **their own** leg (current week, before it's graded and before the pick deadline) | ✓ | ✓ | ✓ |
+| Add or edit anyone's leg (even after the deadline), grade legs, set the payer, enter the actual payout | | ✓ | ✓ |
+| Spin and re-spin the wheel, add or bench players, open the next week, set the pick deadline | | ✓ | ✓ |
+| Make someone an admin, remove a login, new invite code, new season | | | ✓ |
 
-The database enforces these rules, not just the app's buttons. A regular member can't grade a leg even with a modified app.
+The database enforces these rules, not just the app's buttons. A regular member can't grade a leg or sneak a pick in after the deadline, even with a modified app.
+
+**To make a friend an admin:** they open the invite link and sign in first. Then the owner goes to Settings → People signed in → **Make admin** next to their email.
+
+**Pick deadline:** an admin sets it in Settings → Pick deadline (for example, every Sunday at 12:55 PM). It applies to this week and every new week. Under "Just Week N" you can move one week's deadline, say for Thanksgiving, or turn it off for that week. Anyone without a leg at the deadline is listed under "Missed the deadline" and goes in the wheel by default.
 
 Friends who never sign in still work fine. The commish can add their legs for them.
 

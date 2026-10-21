@@ -57,3 +57,11 @@ People sign in the first time with an emailed code, then can set a password in S
 - *Reactions:* a fixed set (🔥 🙏 🤡 💀) so the row stays tidy on a phone; one of each per person per pick. A trigger fills in league and user, so people can't react as someone else.
 - *Bet placed:* `mark_placed()` lets whoever's on the hook, or the commish, mark it, with an optional screenshot in a private Storage bucket (`slips`, 5 MB, images only). Files sit under `<league id>/`, and Storage rules check league membership. Photos are shrunk in the browser first (≤2000 px JPEG). Replaced screenshots aren't deleted; there's little reason to bother at this size.
 - Supabase can't filter delete events by league, so the app listens for deletes on a few tables unfiltered and reloads.
+
+**2026-10-21 · Pick deadline, and "admin" instead of "co-commish"**
+- A league has one weekly deadline (day, time, time zone) in `leagues`; each week stores its own `lock_at`. New weeks get the next deadline from a trigger (`weeks_fill_lock`), so a one-off change (`set_week_lock`) never leaks into other weeks. Past weeks added from History get no deadline.
+- The time zone is the admin's phone's when they save, so "Sunday 12:55 PM" means what they think it means. Everyone else sees the deadline in their own local time.
+- After the deadline, members can't add, edit, or remove their own leg. The `legs_guard` trigger and the delete policy enforce it, not just the app. Admins can still fix anything, because someone always sends his pick late in the group chat.
+- Anyone with no leg in the current week goes in the wheel by default along with the losers (the admin can still change the pool before spinning). Without this, skipping your pick would be a free pass out of the wheel.
+- The button and role label say "Admin" because that's the word people look for. The rights are the same as before.
+

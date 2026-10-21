@@ -3,6 +3,7 @@ import { dec, amerFmt, fmtOdds, parseOdds, weekInfo, money, signed } from './odd
 import { standings, hitPct, bozoBelt } from './stats.js';
 import { indexAt, targetRotation, restRotation, wheelContext, TAU } from './wheel.js';
 import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
+import { countdown, lockState, toLocalInput } from './deadline.js';
 
 describe('odds', () => {
   it('converts American odds to decimal', () => {
@@ -125,6 +126,30 @@ describe('Bozo Belt', () => {
   });
 });
 
+describe('deadline', () => {
+  const H = 3600e3;
+  it('formats the countdown', () => {
+    expect(countdown(2 * 24 * H + 4 * H + 5e3)).toBe('2d 4h');
+    expect(countdown(3 * H + 12 * 60e3)).toBe('3h 12m');
+    expect(countdown(12 * 60e3)).toBe('12m');
+    expect(countdown(20e3)).toBe('under a minute');
+  });
+  it('knows when a week is locked', () => {
+    const now = Date.UTC(2026, 9, 21, 16, 0);
+    expect(lockState(null, now)).toBe(null);
+    const open = lockState(new Date(now + 90 * 60e3).toISOString(), now);
+    expect(open.locked).toBe(false);
+    expect(open.soon).toBe(true);
+    expect(open.countdown).toBe('1h 30m');
+    expect(lockState(new Date(now - 1000).toISOString(), now).locked).toBe(true);
+  });
+  it('round-trips a datetime-local value', () => {
+    const d = new Date(2026, 9, 25, 12, 55);
+    expect(toLocalInput(d)).toBe('2026-10-25T12:55');
+    expect(new Date(toLocalInput(d)).getTime()).toBe(d.getTime());
+  });
+});
+
 describe('NFL week', () => {
   const at = (y, m, d) => nflWeek(new Date(y, m - 1, d));
   it('finds the current week of the 2026 season', () => {
@@ -169,5 +194,8 @@ describe('wheel', () => {
     const ready = wheelContext({ weeks, legs: [L('w2', 'a', -110, 'L'), L('w2', 'b', -110, 'W')], spins });
     expect(ready.mode).toBe('ready');
     expect(ready.losers).toEqual(['a']);
+    const players = [{ id: 'a', active: true }, { id: 'b', active: true }, { id: 'c', active: true }, { id: 'd', active: false }];
+    const withShows = wheelContext({ weeks, legs: [L('w2', 'a', -110, 'L'), L('w2', 'b', -110, 'W')], spins, players });
+    expect(withShows.noShows).toEqual(['c']);
   });
 });

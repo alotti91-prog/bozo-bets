@@ -27,8 +27,9 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent }) {
   const confirmRespin = confirmFor != null && confirmFor === ctx.last?.week.id;
   const setConfirmRespin = (on) => setConfirmFor(on ? ctx.last?.week.id ?? null : null);
 
+  const inWheel = ctx.mode === 'none' ? [] : [...new Set([...ctx.losers, ...ctx.noShows])];
   const defaultPool = ctx.mode === 'ready'
-    ? sortIds(ctx.losers.length ? ctx.losers : data.players.filter((p) => p.active).map((p) => p.id))
+    ? sortIds(inWheel.length ? inWheel : data.players.filter((p) => p.active).map((p) => p.id))
     : [];
   const pool = poolSel && poolSel.week === weekId ? poolSel.ids : defaultPool;
 
@@ -72,7 +73,7 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent }) {
     restAt = ctx.last.spin.pool.indexOf(ctx.last.spin.landed_id);
     restKey = ctx.last.spin.id;
   } else if (ctx.mode === 'waiting') {
-    names = sortIds(ctx.losers.length ? ctx.losers : data.players.filter((p) => p.active).map((p) => p.id)).map(pname);
+    names = sortIds(inWheel.length ? inWheel : data.players.filter((p) => p.active).map((p) => p.id)).map(pname);
   }
 
   // Hide the spin that's still animating so the log doesn't spoil the result.
@@ -86,8 +87,11 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent }) {
           <>
             <h2 className="sec-title">Week {ctx.week.n} wheel</h2>
             <p className="sub">
-              {ctx.losers.length
-                ? `${listNames(sortIds(ctx.losers).map(pname))}${ctx.losers.length > 1 ? ' all' : ''} missed. Spin to see who puts in ${dollars(data.league.stake)} for Week ${ctx.week.n + 1}.`
+              {inWheel.length
+                ? `${[
+                    ctx.losers.length ? `${listNames(sortIds(ctx.losers).map(pname))} missed` : '',
+                    ctx.noShows.length ? `${listNames(sortIds(ctx.noShows).map(pname))} didn’t put in a leg` : '',
+                  ].filter(Boolean).join(', and ')}. Spin to see who puts in ${dollars(data.league.stake)} for Week ${ctx.week.n + 1}.`
                 : `Nobody missed, so everyone goes in the wheel for Week ${ctx.week.n + 1}.`}
             </p>
           </>

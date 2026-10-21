@@ -3,6 +3,7 @@ import { supabase, friendly } from '../lib/supabase.js';
 import { toast, shareText, store } from '../lib/ui.js';
 import { Sheet, IconShare } from '../components/common.jsx';
 import { nflWeek } from '../lib/nfl.js';
+import { DAYS, lockState, toLocalInput } from '../lib/deadline.js';
 
 export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, reload, onClose, onChangePlayer, leagues, onSwitchLeague, onAddLeague, onSignOut }) {
   const [confirm, setConfirm] = useState(null);
@@ -23,7 +24,7 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
       <section style={{ borderTop: 0, paddingTop: 0 }}>
         <span className="lbl">You</span>
         <p>{member?.player_id ? <>You{'’'}re <strong>{pname(member.player_id)}</strong> in {league.name}.</> : 'You’re not linked to a player yet.'}{' '}
-          <span className="role">{member?.role === 'owner' ? 'Owner' : member?.role === 'admin' ? 'Co-commish' : 'Member'}</span>
+          <span className="role">{member?.role === 'owner' ? 'Owner' : member?.role === 'admin' ? 'Admin' : 'Member'}</span>
         </p>
         <div className="btns">
           <button className="btn small" onClick={onChangePlayer}>{member?.player_id ? 'I’m someone else' : 'Pick my name'}</button>
@@ -55,6 +56,7 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
         <p className="fine" style={{ userSelect: 'all', overflowWrap: 'anywhere' }}>{inviteLink}</p>
       </section>
 
+      {isAdmin && <DeadlineForm key={`${league.lock_dow}-${league.lock_time}-${data.weeks[data.weeks.length - 1]?.lock_at}`} data={data} reload={reload} />}
       {isAdmin && <LeagueForm league={league} reload={reload} />}
       {isAdmin && <PlayersForm data={data} reload={reload} />}
 
@@ -65,7 +67,7 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
             <div className="member" key={m.user_id}>
               <div className="member-top">
                 <span className="member-email">{m.email || 'Signed-in member'}{m.user_id === userId ? ' (you)' : ''}</span>
-                <span className="role">{m.role === 'owner' ? 'Owner' : m.role === 'admin' ? 'Co-commish' : 'Member'}</span>
+                <span className="role">{m.role === 'owner' ? 'Owner' : m.role === 'admin' ? 'Admin' : 'Member'}</span>
               </div>
               <div className="p-row">
                 <select aria-label={`Player for ${m.email || 'member'}`} value={m.player_id || ''}
@@ -76,8 +78,8 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
               </div>
               {isOwner && m.role !== 'owner' && (
                 <div className="btns">
-                  <button className="btn small" onClick={() => rpc('set_member_role', { p_league: league.id, p_user: m.user_id, p_role: m.role === 'admin' ? 'member' : 'admin' }, m.role === 'admin' ? 'No longer a co-commish.' : 'Now a co-commish.')}>
-                    {m.role === 'admin' ? 'Remove co-commish' : 'Make co-commish'}
+                  <button className="btn small" onClick={() => rpc('set_member_role', { p_league: league.id, p_user: m.user_id, p_role: m.role === 'admin' ? 'member' : 'admin' }, m.role === 'admin' ? 'No longer an admin.' : 'Now an admin.')}>
+                    {m.role === 'admin' ? 'Remove admin' : 'Make admin'}
                   </button>
                   {confirm === 'rm:' + m.user_id ? (
                     <>
@@ -89,7 +91,7 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
               )}
             </div>
           ))}
-          <p className="fine">Co-commishes can grade legs, spin the wheel, and edit players. Only the owner changes roles.</p>
+          <p className="fine">Admins (co-commishes) can grade legs, spin the wheel, set the deadline, and edit players. Only the owner makes or removes admins. Someone has to open the invite and sign in before they show up here.</p>
         </section>
       )}
 
@@ -169,6 +171,76 @@ function PasswordForm() {
       </form>
     </section>
   );
+}
+
+function DeadlineForm({ data, reload }) {
+  const league = data.league;
+  const cur = data.weeks[data.weeks.length - 1];
+  const myTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+  const [dow, setDow] = useState(league.lock_dow == null ? '' : String(league.lock_dow));
+  const [time, setTime] = useState((league.lock_time || '12:55').slice(0, 5));
+  const [one, setOne] = useState(cur?.lock_at ? toLocalInput(new Date(cur.lock_at)) : '');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const lock = cur ? lockState(cur.lock_at) : null;
+  const on = league.lock_dow != null;
+  const changed = dow !== (on ? String(league.lock_dow) : '') || (dow !== '' && time !== (league.lock_time || '').slice(0, 5));
+
+  async function call(fn, args, ok) {
+    setBusy(true); setErr('');
+    const { error } = await supabase.rpc(fn, args);
+    setBusy(false);
+    if (error) { setErr(friendly(error)); return; }
+    toast(ok);
+    reload();
+  }
+  function save(e) {
+    e.preventDefault();
+    if (dow !== '' && !/^\d{2}:\d{2}$/.test(time)) { setErr('Pick a time.'); return; }
+    call('set_deadline', { p_league: league.id, p_dow: dow === '' ? null : Number(dow), p_time: dow === '' ? null : time, p_tz: myTz },
+      dow === '' ? 'Deadline turned off.' : `Picks now lock ${DAYS[dow]}s at ${fmtTime(time)}.`);
+  }
+  function saveOne(e) {
+    e.preventDefault();
+    const d = new Date(one);
+    if (!one || isNaN(d)) { setErr('Pick a date and time for this week.'); return; }
+    call('set_week_lock', { p_week: cur.id, p_lock_at: d.toISOString() }, `Week ${cur.n} now locks ${lockState(d.toISOString()).label}.`);
+  }
+
+  return (
+    <section>
+      <span className="lbl">Pick deadline</span>
+      <p className="sub">After the deadline, people can{'’'}t add or change their own leg. Admins still can. Anyone without a leg goes in the wheel.</p>
+      <form className="stack" onSubmit={save} noValidate>
+        <div className="dl-row">
+          <select aria-label="Deadline day" value={dow} onChange={(e) => setDow(e.target.value)}>
+            <option value="">No deadline</option>
+            {DAYS.map((d, i) => <option key={d} value={i}>Every {d}</option>)}
+          </select>
+          {dow !== '' && <input type="time" aria-label="Deadline time" value={time} onChange={(e) => setTime(e.target.value)} />}
+          <button className="btn small primary" disabled={busy || !changed}>Save</button>
+        </div>
+        <p className="hint">{dow === '' ? 'Sunday 12:55 PM works well: picks close just before the early games.' : `Your time zone (${myTz.replace(/_/g, ' ')}). Applies to this week and every new week.`}</p>
+      </form>
+      {cur && (on || cur.lock_at) && (
+        <form className="stack" onSubmit={saveOne} noValidate>
+          <label htmlFor="one-lock" className="label-sm">Just Week {cur.n}</label>
+          <p className="sub" style={{ marginTop: 0 }}>{lock ? (lock.locked ? `Locked ${lock.label}.` : `Locks ${lock.label}, ${lock.countdown} from now.`) : 'No deadline this week.'} Change it for a holiday or a weird schedule.</p>
+          <div className="dl-row">
+            <input id="one-lock" type="datetime-local" value={one} onChange={(e) => setOne(e.target.value)} />
+            <button className="btn small" disabled={busy || !one}>Save for this week</button>
+            {cur.lock_at && <button type="button" className="link" disabled={busy} onClick={() => { setOne(''); call('set_week_lock', { p_week: cur.id, p_lock_at: null }, `No deadline for Week ${cur.n}.`); }}>No deadline this week</button>}
+          </div>
+        </form>
+      )}
+      {err && <p className="hint err">{err}</p>}
+    </section>
+  );
+}
+
+function fmtTime(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
 function WeekNumberForm({ data, reload }) {

@@ -13,6 +13,7 @@ Run all three checks before saying a change is done.
 
 ## How it fits together
 - `supabase/schema.sql` is the whole backend: tables, row-level security, server functions (`create_league`, `join_league`, `claim_player`, `spin_wheel`, …), and the realtime publication. Keep it re-runnable (`if not exists`, `create or replace`, `drop policy if exists`). Any new rule needs a check in `scripts/sql-dryrun.mjs`, which also checks re-running the file and upgrading from the first version (`scripts/fixtures/schema-v1.sql`). When a function's arguments change, add `drop function if exists` for the old signature and update the grant lists.
+- Pick deadline: `leagues.lock_dow/lock_time/lock_tz` is the weekly rule; `weeks.lock_at` is the per-week deadline (null = none). `week_open()` in SQL and `lockState()` in `src/lib/deadline.js` decide if a week is locked. Admins bypass the lock.
 - Week numbers follow NFL weeks and can have gaps. The current week is always the highest `n`; "last week" means the closest lower `n`. `src/lib/nfl.js` works out the current NFL week.
 - Permissions are enforced in the database. UI checks (`isAdmin`, `me`) only hide buttons.
 - `src/lib/useLeague.js` loads every row for a league and re-fetches on any realtime change. Screens get `data = { league, players, members, weeks, legs, spins, reactions }`.

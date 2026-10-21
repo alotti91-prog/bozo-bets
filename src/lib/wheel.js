@@ -8,7 +8,7 @@ export const TAU = Math.PI * 2;
  * 'ready'   the current week is fully graded and can be spun
  * 'waiting' the current week isn't graded yet; shows last week's result if any
  */
-export function wheelContext({ weeks, legs, spins }) {
+export function wheelContext({ weeks, legs, spins, players = [] }) {
   const c = weeks[weeks.length - 1];
   if (!c) return { mode: 'none' };
   const cl = legs.filter((l) => l.week_id === c.id);
@@ -17,7 +17,10 @@ export function wheelContext({ weeks, legs, spins }) {
   const prevSpins = prev ? spins.filter((s) => s.week_id === prev.id) : [];
   const last = prevSpins.length ? { week: prev, spin: prevSpins[prevSpins.length - 1], count: prevSpins.length } : null;
   const losers = [...new Set(info.losers.map((l) => l.player_id))];
-  return { mode: info.graded ? 'ready' : 'waiting', week: c, info, losers, last, legs: cl };
+  // Active players with no leg this week ("missed the deadline"). They go in
+  // the wheel by default too.
+  const noShows = players.filter((p) => p.active && !cl.some((l) => l.player_id === p.id)).map((p) => p.id);
+  return { mode: info.graded ? 'ready' : 'waiting', week: c, info, losers, noShows, last, legs: cl };
 }
 
 /** Which segment sits under the pointer (top) at rotation r. */

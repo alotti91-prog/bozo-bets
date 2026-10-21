@@ -225,6 +225,51 @@ pw = (await as(A, `select placed_at, slip_path from public.weeks where id = $1`,
 assert.equal(pw.placed_at, null); assert.equal(pw.slip_path, null);
 ok('bet placed: the payer or commish marks it (with a screenshot path in their league); others can’t');
 
+// ---- Pick deadline ---------------------------------------------------------
+const lid4 = (await as(A, `select public.create_league('Deadline', 10, array['Lotti','Sully','Mikey'], 'Lotti', 7) as id`)).rows[0].id;
+const p4 = Object.fromEntries((await as(A, `select id, name from public.players where league_id = $1`, [lid4])).rows.map((r) => [r.name, r.id]));
+const code4 = (await as(A, `select invite_code from public.leagues where id = $1`, [lid4])).rows[0].invite_code;
+await as(B, `select public.join_league($1)`, [code4]);
+await as(B, `select public.claim_player($1, $2)`, [lid4, p4.Sully]);
+const w7 = (await as(A, `select id from public.weeks where league_id = $1`, [lid4])).rows[0].id;
+assert.equal((await as(A, `select lock_at from public.weeks where id = $1`, [w7])).rows[0].lock_at, null);
+
+await fails(B, `select public.set_deadline($1, 0, '12:55', 'America/New_York')`, [lid4], /commish/);
+await fails(A, `select public.set_deadline($1, 0, '12:55', 'Mars/Olympus')`, [lid4], /time zone/);
+await as(A, `select public.set_deadline($1, 0, '12:55', 'America/New_York')`, [lid4]);
+const lk = (await as(A, `select lock_at, extract(dow from lock_at at time zone 'America/New_York')::int dow,
+  to_char(lock_at at time zone 'America/New_York', 'HH24:MI') hm, lock_at > now() future, lock_at <= now() + interval '7 days' soon
+  from public.weeks where id = $1`, [w7])).rows[0];
+assert.equal(lk.dow, 0); assert.equal(lk.hm, '12:55'); assert.ok(lk.future); assert.ok(lk.soon);
+ok('commish sets a weekly deadline; this week locks on the next Sunday 12:55 PM Eastern');
+
+await as(B, `insert into public.legs (week_id, league_id, player_id, pick, odds) values ($1,$2,$3,'Lions ML',-150)`, [w7, lid4, p4.Sully]);
+ok('members can add picks before the deadline');
+
+await as(A, `select public.set_week_lock($1, now() - interval '1 minute')`, [w7]);
+await fails(B, `update public.legs set pick = 'Lions -3' where player_id = $1`, [p4.Sully], /locked/);
+await fails(B, `insert into public.legs (week_id, league_id, player_id, pick, odds) values ($1,$2,$3,'Late',-110)`, [w7, lid4, p4.Mikey]);
+await as(B, `delete from public.legs where player_id = $1`, [p4.Sully]); // blocked by the rules: 0 rows
+assert.equal((await as(A, `select count(*)::int c from public.legs where week_id = $1`, [w7])).rows[0].c, 1);
+await as(A, `insert into public.legs (week_id, league_id, player_id, pick, odds) values ($1,$2,$3,'Commish add',-110)`, [w7, lid4, p4.Mikey]);
+ok('after the deadline members can’t add, edit, or remove; the commish still can');
+
+await fails(B, `select public.set_week_lock($1, null)`, [w7], /commish/);
+await as(A, `select public.set_week_lock($1, null)`, [w7]);
+await as(B, `update public.legs set pick = 'Lions -3' where player_id = $1`, [p4.Sully]);
+ok('commish can turn off one week’s deadline');
+
+// Next week opened by a spin picks up the rule automatically, in the future.
+await as(A, `update public.legs set result = 'L' where week_id = $1`, [w7]);
+await as(A, `select public.spin_wheel($1, $2::uuid[])`, [w7, [p4.Sully]]);
+const w8 = (await as(A, `select lock_at, lock_at > now() future, extract(dow from lock_at at time zone 'America/New_York')::int dow from public.weeks where league_id = $1 and n = 8`, [lid4])).rows[0];
+assert.ok(w8.lock_at && w8.future); assert.equal(w8.dow, 0);
+ok('a week opened by the wheel gets the next deadline on its own');
+
+await as(A, `select public.set_deadline($1, null, null, null)`, [lid4]);
+assert.equal((await as(A, `select lock_at from public.weeks where league_id = $1 and n = 8`, [lid4])).rows[0].lock_at, null);
+ok('turning the deadline off clears it for the current week');
+
 // ---- Re-running the setup file, and upgrading from the first version ----
 const before = (await db.query(`select (select count(*) from public.legs)::int legs, (select count(*) from public.weeks)::int weeks`)).rows[0];
 await db.exec(schema);
