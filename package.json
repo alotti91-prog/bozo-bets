@@ -11,8 +11,7 @@
     "test": "vitest run",
     "test:sql": "node scripts/sql-dryrun.mjs",
     "demo": "vite --mode demo",
-    "build:demo": "vite build --mode demo --outDir dist-demo",
-    "test:import": "node scripts/import-dryrun.mjs"
+    "build:demo": "vite build --mode demo --outDir dist-demo"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

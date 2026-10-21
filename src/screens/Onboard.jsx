@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase, friendly } from '../lib/supabase.js';
 import { Brand } from '../components/common.jsx';
+import { nflWeek } from '../lib/nfl.js';
 
 /** No league yet: join one with a code, or start one. */
 export default function Onboard({ onJoined, onSignOut, hasLeagues, onCancel }) {
@@ -12,6 +13,8 @@ export default function Onboard({ onJoined, onSignOut, hasLeagues, onCancel }) {
   const [me, setMe] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [nowWeek] = useState(() => nflWeek().week);
+  const [startWeek, setStartWeek] = useState(() => String(nflWeek().week));
 
   const list = [...new Set(names.split(/[\n,]+/).map((s) => s.trim().slice(0, 24)).filter(Boolean))];
 
@@ -32,8 +35,10 @@ export default function Onboard({ onJoined, onSignOut, hasLeagues, onCancel }) {
     if (!name.trim()) { setErr('Give the league a name.'); return; }
     if (!(s > 0)) { setErr('Stake needs to be a dollar amount, like 10.'); return; }
     if (list.length < 2) { setErr('Add at least two names, one per line.'); return; }
+    const wk = parseInt(startWeek, 10);
+    if (!(wk >= 1 && wk <= 30)) { setErr('Starting week needs to be a number from 1 to 30.'); return; }
     setBusy(true); setErr('');
-    const { data, error } = await supabase.rpc('create_league', { p_name: name.trim(), p_stake: s, p_players: list, p_my_name: me || null });
+    const { data, error } = await supabase.rpc('create_league', { p_name: name.trim(), p_stake: s, p_players: list, p_my_name: me || null, p_first_week: wk });
     setBusy(false);
     if (error) { setErr(friendly(error)); return; }
     onJoined(data);
@@ -76,6 +81,11 @@ export default function Onboard({ onJoined, onSignOut, hasLeagues, onCancel }) {
             <label htmlFor="lg-stake">Weekly stake ($)</label>
             <input id="lg-stake" inputMode="decimal" value={stake} onChange={(e) => setStake(e.target.value)} />
           </div>
+        </div>
+        <div className="field">
+          <label htmlFor="lg-week">Starting week</label>
+          <input id="lg-week" inputMode="numeric" value={startWeek} onChange={(e) => setStartWeek(e.target.value.replace(/\D/g, '').slice(0, 2))} style={{ maxWidth: 120 }} />
+          <p className="hint">It’s NFL Week {nowWeek} right now. Started late? Add earlier weeks any time from History.</p>
         </div>
         {err && <p className="hint err">{err}</p>}
         <button className="btn block" disabled={busy}>Start the league</button>

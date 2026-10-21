@@ -10,7 +10,7 @@ const daysAgo = (d) => new Date(Date.now() - d * 864e5).toISOString().slice(0, 1
 const L = 'demo-league';
 const names = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris', 'T-Bone'];
 const P = names.map((n, i) => ({ id: 'p' + (i + 1), league_id: L, name: n, active: true, sort: i, created_at: now() }));
-const W = [1, 2, 3, 4].map((n) => ({ id: 'w' + n, league_id: L, n, start_date: daysAgo(35 - n * 7), stake: 10, payer_id: null, actual_payout: null, created_at: now() }));
+const W = [1, 2, 3, 4].map((n) => ({ id: 'w' + n, league_id: L, n: n + 3, start_date: daysAgo(35 - n * 7), stake: 10, payer_id: null, actual_payout: null, created_at: now() }));
 W[0].payer_id = 'p1'; W[1].payer_id = 'p5'; W[2].payer_id = 'p3'; W[3].payer_id = 'p4';
 const leg = (w, p, pick, odds, sport, result) => ({ id: id(), week_id: w, league_id: L, player_id: p, pick, odds, sport, result, created_by: uid, created_at: now(), updated_at: now() });
 
@@ -104,7 +104,7 @@ const rpcs = {
     const s = { id: id(), week_id: w.id, league_id: L, pool, landed_id: landed, spun_by: uid, created_at: now() };
     db.spins.push(s);
     emit('spins', 'INSERT', s);
-    const next = db.weeks.find((x) => x.n === w.n + 1);
+    const next = [...db.weeks].filter((x) => x.n > w.n).sort((a, b) => a.n - b.n)[0];
     if (next) { next.payer_id = landed; emit('weeks', 'UPDATE', next); }
     else { const nw = { id: id(), league_id: L, n: w.n + 1, start_date: new Date().toISOString().slice(0, 10), stake: db.leagues[0].stake, payer_id: landed, actual_payout: null, created_at: now() }; db.weeks.push(nw); emit('weeks', 'INSERT', nw); }
     return s;
@@ -116,6 +116,33 @@ const rpcs = {
   regenerate_invite() { db.leagues[0].invite_code = 'NEW' + Math.floor(Math.random() * 900 + 100); emit('leagues', 'UPDATE', db.leagues[0]); return db.leagues[0].invite_code; },
   start_next_week() { const n = Math.max(...db.weeks.map((x) => x.n)) + 1; const nw = { id: id(), league_id: L, n, start_date: new Date().toISOString().slice(0, 10), stake: db.leagues[0].stake, payer_id: null, actual_payout: null, created_at: now() }; db.weeks.push(nw); emit('weeks', 'INSERT', nw); return nw.id; },
   new_season() { db.weeks = [{ id: id(), league_id: L, n: 1, start_date: new Date().toISOString().slice(0, 10), stake: db.leagues[0].stake, payer_id: null, actual_payout: null, created_at: now() }]; db.legs = []; db.spins = []; emit('weeks', 'INSERT', db.weeks[0]); return null; },
+  set_week_number({ p_n }) {
+    const cur = [...db.weeks].sort((a, b) => b.n - a.n)[0];
+    const others = db.weeks.filter((w) => w !== cur).map((w) => w.n);
+    if (others.length && p_n <= Math.max(...others)) throw new Error(`This week has to come after Week ${Math.max(...others)}, your latest past week`);
+    cur.n = p_n; emit('weeks', 'UPDATE', cur); return null;
+  },
+  save_past_week({ p_week, p_n, p_start, p_payer, p_legs }) {
+    let w;
+    if (p_week) {
+      w = db.weeks.find((x) => x.id === p_week);
+      w.payer_id = p_payer;
+      db.legs = db.legs.filter((l) => l.week_id !== w.id);
+    } else {
+      if (db.weeks.some((x) => x.n === p_n)) throw new Error(`Week ${p_n} is already in the league. Edit it from History instead.`);
+      w = { id: id(), league_id: L, n: p_n, start_date: p_start, stake: db.leagues[0].stake, payer_id: p_payer, actual_payout: null, created_at: now() };
+      db.weeks.push(w);
+    }
+    p_legs.forEach((l) => db.legs.push(leg(w.id, l.player_id, l.pick, l.odds, l.sport || 'NFL', l.result)));
+    emit('weeks', 'UPDATE', w); emit('legs', 'INSERT', {});
+    return w.id;
+  },
+  delete_past_week({ p_week }) {
+    db.weeks = db.weeks.filter((w) => w.id !== p_week);
+    db.legs = db.legs.filter((l) => l.week_id !== p_week);
+    db.spins = db.spins.filter((s) => s.week_id !== p_week);
+    emit('weeks', 'DELETE', {}); return null;
+  },
   join_league() { return L; },
   create_league() { return L; },
 };

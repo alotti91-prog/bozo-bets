@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase, friendly } from '../lib/supabase.js';
 import { toast, shareText } from '../lib/ui.js';
 import { Sheet, IconShare } from '../components/common.jsx';
+import { nflWeek } from '../lib/nfl.js';
 
 export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, reload, onClose, onChangePlayer, leagues, onSwitchLeague, onAddLeague, onSignOut }) {
   const [confirm, setConfirm] = useState(null);
@@ -93,6 +94,7 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
       {isAdmin && (
         <section>
           <span className="lbl">Weeks</span>
+          <WeekNumberForm data={data} reload={reload} />
           {confirm === 'next' ? (
             <div className="confirm-box">
               <p>Open the next week without spinning? You{'’'}ll pick who puts in by hand.</p>
@@ -104,9 +106,9 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
           ) : <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setConfirm('next')}>Open next week without spinning</button>}
           {isOwner && (confirm === 'season' ? (
             <div className="confirm-box">
-              <p>Delete every week, pick, and spin, and start over at Week 1? Players and logins stay. This can{'’'}t be undone.</p>
+              <p>Delete every week, pick, and spin, and start over at Week {nflWeek().week} (the current NFL week)? Players and logins stay. This can{'’'}t be undone.</p>
               <div className="btns">
-                <button className="btn small nose" onClick={() => { setConfirm(null); rpc('new_season', { p_league: league.id }, 'New season started.'); }}>Delete and restart</button>
+                <button className="btn small nose" onClick={() => { setConfirm(null); rpc('new_season', { p_league: league.id, p_first_week: nflWeek().week }, 'New season started.'); }}>Delete and restart</button>
                 <button className="btn small" onClick={() => setConfirm(null)}>Keep everything</button>
               </div>
             </div>
@@ -114,6 +116,40 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
         </section>
       )}
     </Sheet>
+  );
+}
+
+function WeekNumberForm({ data, reload }) {
+  const weeks = data.weeks;
+  const cur = weeks[weeks.length - 1];
+  const pastMax = weeks.length > 1 ? weeks[weeks.length - 2].n : 0;
+  const [n, setN] = useState(cur ? String(cur.n) : '');
+  const [err, setErr] = useState('');
+  const now = nflWeek().week;
+  if (!cur) return null;
+  async function save(e) {
+    e.preventDefault();
+    const v = parseInt(n, 10);
+    if (!(v >= 1 && v <= 30)) { setErr('Use a number from 1 to 30.'); return; }
+    if (v <= pastMax) { setErr(`This week has to come after Week ${pastMax}, your latest past week.`); return; }
+    setErr('');
+    const { error } = await supabase.rpc('set_week_number', { p_league: data.league.id, p_n: v });
+    if (error) { setErr(friendly(error)); return; }
+    toast(`This week is now Week ${v}.`);
+    reload();
+  }
+  return (
+    <form className="stack" onSubmit={save} noValidate>
+      <div className="field">
+        <label htmlFor="cur-week">This week{'’'}s number</label>
+        <div className="p-row">
+          <input id="cur-week" inputMode="numeric" value={n} onChange={(e) => setN(e.target.value.replace(/\D/g, '').slice(0, 2))} style={{ maxWidth: 120 }} />
+          <button className="btn small" type="submit" disabled={String(cur.n) === n}>Save</button>
+        </div>
+        <p className="hint">It{'’'}s NFL Week {now} right now.{cur.n !== now ? ` Your league is on Week ${cur.n}.` : ''} Add earlier weeks from History.</p>
+      </div>
+      {err && <p className="hint err">{err}</p>}
+    </form>
   );
 }
 

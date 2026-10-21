@@ -7,13 +7,13 @@ Weekly group-parlay tracker for a group of friends. React (Vite, plain JavaScrip
 - `npm run dev`: run against Supabase (needs `.env.local`, see `.env.example`)
 - `npm test`: unit tests for odds, standings, and wheel math (`src/lib/logic.test.js`)
 - `npm run test:sql`: runs `supabase/schema.sql` in PGlite and checks the permission rules
-- `npm run test:import`: runs the 2026 Weeks 1-3 history import against a throwaway copy of the database
 - `npm run build`: production build
 
 Run all three checks before saying a change is done.
 
 ## How it fits together
-- `supabase/schema.sql` is the whole backend: tables, row-level security, server functions (`create_league`, `join_league`, `claim_player`, `spin_wheel`, …), and the realtime publication. Keep it re-runnable (`if not exists`, `create or replace`, `drop policy if exists`). Any new rule needs a check in `scripts/sql-dryrun.mjs`.
+- `supabase/schema.sql` is the whole backend: tables, row-level security, server functions (`create_league`, `join_league`, `claim_player`, `spin_wheel`, …), and the realtime publication. Keep it re-runnable (`if not exists`, `create or replace`, `drop policy if exists`). Any new rule needs a check in `scripts/sql-dryrun.mjs`, which also checks re-running the file and upgrading from the first version (`scripts/fixtures/schema-v1.sql`). When a function's arguments change, add `drop function if exists` for the old signature and update the grant lists.
+- Week numbers follow NFL weeks and can have gaps. The current week is always the highest `n`; "last week" means the closest lower `n`. `src/lib/nfl.js` works out the current NFL week.
 - Permissions are enforced in the database. UI checks (`isAdmin`, `me`) only hide buttons.
 - `src/lib/useLeague.js` loads every row for a league and re-fetches on any realtime change. Screens get `data = { league, players, members, weeks, legs, spins }`.
 - Pure logic lives in `src/lib/odds.js`, `stats.js`, and `wheel.js`, with tests. Put new math there, not in components.

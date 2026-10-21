@@ -43,8 +43,8 @@ The Vercel Supabase integration names its variables `SUPABASE_URL` and `SUPABASE
 **2026-10-20 · Demo mode**
 `npm run demo` swaps in an in-memory fake of Supabase with sample data, so anyone can work on screens without setting up a backend. `vite.config.js` swaps it out of real builds.
 
-**2026-10-21 · Imported 2026 Weeks 1-3 from the old Google Sheet**
-`supabase/imports/2026-weeks-1-3.sql` adds the sheet's three filled-in weeks as Weeks 1-3 and renumbers the open week to 7, so app week numbers match NFL weeks like the sheet's did. It stops before changing anything if a sheet name isn't in the league, to avoid duplicate players. The gray "Puka 70+" was a void, so it's stored as a push with placeholder odds (−110), and pushes are now left out of average odds. Payers and wheel spins weren't in the sheet, so those weeks have none. `npm run test:import` checks it.
-
 **2026-10-21 · "Solo $100" standings column**
 The sheet tracked each person's running profit as if they'd bet $100 on their own leg alone. Standings now shows the same number (win: the payout on $100, loss: −$100, push: $0), and a test checks it against the sheet's totals.
+
+**2026-10-21 · Weeks follow the NFL calendar; past weeks are entered in the app**
+New leagues start at the current NFL week (worked out in `src/lib/nfl.js`: weeks run Tuesday to Monday from the Tuesday after Labor Day), editable at setup. The commish can renumber the current week and add, edit, or delete past weeks from History (`save_past_week`, `delete_past_week`, `set_week_number`). This replaced a one-off SQL import of the group's spreadsheet, so any league that starts late can fill in its history. Week numbers can now have gaps, so the wheel's "last week" is the closest earlier week, not `n - 1`. Pushes no longer count toward average odds, so a void entered with placeholder odds doesn't skew anything.

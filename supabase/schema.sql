@@ -238,8 +238,11 @@ create policy "spin read" on public.spins for select to authenticated using (pub
 
 -- ---------- Functions the app calls ----------------------------------
 
--- Start a league: you become the owner, players are created, Week 1 opens.
-create or replace function public.create_league(p_name text, p_stake numeric, p_players text[], p_my_name text default null)
+-- Start a league: you become the owner, players are created, and the first
+-- week opens. p_first_week lets a league start mid-season (the app suggests
+-- the current NFL week).
+drop function if exists public.create_league(text, numeric, text[], text);
+create or replace function public.create_league(p_name text, p_stake numeric, p_players text[], p_my_name text default null, p_first_week int default 1)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare
   uid uuid := auth.uid();
@@ -252,6 +255,7 @@ begin
   if coalesce(trim(p_name), '') = '' then raise exception 'Give the league a name'; end if;
   if p_stake is null or p_stake <= 0 then raise exception 'Stake must be more than $0'; end if;
   if coalesce(array_length(p_players, 1), 0) < 2 then raise exception 'Add at least two players'; end if;
+  if p_first_week is null or p_first_week < 1 or p_first_week > 30 then raise exception 'Starting week must be between 1 and 30'; end if;
 
   insert into public.leagues (name, stake, invite_code, created_by)
   values (left(trim(p_name), 40), p_stake, public.new_invite_code(), uid)
@@ -276,7 +280,7 @@ begin
     end if;
   end if;
 
-  insert into public.weeks (league_id, n, stake) values (lid, 1, p_stake);
+  insert into public.weeks (league_id, n, stake) values (lid, p_first_week, p_stake);
   return lid;
 end $$;
 
@@ -371,13 +375,19 @@ declare
   k int;
   s public.spins;
   next_id uuid;
+  prev_n int;
 begin
   select * into w from public.weeks where id = p_week;
   if w.id is null then raise exception 'That week does not exist'; end if;
   if not public.is_admin(w.league_id) then raise exception 'Only the commish can spin the wheel'; end if;
 
+  -- Week numbers can have gaps (a league that started mid-season, past weeks
+  -- added later), so "last week" means the closest week before the current one.
   select max(n) into latest from public.weeks where league_id = w.league_id;
-  if w.n < latest - 1 then raise exception 'Only this week or last week can be spun'; end if;
+  select max(n) into prev_n from public.weeks where league_id = w.league_id and n < latest;
+  if w.n <> latest and (prev_n is null or w.n <> prev_n) then
+    raise exception 'Only this week or last week can be spun';
+  end if;
   if w.n = latest then
     if not exists (select 1 from public.legs where week_id = w.id) then
       raise exception 'No legs this week yet';
@@ -407,7 +417,7 @@ begin
   values (w.id, w.league_id, pool, pool[k], auth.uid())
   returning * into s;
 
-  select id into next_id from public.weeks where league_id = w.league_id and n = w.n + 1;
+  select id into next_id from public.weeks where league_id = w.league_id and n > w.n order by n limit 1;
   if next_id is null then
     insert into public.weeks (league_id, n, stake, payer_id)
     select w.league_id, w.n + 1, l.stake, pool[k] from public.leagues l where l.id = w.league_id;
@@ -432,19 +442,107 @@ begin
   return wid;
 end $$;
 
--- Owner tool: wipe every week and start over at Week 1. Players stay.
-create or replace function public.new_season(p_league uuid)
+-- Owner tool: wipe every week and start over. Players stay.
+drop function if exists public.new_season(uuid);
+create or replace function public.new_season(p_league uuid, p_first_week int default 1)
 returns void language plpgsql security definer set search_path = public as $$
 begin
   if not public.is_owner(p_league) then raise exception 'Only the league owner can start a new season'; end if;
+  if p_first_week is null or p_first_week < 1 or p_first_week > 30 then raise exception 'Starting week must be between 1 and 30'; end if;
   delete from public.weeks where league_id = p_league;
-  insert into public.weeks (league_id, n, stake) select p_league, 1, stake from public.leagues where id = p_league;
+  insert into public.weeks (league_id, n, stake) select p_league, p_first_week, stake from public.leagues where id = p_league;
+end $$;
+
+-- Commish tool: change the current week's number (say Week 1 -> Week 7 for a
+-- league that started late). It has to stay after every past week.
+create or replace function public.set_week_number(p_league uuid, p_n int)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  cur_id uuid;
+  other_max int;
+begin
+  if not public.is_admin(p_league) then raise exception 'Only the commish can do that'; end if;
+  if p_n is null or p_n < 1 or p_n > 30 then raise exception 'Week number must be between 1 and 30'; end if;
+  select id into cur_id from public.weeks where league_id = p_league order by n desc limit 1;
+  if cur_id is null then raise exception 'There''s no week to renumber'; end if;
+  select max(n) into other_max from public.weeks where league_id = p_league and id <> cur_id;
+  if other_max is not null and p_n <= other_max then
+    raise exception 'This week has to come after Week %, your latest past week', other_max;
+  end if;
+  update public.weeks set n = p_n where id = cur_id;
+end $$;
+
+-- Commish tool: add or edit a past week in one go. p_week null = new week
+-- numbered p_n (must come before the current week). Editing replaces that
+-- week's picks with p_legs: [{player_id, pick, odds, sport, result}].
+create or replace function public.save_past_week(p_league uuid, p_week uuid, p_n int, p_start date, p_payer uuid, p_legs jsonb)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  cur_id uuid;
+  cur_n int;
+  wid uuid;
+  w public.weeks;
+  leg jsonb;
+  lstake numeric;
+begin
+  if not public.is_admin(p_league) then raise exception 'Only the commish can add past weeks'; end if;
+  select id, n into cur_id, cur_n from public.weeks where league_id = p_league order by n desc limit 1;
+  if cur_id is null then raise exception 'Start the league first'; end if;
+  if p_payer is not null and not exists (select 1 from public.players where id = p_payer and league_id = p_league) then
+    raise exception 'That player is not in this league';
+  end if;
+  if jsonb_typeof(p_legs) is distinct from 'array' then raise exception 'No picks were sent'; end if;
+
+  if p_week is null then
+    if p_n is null or p_n < 1 or p_n >= cur_n then
+      raise exception 'Past weeks have to come before this week (Week %)', cur_n;
+    end if;
+    if exists (select 1 from public.weeks where league_id = p_league and n = p_n) then
+      raise exception 'Week % is already in the league. Edit it from History instead.', p_n;
+    end if;
+    select stake into lstake from public.leagues where id = p_league;
+    insert into public.weeks (league_id, n, start_date, stake, payer_id)
+    values (p_league, p_n, coalesce(p_start, current_date), lstake, p_payer)
+    returning id into wid;
+  else
+    select * into w from public.weeks where id = p_week and league_id = p_league;
+    if w.id is null then raise exception 'That week isn''t in this league'; end if;
+    if w.id = cur_id then raise exception 'Change the current week from This week, not here'; end if;
+    update public.weeks set payer_id = p_payer where id = w.id;
+    delete from public.legs where week_id = w.id;
+    wid := w.id;
+  end if;
+
+  for leg in select value from jsonb_array_elements(p_legs) loop
+    if coalesce(leg->>'result', '') not in ('W', 'L', 'P') then
+      raise exception 'Every pick in a past week needs a result: W, L or P';
+    end if;
+    insert into public.legs (week_id, league_id, player_id, pick, odds, sport, result)
+    values (wid, p_league, (leg->>'player_id')::uuid, left(trim(leg->>'pick'), 80), (leg->>'odds')::int,
+            coalesce(nullif(leg->>'sport', ''), 'NFL'), leg->>'result');
+  end loop;
+  return wid;
+end $$;
+
+-- Commish tool: delete a past week and its picks. The current week can't be deleted.
+create or replace function public.delete_past_week(p_week uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  w public.weeks;
+  cur_id uuid;
+begin
+  select * into w from public.weeks where id = p_week;
+  if w.id is null then raise exception 'That week does not exist'; end if;
+  if not public.is_admin(w.league_id) then raise exception 'Only the commish can delete weeks'; end if;
+  select id into cur_id from public.weeks where league_id = w.league_id order by n desc limit 1;
+  if w.id = cur_id then raise exception 'You can''t delete the current week'; end if;
+  delete from public.weeks where id = w.id;
 end $$;
 
 -- ---------- Permissions on functions ---------------------------------
 
 revoke execute on function
-  public.create_league(text, numeric, text[], text),
+  public.create_league(text, numeric, text[], text, int),
   public.join_league(text),
   public.claim_player(uuid, uuid),
   public.assign_player(uuid, uuid, uuid),
@@ -453,12 +551,15 @@ revoke execute on function
   public.regenerate_invite(uuid),
   public.spin_wheel(uuid, uuid[]),
   public.start_next_week(uuid),
-  public.new_season(uuid),
+  public.new_season(uuid, int),
+  public.set_week_number(uuid, int),
+  public.save_past_week(uuid, uuid, int, date, uuid, jsonb),
+  public.delete_past_week(uuid),
   public.new_invite_code()
 from public, anon;
 
 grant execute on function
-  public.create_league(text, numeric, text[], text),
+  public.create_league(text, numeric, text[], text, int),
   public.join_league(text),
   public.claim_player(uuid, uuid),
   public.assign_player(uuid, uuid, uuid),
@@ -467,7 +568,10 @@ grant execute on function
   public.regenerate_invite(uuid),
   public.spin_wheel(uuid, uuid[]),
   public.start_next_week(uuid),
-  public.new_season(uuid)
+  public.new_season(uuid, int),
+  public.set_week_number(uuid, int),
+  public.save_past_week(uuid, uuid, int, date, uuid, jsonb),
+  public.delete_past_week(uuid)
 to authenticated;
 
 -- ---------- Live updates ---------------------------------------------

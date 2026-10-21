@@ -78,7 +78,8 @@ The first few emails from a new Gmail sender can land in spam, so tell the group
 ### 4. Start your league
 
 1. Open your site, enter your email, and sign in with the link or code.
-2. Choose **Start a league**, list everyone in the bet, pick your own name, and set the stake. You're the owner (commish).
+2. Choose **Start a league**, list everyone in the bet, pick your own name, and set the stake. The starting week fills in with the current NFL week. You're the owner (commish).
+   - **Started the season before using the app?** Open **History → Add a past week** to enter earlier weeks: who put in, plus each person's pick, odds, and W/L/P. Those weeks count in Standings.
 3. Open **Settings** (the gear) and tap **Share invite**. Send it to the group chat. Friends open it, sign in, and pick their name.
 4. Tell everyone to add it to their home screen:
    - **iPhone:** open the site in Safari → Share → **Add to Home Screen**.
@@ -130,7 +131,7 @@ npm run build     # makes sure the site builds
 
 **Using Claude Code:** [`CLAUDE.md`](CLAUDE.md) tells Claude how this project is laid out, and [`DECISIONS.md`](DECISIONS.md) records why things are built the way they are. Add a line to `DECISIONS.md` whenever you make a choice someone might later wonder about.
 
-**Changing the database:** add the change to `supabase/schema.sql` in a way that's safe to run again (`create ... if not exists`, `create or replace`, `drop policy if exists` before `create policy`). Then paste just the new part into the Supabase SQL Editor and run it. Run `npm run test:sql` first.
+**Changing the database:** add the change to `supabase/schema.sql` in a way that's safe to run again (`create ... if not exists`, `create or replace`, `drop policy if exists` before `create policy`). Run `npm run test:sql` first. Then paste the **whole** file into the Supabase SQL Editor and run it. It keeps all existing data.
 
 ---
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { dec, amerFmt, fmtOdds, parseOdds, weekInfo, money, signed } from './odds.js';
 import { standings, hitPct } from './stats.js';
 import { indexAt, targetRotation, restRotation, wheelContext, TAU } from './wheel.js';
+import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
 
 describe('odds', () => {
   it('converts American odds to decimal', () => {
@@ -106,6 +107,27 @@ describe('solo $100 stat matches the old spreadsheet', () => {
     expect(s.rows.Chris.nOdds).toBe(2);
     expect(s.settled).toBe(3);
     expect(s.hits).toBe(0);
+  });
+});
+
+describe('NFL week', () => {
+  const at = (y, m, d) => nflWeek(new Date(y, m - 1, d));
+  it('finds the current week of the 2026 season', () => {
+    expect(at(2026, 9, 8)).toEqual({ season: 2026, week: 1 }); // Tuesday after Labor Day
+    expect(at(2026, 9, 9)).toEqual({ season: 2026, week: 1 }); // kickoff
+    expect(at(2026, 9, 14)).toEqual({ season: 2026, week: 1 }); // Monday night
+    expect(at(2026, 9, 15)).toEqual({ season: 2026, week: 2 });
+    expect(at(2026, 10, 21)).toEqual({ season: 2026, week: 7 });
+    expect(at(2027, 1, 10)).toEqual({ season: 2026, week: 18 });
+  });
+  it('treats the offseason as Week 1 of the next season', () => {
+    expect(at(2027, 7, 4)).toEqual({ season: 2027, week: 1 });
+    expect(at(2026, 8, 20)).toEqual({ season: 2026, week: 1 });
+  });
+  it('dates a week by its Thursday', () => {
+    expect(nflWeekDate(2026, 1)).toBe('2026-09-10');
+    expect(nflWeekDate(2026, 7)).toBe('2026-10-22');
+    expect(seasonOf('2026-10-21')).toBe(2026);
   });
 });
 

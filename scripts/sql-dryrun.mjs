@@ -130,4 +130,93 @@ await as(B, `update public.legs set result = 'W' where week_id = $1`, [w2.id]);
 await fails(A, `select public.set_member_role($1, $2, 'member')`, [lid, A], /owner/);
 ok('owner promotes a co-commish; owner role is protected');
 
+// ---- Starting mid-season, renumbering, and past weeks -------------------
+const lid2 = (await as(A, `select public.create_league('Late Start', 10, array['Lotti','Sully','Mikey'], 'Lotti', 7) as id`)).rows[0].id;
+const p2 = Object.fromEntries((await as(A, `select id, name from public.players where league_id = $1`, [lid2])).rows.map((r) => [r.name, r.id]));
+assert.deepEqual((await as(A, `select n from public.weeks where league_id = $1`, [lid2])).rows.map((r) => r.n), [7]);
+ok('a league can start at Week 7');
+await fails(A, `select public.create_league('Bad', 10, array['a','b'], null, 0)`, [], /between 1 and 30/);
+
+const code2 = (await as(A, `select invite_code from public.leagues where id = $1`, [lid2])).rows[0].invite_code;
+await as(B, `select public.join_league($1)`, [code2]);
+await as(B, `select public.claim_player($1, $2)`, [lid2, p2.Sully]);
+const legs3 = JSON.stringify([
+  { player_id: p2.Lotti, pick: 'Bills -3', odds: -110, result: 'W' },
+  { player_id: p2.Sully, pick: 'Lions ML', odds: -150, result: 'L' },
+]);
+await fails(B, `select public.save_past_week($1, null, 3, '2026-09-24', null, $2::jsonb)`, [lid2, legs3], /commish/);
+await fails(A, `select public.save_past_week($1, null, 7, '2026-09-24', null, $2::jsonb)`, [lid2, legs3], /before this week/);
+await fails(A, `select public.save_past_week($1, null, 3, null, null, $2::jsonb)`, [lid2, JSON.stringify([{ player_id: p2.Lotti, pick: 'x', odds: -110 }])], /needs a result/);
+const w3 = (await as(A, `select public.save_past_week($1, null, 3, '2026-09-24', $2, $3::jsonb) as id`, [lid2, p2.Mikey, legs3])).rows[0].id;
+const got = (await as(B, `select pick, result from public.legs where week_id = $1 order by pick`, [w3])).rows;
+assert.deepEqual(got, [{ pick: 'Bills -3', result: 'W' }, { pick: 'Lions ML', result: 'L' }]);
+assert.equal((await as(B, `select payer_id from public.weeks where id = $1`, [w3])).rows[0].payer_id, p2.Mikey);
+ok('commish adds a past week with graded picks and a payer; members can read it');
+await fails(A, `select public.save_past_week($1, null, 3, null, null, '[]'::jsonb)`, [lid2], /already in the league/);
+
+const legs3b = JSON.stringify([{ player_id: p2.Mikey, pick: 'Over 44', odds: 120, result: 'W' }]);
+await as(A, `select public.save_past_week($1, $2, null, null, null, $3::jsonb)`, [lid2, w3, legs3b]);
+const got2 = (await as(A, `select pick from public.legs where week_id = $1`, [w3])).rows.map((r) => r.pick);
+assert.deepEqual(got2, ['Over 44']);
+ok('editing a past week replaces its picks');
+
+await as(B, `update public.legs set result = 'L' where week_id = $1`, [w3]); // row-level security matches 0 rows
+assert.equal((await as(A, `select result from public.legs where week_id = $1`, [w3])).rows[0].result, 'W');
+ok('members still can\u2019t change past-week results');
+
+await fails(A, `select public.set_week_number($1, 3)`, [lid2], /after Week 3/);
+await as(A, `select public.set_week_number($1, 8)`, [lid2]);
+assert.deepEqual((await as(A, `select n from public.weeks where league_id = $1 order by n`, [lid2])).rows.map((r) => r.n), [3, 8]);
+await fails(B, `select public.set_week_number($1, 9)`, [lid2], /commish/);
+ok('commish renumbers the current week; it must stay after past weeks');
+
+// Wheel with a gap: spin Week 8, then re-spin it. Re-spin must not invent the week in between.
+const cur8 = (await as(A, `select id from public.weeks where league_id = $1 and n = 8`, [lid2])).rows[0].id;
+await as(A, `insert into public.legs (week_id, league_id, player_id, pick, odds, result) values ($1,$2,$3,'a',-110,'L')`, [cur8, lid2, p2.Lotti]);
+await as(A, `select public.spin_wheel($1, $2::uuid[])`, [cur8, [p2.Lotti]]);
+await as(A, `select public.spin_wheel($1, $2::uuid[])`, [cur8, [p2.Lotti]]);
+assert.deepEqual((await as(A, `select n from public.weeks where league_id = $1 order by n`, [lid2])).rows.map((r) => r.n), [3, 8, 9]);
+await fails(A, `select public.spin_wheel($1, $2::uuid[])`, [w3, [p2.Lotti]], /this week or last week/);
+ok('wheel works across week-number gaps');
+
+await fails(A, `select public.delete_past_week((select id from public.weeks where league_id = $1 and n = 9))`, [lid2], /current week/);
+await fails(B, `select public.delete_past_week($1)`, [w3], /commish/);
+await as(A, `select public.delete_past_week($1)`, [w3]);
+assert.deepEqual((await as(A, `select n from public.weeks where league_id = $1 order by n`, [lid2])).rows.map((r) => r.n), [8, 9]);
+ok('commish deletes a past week; the current week is protected');
+
+await as(A, `select public.new_season($1, 1)`, [lid2]);
+assert.deepEqual((await as(A, `select n from public.weeks where league_id = $1`, [lid2])).rows.map((r) => r.n), [1]);
+ok('new season can start at any week');
+
+// ---- Re-running the setup file, and upgrading from the first version ----
+const before = (await db.query(`select (select count(*) from public.legs)::int legs, (select count(*) from public.weeks)::int weeks`)).rows[0];
+await db.exec(schema);
+const afterRun = (await db.query(`select (select count(*) from public.legs)::int legs, (select count(*) from public.weeks)::int weeks`)).rows[0];
+assert.deepEqual(afterRun, before);
+ok('running the setup file again keeps all data');
+
+const v1 = readFileSync(new URL('./fixtures/schema-v1.sql', import.meta.url), 'utf8');
+const old = new PGlite();
+await old.exec(`
+  create role anon nologin; create role authenticated nologin; create schema auth;
+  create table auth.users (id uuid primary key, email text);
+  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+  create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+  grant usage on schema auth to authenticated, anon; create publication supabase_realtime;`);
+await old.exec(v1);
+await old.exec(`grant usage on schema public to authenticated, anon; grant select, insert, update, delete on all tables in schema public to authenticated; insert into auth.users values ('${A}','a@x.com');`);
+const asOld = (uid, sql, params = []) => old.transaction(async (tx) => {
+  await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [uid]);
+  await tx.exec('set local role authenticated');
+  return tx.query(sql, params);
+});
+const oldLid = (await asOld(A, `select public.create_league('Old', 10, array['Lotti','Sully'], 'Lotti') as id`)).rows[0].id;
+await old.exec(schema);
+await asOld(A, `select public.set_week_number($1, 7)`, [oldLid]);
+assert.deepEqual((await asOld(A, `select n from public.weeks where league_id = $1`, [oldLid])).rows.map((r) => r.n), [7]);
+const fns = (await old.query(`select count(*)::int c from pg_proc where proname = 'create_league'`)).rows[0].c;
+assert.equal(fns, 1);
+ok('upgrading a database set up with the first version works, with no duplicate functions');
+
 console.log(`\n${passed} checks passed.`);
