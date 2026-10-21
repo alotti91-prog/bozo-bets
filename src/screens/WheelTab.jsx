@@ -19,6 +19,7 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
   const [focus, setFocus] = useState(null); // an older spin left on screen after replaying it
   const [poolSel, setPoolSel] = useState(null); // { week, ids }: a hand-picked pool for one week
   const [confirmFor, setConfirmFor] = useState(null); // week id awaiting re-spin confirmation
+  const [confirmDel, setConfirmDel] = useState(null); // spin id awaiting delete confirmation
   const [busy, setBusy] = useState(false);
   const [muted, setMutedState] = useState(isMuted());
 
@@ -27,6 +28,10 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
   const sortIds = (ids) => [...ids].sort((a, b) => order.indexOf(a) - order.indexOf(b));
   const weekN = (id) => data.weeks.find((w) => w.id === id)?.n ?? null;
   const activeIds = data.players.filter((p) => p.active).map((p) => p.id);
+  // The latest spin for a week is the one that counts. Earlier ones were replaced by a re-spin.
+  const latestOf = {};
+  data.spins.forEach((s) => { latestOf[s.week_id] = s.id; });
+  const replaced = (s) => latestOf[s.week_id] !== s.id;
 
   const target = ctx.target || null;
   const inWheel = ctx.mode === 'ready' ? [...new Set([...ctx.losers, ...ctx.noShows])] : [];
@@ -63,6 +68,15 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
     const t = setTimeout(() => play(spinEvent), 0);
     return () => clearTimeout(t);
   }, [spinEvent]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function removeSpin(s) {
+    setConfirmDel(null);
+    const { error } = await supabase.rpc('delete_spin', { p_spin: s.id });
+    if (error) { toast(friendly(error)); return; }
+    if (focus?.id === s.id) setFocus(null);
+    toast('Deleted. The spin that counts is still there.');
+    reload();
+  }
 
   async function spin(weekId, ids) {
     setBusy(true);
@@ -127,8 +141,8 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
         {!active && focus && (
           <div className={`result${revealed === focus.id ? ' reveal' : ''}`} role="status">
             <span className="label-sm">Week {weekN(focus.week_id) ?? '?'} wheel landed on</span>
-            <strong className="result-name">{pname(focus.landed_id)}</strong>
-            <span className="result-sub">Out of {focus.pool.length} · {fmtWhen(focus.created_at)}</span>
+            <strong className={`result-name${replaced(focus) ? ' struck' : ''}`}>{pname(focus.landed_id)}</strong>
+            <span className="result-sub">{replaced(focus) ? 'Re-spun, so this one doesn’t count' : `Out of ${focus.pool.length} · ${fmtWhen(focus.created_at)}`}</span>
             <div className="btns">
               <button className="link" onClick={() => play(focus, true)}>Watch it again</button>
               <button className="link" onClick={() => setFocus(null)}>Back to the current wheel</button>
@@ -201,20 +215,38 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
             {allSpins.slice(0, 12).map((s) => {
               const n = weekN(s.week_id);
               const idx = data.spins.filter((x) => x.week_id === s.week_id).findIndex((x) => x.id === s.id);
+              const old = replaced(s);
               return (
-                <li key={s.id}>
+                <li key={s.id} className={old ? 'is-replaced' : ''}>
                   <span className="log-wk">Wk {n ?? '?'}</span>
-                  <span className="log-who">{pname(s.landed_id)} <small>out of {s.pool.length}{idx > 0 ? ' · re-spin' : ''}</small></span>
+                  <span className="log-who">
+                    {old ? <s>{pname(s.landed_id)}</s> : pname(s.landed_id)}{' '}
+                    <small>out of {s.pool.length}{old ? ' · replaced' : idx > 0 ? ' · re-spin' : ''}</small>
+                  </span>
                   <time dateTime={s.created_at}>{fmtWhen(s.created_at)}</time>
-                  <button type="button" className="log-play" disabled={!!active} onClick={() => replay(s)}
-                    aria-label={`Watch the Week ${n ?? ''} spin again`} title="Watch again">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-                  </button>
+                  <span className="log-acts">
+                    {isAdmin && old && (
+                      <button type="button" className="log-btn" onClick={() => setConfirmDel(confirmDel === s.id ? null : s.id)}
+                        aria-label={`Delete the replaced Week ${n ?? ''} spin`} title="Delete">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+                      </button>
+                    )}
+                    <button type="button" className="log-btn log-play" disabled={!!active} onClick={() => replay(s)}
+                      aria-label={`Watch the Week ${n ?? ''} spin again`} title="Watch again">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+                    </button>
+                  </span>
+                  {confirmDel === s.id && (
+                    <span className="log-confirm">Delete this replaced spin? It won{'’'}t change who{'’'}s on the hook.
+                      <button type="button" className="link danger" onClick={() => removeSpin(s)}>Delete</button>
+                      <button type="button" className="link" onClick={() => setConfirmDel(null)}>Keep</button>
+                    </span>
+                  )}
                 </li>
               );
             })}
           </ol>
-          <p className="fine">Every spin is logged here, re-spins included. Tap ▶ to watch one again.</p>
+          <p className="fine">Every spin is logged here. When a week is re-spun, only the latest counts; the replaced ones are crossed out{isAdmin ? ' and can be deleted' : ''}. Tap ▶ to watch one again.</p>
         </section>
       )}
     </>

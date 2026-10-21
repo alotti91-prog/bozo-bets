@@ -741,6 +741,22 @@ begin
   end if;
 end $$;
 
+-- Commish tool: delete a spin that a re-spin replaced. The latest spin for a
+-- week is the one that decided who pays, so it can't be deleted.
+create or replace function public.delete_spin(p_spin uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  s public.spins;
+begin
+  select * into s from public.spins where id = p_spin;
+  if s.id is null then raise exception 'That spin does not exist'; end if;
+  if not public.is_admin(s.league_id) then raise exception 'Only the commish can delete spins'; end if;
+  if not exists (select 1 from public.spins where week_id = s.week_id and created_at > s.created_at) then
+    raise exception 'That''s the spin that counts. Only spins replaced by a re-spin can be deleted.';
+  end if;
+  delete from public.spins where id = s.id;
+end $$;
+
 -- Commish tool: change one week's deadline (null = no deadline that week).
 create or replace function public.set_week_lock(p_week uuid, p_lock_at timestamptz)
 returns void language plpgsql security definer set search_path = public as $$
@@ -772,6 +788,7 @@ revoke execute on function
   public.mark_placed(uuid, boolean, text),
   public.set_deadline(uuid, int, time, text),
   public.set_week_lock(uuid, timestamptz),
+  public.delete_spin(uuid),
   public.new_invite_code()
 from public, anon;
 
@@ -791,7 +808,8 @@ grant execute on function
   public.delete_past_week(uuid),
   public.mark_placed(uuid, boolean, text),
   public.set_deadline(uuid, int, time, text),
-  public.set_week_lock(uuid, timestamptz)
+  public.set_week_lock(uuid, timestamptz),
+  public.delete_spin(uuid)
 to authenticated;
 
 -- ---------- Live updates ---------------------------------------------

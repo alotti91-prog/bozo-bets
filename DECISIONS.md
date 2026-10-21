@@ -77,3 +77,6 @@ The group chat already handles general trash talk, and the app has no notificati
 - Any spin can be replayed from the result or the Wheel log. Replays reuse the saved names and result, so they always land on the same person; only the animation is new.
 - A live spin plays once per phone. On other tabs, the pop-up says "The wheel is spinning!" with a Watch button and doesn't name anyone, and the app holds back data refreshes for about 7.5 seconds so "On the hook" doesn't give it away.
 
+**2026-10-21 · Replaced spins are crossed out and can be deleted**
+When a week is re-spun, only the latest spin counts. Earlier ones stay in the Wheel log crossed out (and on replay) so everyone can see a re-spin happened. Admins can delete a replaced spin with `delete_spin()`; the spin that counts can't be deleted, so the payer never changes by accident. Trade-off: deleting replaced spins erases the record that a week was re-spun, which was the main check on an admin re-spinning until they like the result.
+

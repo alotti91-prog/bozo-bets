@@ -46,6 +46,7 @@ const db = {
   spins: [
     { id: 's1', week_id: 'w1', league_id: L, pool: ['p3', 'p5'], landed_id: 'p5', spun_by: uid, created_at: daysAgo(27) + 'T23:00:00Z' },
     { id: 's2', week_id: 'w2', league_id: L, pool: P.map((p) => p.id), landed_id: 'p3', spun_by: uid, created_at: daysAgo(20) + 'T23:00:00Z' },
+    { id: 's3a', week_id: 'w3', league_id: L, pool: ['p1', 'p4'], landed_id: 'p1', spun_by: uid, created_at: daysAgo(13) + 'T22:58:00Z' },
     { id: 's3', week_id: 'w3', league_id: L, pool: ['p1', 'p4'], landed_id: 'p4', spun_by: uid, created_at: daysAgo(13) + 'T23:00:00Z' },
   ],
   reactions: [],
@@ -184,6 +185,13 @@ const rpcs = {
     if (p_placed) { w.placed_at = w.placed_at || now(); w.placed_by = uid; w.slip_path = p_slip_path || w.slip_path || null; }
     else { w.placed_at = null; w.placed_by = null; w.slip_path = null; }
     emit('weeks', 'UPDATE', w); return null;
+  },
+  delete_spin({ p_spin }) {
+    const s = db.spins.find((x) => x.id === p_spin);
+    if (!s) throw new Error('That spin does not exist');
+    if (!db.spins.some((x) => x.week_id === s.week_id && x.created_at > s.created_at)) throw new Error('That’s the spin that counts. Only spins replaced by a re-spin can be deleted.');
+    db.spins = db.spins.filter((x) => x.id !== p_spin);
+    emit('spins', 'DELETE', {}); return null;
   },
   set_deadline({ p_dow, p_time, p_tz }) {
     const lg = db.leagues[0];

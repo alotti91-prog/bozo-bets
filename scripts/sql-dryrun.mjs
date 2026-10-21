@@ -113,6 +113,16 @@ assert.equal(spins, 2);
 assert.equal((await as(A, `select payer_id from public.weeks where id = $1`, [w2.id])).rows[0].payer_id, spin2.landed_id);
 ok('re-spins are logged and update the payer');
 
+// Deleting a replaced spin: commish only, and never the one that counts.
+const [oldSpin, newSpin] = (await as(A, `select id from public.spins where week_id = $1 order by created_at`, [week1])).rows;
+await fails(B, `select public.delete_spin($1)`, [oldSpin.id], /commish/);
+await fails(A, `select public.delete_spin($1)`, [newSpin.id], /spin that counts/);
+await as(A, `select public.delete_spin($1)`, [oldSpin.id]);
+await as(A, `delete from public.spins where id = $1`, [newSpin.id]); // no direct deletes: matches 0 rows
+assert.deepEqual((await as(B, `select id from public.spins where week_id = $1`, [week1])).rows.map((r) => r.id), [newSpin.id]);
+assert.equal((await as(A, `select payer_id from public.weeks where id = $1`, [w2.id])).rows[0].payer_id, spin2.landed_id);
+ok('commish can delete a replaced spin; the one that counts stays, and so does the payer');
+
 // Wheel fairness smoke test: 600 spins over 3 names, each lands a fair share
 const pool3 = [players.Lotti, players.Sully, players.Mikey];
 const counts = { [players.Lotti]: 0, [players.Sully]: 0, [players.Mikey]: 0 };

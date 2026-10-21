@@ -58,7 +58,7 @@ export function useLeague(leagueId, onSpin) {
     ch.on('postgres_changes', { event: '*', schema: 'public', table: 'leagues', filter: `id=eq.${leagueId}` }, reload);
     // Supabase can't filter delete events by league, so listen for all of them
     // (a removed pick, reaction, or comment) and reload. With one group, that's cheap.
-    ['legs', 'reactions', 'comments', 'weeks', 'players'].forEach((t) => {
+    ['legs', 'reactions', 'comments', 'spins', 'weeks', 'players'].forEach((t) => {
       ch.on('postgres_changes', { event: 'DELETE', schema: 'public', table: t }, reload);
     });
     ch.subscribe();
