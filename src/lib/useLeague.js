@@ -28,11 +28,12 @@ export function useLeague(leagueId, onSpin) {
       supabase.from('reactions').select('*').eq('league_id', leagueId).order('created_at'),
       supabase.from('comments').select('*').eq('league_id', leagueId).order('created_at'),
     ]);
-    const err = [lg, pl, mb, wk, lgs, sp, rx, cm].find((r) => r.error);
+    // Comments are optional: if the database hasn't been updated yet, show none instead of failing.
+    const err = [lg, pl, mb, wk, lgs, sp, rx].find((r) => r.error);
     if (err) { setError(friendly(err.error)); return; }
     if (!lg.data) { setError('That league doesn’t exist or you’re not in it.'); return; }
     setError('');
-    setData({ league: lg.data, players: pl.data, members: mb.data, weeks: wk.data, legs: lgs.data, spins: sp.data, reactions: rx.data, comments: cm.data });
+    setData({ league: lg.data, players: pl.data, members: mb.data, weeks: wk.data, legs: lgs.data, spins: sp.data, reactions: rx.data, comments: cm.error ? [] : cm.data });
   }, [leagueId]);
 
   const reload = useCallback(() => {
