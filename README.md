@@ -97,9 +97,10 @@ The first few emails from a new Gmail sender can land in spam, so tell the group
 | | Member | Admin | Owner |
 |---|---|---|---|
 | See everything | ✓ | ✓ | ✓ |
+| React to and comment on any pick, delete **their own** comments | ✓ | ✓ | ✓ |
 | Add, edit, or remove **their own** leg (current week, before it's graded and before the pick deadline) | ✓ | ✓ | ✓ |
 | Add or edit anyone's leg (even after the deadline), grade legs, set the payer, enter the actual payout | | ✓ | ✓ |
-| Spin and re-spin the wheel, add or bench players, open the next week, set the pick deadline | | ✓ | ✓ |
+| Spin and re-spin the wheel, add or bench players, open the next week, set the pick deadline, delete anyone's comment | | ✓ | ✓ |
 | Make someone an admin, remove a login, new invite code, new season | | | ✓ |
 
 The database enforces these rules, not just the app's buttons. A regular member can't grade a leg or sneak a pick in after the deadline, even with a modified app.

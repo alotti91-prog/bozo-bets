@@ -3,6 +3,7 @@ import { weekInfo, amerFmt, fmtOdds, money } from '../lib/odds.js';
 import { fmtDate, listNames, toast } from '../lib/ui.js';
 import { IconChev, Belt } from '../components/common.jsx';
 import Reactions from '../components/Reactions.jsx';
+import Comments from '../components/Comments.jsx';
 import PastWeekSheet from './PastWeekSheet.jsx';
 import { supabase, friendly } from '../lib/supabase.js';
 import { nflWeek } from '../lib/nfl.js';
@@ -81,6 +82,7 @@ export default function HistoryTab({ data, pname, isAdmin, reload, beltId, nameO
                     <span className="hl-pick">{l.pick} <Reactions readOnly leg={l} reactions={data.reactions || []} userId={userId} nameOfUser={nameOfUser} reload={reload} /></span>
                     <span className="hl-odds">{fmtOdds(l.odds)}</span>
                     <span className="hl-r">{l.result || '–'}</span>
+                    <Comments readOnly leg={l} comments={(data.comments || []).filter((c) => c.leg_id === l.id)} nameOfUser={nameOfUser} />
                   </li>
                 )) : <li><span className="hl-pick">No legs</span></li>}
               </ol>

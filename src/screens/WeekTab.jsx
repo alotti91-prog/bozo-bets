@@ -4,7 +4,7 @@ import { weekInfo, amerFmt, fmtOdds, money, dollars, parseOdds } from '../lib/od
 import { toast, shareText, fmtDate, listNames, store } from '../lib/ui.js';
 import { lockState } from '../lib/deadline.js';
 import { IconShare, Belt } from '../components/common.jsx';
-import Reactions from '../components/Reactions.jsx';
+import { LegTalk } from '../components/Comments.jsx';
 import PlacedSheet from './PlacedSheet.jsx';
 
 const SPORTS = ['NFL', 'NCAAF', 'NBA', 'NHL', 'MLB', 'Soccer', 'Other'];
@@ -145,7 +145,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
                   ))}
                   {l.result === 'L' && <span className="bozo-mark">Bozo</span>}
                 </div>
-                <Reactions leg={l} reactions={data.reactions || []} userId={userId} nameOfUser={nameOfUser} reload={reload} />
+                <LegTalk leg={l} data={data} userId={userId} isAdmin={isAdmin} nameOfUser={nameOfUser} reload={reload} who={pname(l.player_id)} />
               </li>
             );
           })}

@@ -214,6 +214,30 @@ await as(B, `delete from public.reactions where leg_id = $1`, [legL]); // only r
 assert.deepEqual((await as(A, `select emoji from public.reactions where leg_id = $1`, [legL])).rows.map((r) => r.emoji), ['🔥']);
 ok('reactions: members react and un-react with their own, strangers can’t see or add');
 
+// Comments: B posts (even trying to post as A), A posts, stranger is shut out.
+await as(B, `insert into public.comments (leg_id, body, user_id) values ($1, '  Bills -3? Bold.  ', $2)`, [legL, A]);
+await as(A, `insert into public.comments (leg_id, body) values ($1, 'Watch and learn')`, [legL]);
+let cm = (await as(B, `select body, user_id, league_id from public.comments where leg_id = $1 order by created_at, body`, [legL])).rows;
+assert.equal(cm.length, 2);
+assert.ok(cm.every((c) => c.league_id === lid3));
+assert.equal(cm.find((c) => c.body === 'Bills -3? Bold.').user_id, B); // trimmed, and posted as B, not A
+await fails(B, `insert into public.comments (leg_id, body) values ($1, '   ')`, [legL], /Write something/);
+await fails(B, `insert into public.comments (leg_id, body) values ($1, $2)`, [legL, 'x'.repeat(281)], /280/);
+await fails(C2, `insert into public.comments (leg_id, body) values ($1, 'lol')`, [legL]);
+assert.equal((await as(C2, `select count(*)::int c from public.comments`)).rows[0].c, 0);
+ok('comments: members post as themselves, empty or too-long ones are rejected, strangers can’t see or post');
+
+await as(B, `update public.comments set body = 'edited' where user_id = $1`, [B]); // no editing: matches 0 rows
+await as(B, `delete from public.comments where user_id = $1`, [A]); // can't delete someone else's: 0 rows
+assert.deepEqual((await as(A, `select body from public.comments where leg_id = $1 order by body`, [legL])).rows.map((r) => r.body), ['Bills -3? Bold.', 'Watch and learn']);
+await as(A, `delete from public.comments where user_id = $1`, [B]); // commish can
+await as(B, `insert into public.comments (leg_id, body) values ($1, 'ok fine')`, [legL]);
+await as(B, `delete from public.comments where user_id = $1`, [B]); // and you can delete your own
+assert.deepEqual((await as(A, `select body from public.comments where leg_id = $1`, [legL])).rows.map((r) => r.body), ['Watch and learn']);
+await as(A, `delete from public.legs where id = $1`, [legL]);
+assert.equal((await as(A, `select count(*)::int c from public.comments where league_id = $1`, [lid3])).rows[0].c, 0);
+ok('comments: no editing; you delete your own, the commish deletes any; removing a pick removes its comments');
+
 await fails(B, `select public.mark_placed($1, true, null)`, [wk7], /on the hook/);
 await as(A, `update public.weeks set payer_id = $2 where id = $1`, [wk7, p3.Sully]);
 await fails(B, `select public.mark_placed($1, true, 'some-other-league/x.jpg')`, [wk7], /isn't in this league/);

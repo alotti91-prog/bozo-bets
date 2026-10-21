@@ -17,7 +17,7 @@ Run all three checks before saying a change is done.
 - Week numbers follow NFL weeks and can have gaps. The current week is always the highest `n`; "last week" means the closest lower `n`. `src/lib/nfl.js` works out the current NFL week.
 - Links back to the app (invites, sign-in emails) use `siteUrl()` from `src/lib/site.js`, never `window.location.origin`, so they point at the public Vercel address.
 - Permissions are enforced in the database. UI checks (`isAdmin`, `me`) only hide buttons.
-- `src/lib/useLeague.js` loads every row for a league and re-fetches on any realtime change. Screens get `data = { league, players, members, weeks, legs, spins, reactions }`.
+- `src/lib/useLeague.js` loads every row for a league and re-fetches on any realtime change. Screens get `data = { league, players, members, weeks, legs, spins, reactions, comments }`.
 - Slip screenshots use the private Storage bucket `slips` (set up at the bottom of `schema.sql`, skipped when there's no `storage` schema, as in tests). The demo client fakes `storage.from().upload/createSignedUrl`.
 - Pure logic lives in `src/lib/odds.js`, `stats.js`, and `wheel.js`, with tests. Put new math there, not in components.
 - `src/lib/demo-supabase.js` fakes the Supabase calls the app uses. If you add a new query or RPC, add it there too so `npm run demo` keeps working.

@@ -9,7 +9,7 @@ const LABEL = { '🔥': 'Fire', '🙏': 'Praying', '🤡': 'Clown', '💀': 'Dea
  * Emoji reactions under one pick. Tapping adds yours; tapping again takes it
  * back. Counts update live for everyone. readOnly shows just the counts.
  */
-export default function Reactions({ leg, reactions, userId, nameOfUser, reload, readOnly = false }) {
+export default function Reactions({ leg, reactions, userId, nameOfUser, reload, readOnly = false, children }) {
   const [busy, setBusy] = useState(null);
   const here = reactions.filter((r) => r.leg_id === leg.id);
   const counts = EMOJI.map((e) => {
@@ -44,6 +44,7 @@ export default function Reactions({ leg, reactions, userId, nameOfUser, reload, 
           <span aria-hidden="true">{c.e}</span>{c.n > 0 && <b>{c.n}</b>}
         </button>
       ))}
+      {children}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { dec, amerFmt, fmtOdds, parseOdds, weekInfo, money, signed } from './odd
 import { standings, hitPct, bozoBelt } from './stats.js';
 import { indexAt, targetRotation, restRotation, wheelContext, TAU } from './wheel.js';
 import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
-import { countdown, lockState, toLocalInput } from './deadline.js';
+import { countdown, lockState, toLocalInput, ago } from './deadline.js';
 import { isPrivateAddress } from './site.js';
 
 describe('odds', () => {
@@ -143,6 +143,15 @@ describe('deadline', () => {
     expect(open.soon).toBe(true);
     expect(open.countdown).toBe('1h 30m');
     expect(lockState(new Date(now - 1000).toISOString(), now).locked).toBe(true);
+  });
+  it('says how long ago a comment was posted', () => {
+    const now = Date.UTC(2026, 9, 21, 16, 0);
+    const at = (ms) => new Date(now - ms).toISOString();
+    expect(ago(at(20e3), now)).toBe('now');
+    expect(ago(at(5 * 60e3), now)).toBe('5m');
+    expect(ago(at(3 * 3600e3), now)).toBe('3h');
+    expect(ago(at(2 * 86400e3), now)).toBe('2d');
+    expect(ago(at(10 * 86400e3), now)).toBe('Oct 11');
   });
   it('round-trips a datetime-local value', () => {
     const d = new Date(2026, 9, 25, 12, 55);

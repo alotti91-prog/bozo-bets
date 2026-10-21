@@ -1,4 +1,4 @@
-// Pick-deadline display math. Pure functions, covered by logic.test.js.
+// Time display helpers (pick deadline, comment times). Pure functions, covered by logic.test.js.
 
 const MIN = 60e3;
 const HOUR = 60 * MIN;
@@ -40,6 +40,16 @@ export function lockState(lockAt, now = Date.now()) {
     countdown: left > 0 ? countdown(left) : '',
     soon: left > 0 && left < 2 * HOUR,
   };
+}
+
+/** How long ago, short: "now", "5m", "3h", "2d", then "Oct 14". */
+export function ago(iso, now = Date.now()) {
+  const ms = now - new Date(iso).getTime();
+  if (ms < MIN) return 'now';
+  if (ms < HOUR) return `${Math.floor(ms / MIN)}m`;
+  if (ms < DAY) return `${Math.floor(ms / HOUR)}h`;
+  if (ms < 7 * DAY) return `${Math.floor(ms / DAY)}d`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 /** Value for an <input type="datetime-local"> in the viewer's time zone. */

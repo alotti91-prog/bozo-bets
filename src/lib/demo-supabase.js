@@ -30,6 +30,7 @@ const db = {
   members: [
     { league_id: L, user_id: uid, role: 'owner', player_id: 'p1', email: 'you@example.com', joined_at: now() },
     { league_id: L, user_id: 'u2', role: 'member', player_id: 'p2', email: 'sully@example.com', joined_at: now() },
+    { league_id: L, user_id: 'u3', role: 'member', player_id: 'p3', email: 'mikey@example.com', joined_at: now() },
   ],
   weeks: W,
   legs: [
@@ -48,12 +49,24 @@ const db = {
     { id: 's3', week_id: 'w3', league_id: L, pool: ['p1', 'p4'], landed_id: 'p4', spun_by: uid, created_at: daysAgo(13) + 'T23:00:00Z' },
   ],
   reactions: [],
+  comments: [],
 };
 // A few sample reactions on this week's picks (Sully is the other signed-in member).
 W[3].lock_at = nextLock(0, '12:55');
 db.legs.filter((l) => l.week_id === 'w4').slice(0, 3).forEach((l, i) => {
   db.reactions.push({ leg_id: l.id, league_id: L, user_id: 'u2', emoji: ['🔥', '🤡', '🙏'][i], created_at: now() });
 });
+// Sample trash talk: on this week's Steelers pick, and on a busted pick from Week 6.
+const ago = (min) => new Date(Date.now() - min * 60e3).toISOString();
+const steelers = db.legs.find((l) => l.week_id === 'w4' && l.player_id === 'p3');
+const texas = db.legs.find((l) => l.week_id === 'w3' && l.player_id === 'p1');
+[
+  [steelers, 'u2', 'Steelers ML at +135. Mikey never learns.', 300],
+  [steelers, uid, 'Bozo Belt is calling your name', 240],
+  [steelers, 'u3', 'Defense travels. Watch.', 200],
+  [steelers, 'u2', 'Aged like milk', 30],
+  [texas, 'u2', 'Laying 6.5 on the road, brave', 9000],
+].forEach(([l, u, body, min]) => db.comments.push({ id: id(), leg_id: l.id, league_id: L, user_id: u, body, created_at: ago(min) }));
 const files = {};
 
 const listeners = [];
@@ -84,7 +97,9 @@ function query(table) {
     const match = (r) => filters.every((f) => f(r));
     if (op === 'insert') {
       const rows = (Array.isArray(payload) ? payload : [payload]).map((r) => ({ id: id(), created_at: now(), active: true, result: null, ...r }));
-      if (table === 'reactions') rows.forEach((r) => { r.user_id = uid; r.league_id = L; });
+      if (table === 'reactions' || table === 'comments') rows.forEach((r) => { r.user_id = uid; r.league_id = L; });
+      if (table === 'comments') rows.forEach((r) => { r.body = String(r.body || '').trim(); });
+      if (table === 'comments' && rows.some((r) => !r.body)) return { data: null, error: { message: 'Write something first' } };
       if (table === 'reactions' && rows.some((r) => db.reactions.some((x) => x.leg_id === r.leg_id && x.user_id === r.user_id && x.emoji === r.emoji))) {
         return { data: null, error: { message: 'duplicate key value violates unique constraint "reactions_pkey"' } };
       }

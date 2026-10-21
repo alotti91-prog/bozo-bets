@@ -94,6 +94,18 @@ create table if not exists public.reactions (
 );
 create index if not exists reactions_league_idx on public.reactions (league_id);
 
+-- Comments on picks (trash talk that stays with the pick).
+create table if not exists public.comments (
+  id         uuid primary key default gen_random_uuid(),
+  leg_id     uuid not null references public.legs(id) on delete cascade,
+  league_id  uuid not null references public.leagues(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  body       text not null check (char_length(body) between 1 and 280),
+  created_at timestamptz not null default now()
+);
+create index if not exists comments_league_idx on public.comments (league_id);
+create index if not exists comments_leg_idx on public.comments (leg_id, created_at);
+
 -- "Bet placed": whoever's on the hook marks the slip placed, with an optional
 -- screenshot stored in the private "slips" storage bucket (set up below).
 alter table public.weeks add column if not exists placed_at timestamptz;
@@ -238,6 +250,7 @@ alter table public.weeks   enable row level security;
 alter table public.legs    enable row level security;
 alter table public.spins   enable row level security;
 alter table public.reactions enable row level security;
+alter table public.comments enable row level security;
 
 -- Leagues: members read; commish edits name/stake. Created via create_league().
 drop policy if exists "league read" on public.leagues;
@@ -310,6 +323,32 @@ create policy "reaction add" on public.reactions for insert to authenticated
   with check (user_id = auth.uid() and public.is_member(league_id));
 drop policy if exists "reaction remove" on public.reactions;
 create policy "reaction remove" on public.reactions for delete to authenticated using (user_id = auth.uid());
+
+-- Comments: members read all and post as themselves. You delete your own; the
+-- commish can delete anyone's. No editing, so what was said stays said.
+create or replace function public.comments_fill() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  select league_id into new.league_id from public.legs where id = new.leg_id;
+  if new.league_id is null then raise exception 'That pick does not exist'; end if;
+  new.user_id := auth.uid();
+  new.body := btrim(coalesce(new.body, ''));
+  if new.body = '' then raise exception 'Write something first'; end if;
+  if char_length(new.body) > 280 then raise exception 'Keep it under 280 characters'; end if;
+  return new;
+end $$;
+drop trigger if exists comments_fill on public.comments;
+create trigger comments_fill before insert on public.comments
+  for each row execute function public.comments_fill();
+
+drop policy if exists "comment read" on public.comments;
+create policy "comment read" on public.comments for select to authenticated using (public.is_member(league_id));
+drop policy if exists "comment add" on public.comments;
+create policy "comment add" on public.comments for insert to authenticated
+  with check (user_id = auth.uid() and public.is_member(league_id));
+drop policy if exists "comment remove" on public.comments;
+create policy "comment remove" on public.comments for delete to authenticated
+  using (user_id = auth.uid() or public.is_admin(league_id));
 
 -- ---------- Functions the app calls ----------------------------------
 
@@ -761,7 +800,7 @@ to authenticated;
 do $$
 declare t text;
 begin
-  foreach t in array array['leagues','players','members','weeks','legs','spins','reactions'] loop
+  foreach t in array array['leagues','players','members','weeks','legs','spins','reactions','comments'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
