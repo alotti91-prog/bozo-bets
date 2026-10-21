@@ -42,6 +42,8 @@ Open the address it prints. You'll see sample data, and nothing is saved.
    | `VITE_SUPABASE_URL` | your Project URL |
    | `VITE_SUPABASE_PUBLISHABLE_KEY` | your publishable key |
 
+   If you connected Supabase through Vercel's **Supabase integration**, you can skip this step. The integration already adds `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, and the app picks those up on its own.
+
 3. Click **Deploy**. When it finishes, copy your site address (like `https://bozo-bets.vercel.app`).
 
 ### 3. Point sign-in emails at your site (Supabase)

@@ -37,5 +37,8 @@ A season is a few hundred rows. Re-fetching everything on any live event is simp
 **2026-10-20 · Money counts settled weeks only**
 "Put in," "Paid," and "Net" only count weeks that hit or busted. A live week isn't money lost yet. Net per person = their share of payouts minus what they put in as payer.
 
+**2026-10-21 · Read the Vercel Supabase integration's keys**
+The Vercel Supabase integration names its variables `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, but Vite only exposes `VITE_` ones. `vite.config.js` passes through exactly those two public values (falling back to the `VITE_` names, and to `anon` keys on older projects). It deliberately does not use `envPrefix: 'SUPABASE_'`, because that would ship the service-role key and JWT secret to every browser.
+
 **2026-10-20 · Demo mode**
 `npm run demo` swaps in an in-memory fake of Supabase with sample data, so anyone can work on screens without setting up a backend. `vite.config.js` swaps it out of real builds.
