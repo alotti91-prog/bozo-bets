@@ -13,6 +13,7 @@ export function useLeague(leagueId, onSpin) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const timer = useRef(null);
+  const holdUntil = useRef(0); // while a spin animates, hold refreshes so the new payer doesn't spoil it
   const onSpinRef = useRef(onSpin);
   useEffect(() => { onSpinRef.current = onSpin; }, [onSpin]);
 
@@ -38,7 +39,7 @@ export function useLeague(leagueId, onSpin) {
 
   const reload = useCallback(() => {
     clearTimeout(timer.current);
-    timer.current = setTimeout(load, 120);
+    timer.current = setTimeout(load, Math.max(120, holdUntil.current - Date.now()));
   }, [load]);
 
   useEffect(() => {
@@ -47,7 +48,10 @@ export function useLeague(leagueId, onSpin) {
     const ch = supabase.channel('league-' + leagueId);
     TABLES.forEach((t) => {
       ch.on('postgres_changes', { event: '*', schema: 'public', table: t, filter: `league_id=eq.${leagueId}` }, (payload) => {
-        if (t === 'spins' && payload.eventType === 'INSERT' && onSpinRef.current) onSpinRef.current(payload.new);
+        if (t === 'spins' && payload.eventType === 'INSERT') {
+          holdUntil.current = Date.now() + 7500; // about as long as the spin animation
+          if (onSpinRef.current) onSpinRef.current(payload.new);
+        }
         reload();
       });
     });

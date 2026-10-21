@@ -179,6 +179,20 @@ assert.deepEqual((await as(A, `select n from public.weeks where league_id = $1 o
 await fails(A, `select public.spin_wheel($1, $2::uuid[])`, [w3, [p2.Lotti]], /this week or last week/);
 ok('wheel works across week-number gaps');
 
+// Spinning last week when it was never spun: sets this week's payer, opens nothing new.
+const lid5 = (await as(A, `select public.create_league('Spin Last', 10, array['Lotti','Sully','Mikey'], 'Lotti', 7) as id`)).rows[0].id;
+const p5 = Object.fromEntries((await as(A, `select id, name from public.players where league_id = $1`, [lid5])).rows.map((r) => [r.name, r.id]));
+const w6x = (await as(A, `select public.save_past_week($1, null, 6, '2026-10-15', null, $2::jsonb) as id`, [lid5,
+  JSON.stringify([{ player_id: p5.Lotti, pick: 'a', odds: -110, result: 'L' }, { player_id: p5.Sully, pick: 'b', odds: -110, result: 'W' }])])).rows[0].id;
+const w7x = (await as(A, `select id from public.weeks where league_id = $1 and n = 7`, [lid5])).rows[0].id;
+const s6 = (await as(A, `select * from public.spin_wheel($1, $2::uuid[])`, [w6x, [p5.Lotti]])).rows[0];
+assert.equal(s6.landed_id, p5.Lotti);
+assert.equal((await as(A, `select payer_id from public.weeks where id = $1`, [w7x])).rows[0].payer_id, p5.Lotti);
+assert.deepEqual((await as(A, `select n from public.weeks where league_id = $1 order by n`, [lid5])).rows.map((r) => r.n), [6, 7]);
+await as(A, `insert into public.legs (week_id, league_id, player_id, pick, odds) values ($1,$2,$3,'c',-110)`, [w7x, lid5, p5.Mikey]);
+await fails(A, `select public.spin_wheel($1, $2::uuid[])`, [w7x, [p5.Mikey]], /Grade every leg/);
+ok('commish can spin last week if it was never spun; it sets this week’s payer');
+
 await fails(A, `select public.delete_past_week((select id from public.weeks where league_id = $1 and n = 9))`, [lid2], /current week/);
 await fails(B, `select public.delete_past_week($1)`, [w3], /commish/);
 await as(A, `select public.delete_past_week($1)`, [w3]);

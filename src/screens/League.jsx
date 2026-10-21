@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { supabase, demo } from '../lib/supabase.js';
 import { useLeague } from '../lib/useLeague.js';
 import { store, toast } from '../lib/ui.js';
@@ -22,21 +22,20 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   const [settings, setSettings] = useState(false);
   const [pwNudgeHidden, setPwNudgeHidden] = useState(() => store.get('bz-has-pw', false) || store.get('bz-pw-nudge-off', false));
   const [skipClaim, setSkipClaim] = useState(() => store.get('bz-skip-claim-' + leagueId, false));
-  const dataRef = useRef(null);
-
-  const onSpin = useCallback((spin) => {
-    setSpinEvent(spin);
-    const d = dataRef.current;
-    if (d && store.get('bz-tab', 'week') !== 'wheel') {
-      const p = d.players.find((x) => x.id === spin.landed_id);
-      toast(`The wheel landed on ${p ? p.name : 'someone'}.`);
-    }
-  }, [dataRef]);
-
-  const { data, error, reload } = useLeague(leagueId, onSpin);
-  useEffect(() => { dataRef.current = data; }, [data]);
+  const [seenSpins] = useState(() => new Set()); // live spins already played, so each plays once
 
   const go = (t) => { setTab(t); store.set('bz-tab', t); window.scrollTo(0, 0); };
+
+  // Someone spun. On the Wheel tab it animates right away. Anywhere else, offer
+  // to watch without naming who it landed on.
+  const onSpin = useCallback((spin) => {
+    setSpinEvent(spin);
+    if (store.get('bz-tab', 'week') !== 'wheel') {
+      toast('The wheel is spinning!', { label: 'Watch', onClick: () => { setTab('wheel'); store.set('bz-tab', 'wheel'); window.scrollTo(0, 0); } });
+    }
+  }, []);
+
+  const { data, error, reload } = useLeague(leagueId, onSpin);
 
   if (error) {
     return (
@@ -104,7 +103,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
           </div>
         )}
         {tab === 'week' && <WeekTab {...props} />}
-        {tab === 'wheel' && <WheelTab {...props} spinEvent={spinEvent} />}
+        {tab === 'wheel' && <WheelTab {...props} spinEvent={spinEvent} seenSpins={seenSpins} />}
         {tab === 'standings' && <StandingsTab {...props} />}
         {tab === 'history' && <HistoryTab {...props} />}
       </main>

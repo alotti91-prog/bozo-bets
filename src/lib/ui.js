@@ -1,7 +1,8 @@
 // Small shared helpers: toasts, sharing, sounds, local storage.
 
-export function toast(message) {
-  window.dispatchEvent(new CustomEvent('bz-toast', { detail: message }));
+/** Show a short message. action = { label, onClick } adds a button to it. */
+export function toast(message, action = null) {
+  window.dispatchEvent(new CustomEvent('bz-toast', { detail: { text: message, action } }));
 }
 
 export const store = {

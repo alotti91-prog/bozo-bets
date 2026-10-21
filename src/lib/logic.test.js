@@ -217,5 +217,24 @@ describe('wheel', () => {
     const players = [{ id: 'a', active: true }, { id: 'b', active: true }, { id: 'c', active: true }, { id: 'd', active: false }];
     const withShows = wheelContext({ weeks, legs: [L('w2', 'a', -110, 'L'), L('w2', 'b', -110, 'W')], spins, players });
     expect(withShows.noShows).toEqual(['c']);
+    expect(ready.target.id).toBe('w2');
+    expect(ready.nextN).toBe(3);
+  });
+  it('spins last week when it settled but was never spun', () => {
+    const weeks = [W('w6', 6), W('w7', 7)];
+    const legs = [L('w6', 'a', -110, 'L'), L('w6', 'b', -110, 'W'), L('w7', 'a', -110, null)];
+    const ctx = wheelContext({ weeks, legs, spins: [] });
+    expect(ctx.mode).toBe('ready');
+    expect(ctx.target.id).toBe('w6');
+    expect(ctx.nextN).toBe(7);
+    expect(ctx.losers).toEqual(['a']);
+    // Once it's spun, the result stays up until this week settles.
+    const after = wheelContext({ weeks, legs, spins: [{ week_id: 'w6', landed_id: 'a', pool: ['a'] }] });
+    expect(after.mode).toBe('waiting');
+    expect(after.last.week.id).toBe('w6');
+    // A past week with an ungraded leg can't be spun.
+    const open = wheelContext({ weeks, legs: [L('w6', 'a', -110, null), L('w7', 'a', -110, null)], spins: [] });
+    expect(open.mode).toBe('waiting');
+    expect(open.last).toBe(null);
   });
 });

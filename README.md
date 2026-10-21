@@ -3,7 +3,7 @@
 A weekly group-parlay tracker. Everyone adds one leg. If the parlay hits, you split it. Anyone whose leg misses goes in the Bozo Wheel, and whoever it lands on puts in next week's stake.
 
 - **This week:** the parlay as a bet slip, with combined odds and payout. Everyone adds their own leg from their phone.
-- **Wheel:** the commish spins. The server picks the result, so nobody can rig it, and every open phone watches the same spin live.
+- **Wheel:** once a week's bets settle, the wheel loads everyone who missed and the commish spins whenever you're ready (say, mid-week). The server picks the result, so nobody can rig it. Every open phone watches the same spin live, and anyone can replay it after. The result stays up until the next week settles.
 - **Standings:** records, hit %, money in and out, and superlatives.
 - **History:** every week, who sank it, and where the wheel landed. The commish can add weeks from before the league joined the app.
 - **Bozo Belt 🤡:** most misses this season wears the clown nose next to their name until someone passes him.

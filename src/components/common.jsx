@@ -24,15 +24,21 @@ export function Toaster() {
   useEffect(() => {
     let t;
     const on = (e) => {
-      setMsg({ text: e.detail, key: Date.now() });
+      const d = typeof e.detail === 'string' ? { text: e.detail } : e.detail;
+      setMsg({ ...d, key: Date.now() });
       clearTimeout(t);
-      t = setTimeout(() => setMsg(null), 3400);
+      t = setTimeout(() => setMsg(null), d.action ? 8000 : 3400);
     };
     window.addEventListener('bz-toast', on);
     return () => { window.removeEventListener('bz-toast', on); clearTimeout(t); };
   }, []);
   if (!msg) return null;
-  return <div className="toast" role="status" key={msg.key}>{msg.text}</div>;
+  return (
+    <div className="toast" role="status" key={msg.key}>
+      <span>{msg.text}</span>
+      {msg.action && <button type="button" className="toast-act" onClick={() => { msg.action.onClick(); setMsg(null); }}>{msg.action.label}</button>}
+    </div>
+  );
 }
 
 export function Sheet({ title, onClose, children }) {

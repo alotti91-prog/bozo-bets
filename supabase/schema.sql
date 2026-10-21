@@ -502,13 +502,13 @@ begin
   if w.n <> latest and (prev_n is null or w.n <> prev_n) then
     raise exception 'Only this week or last week can be spun';
   end if;
-  if w.n = latest then
-    if not exists (select 1 from public.legs where week_id = w.id) then
-      raise exception 'No legs this week yet';
-    end if;
-    if exists (select 1 from public.legs where week_id = w.id and result is null) then
-      raise exception 'Grade every leg before spinning';
-    end if;
+  -- The wheel spins on a settled week: this week once it's graded, or last
+  -- week (a first spin if it was never spun, or a re-spin).
+  if not exists (select 1 from public.legs where week_id = w.id) then
+    raise exception 'No legs that week yet';
+  end if;
+  if exists (select 1 from public.legs where week_id = w.id and result is null) then
+    raise exception 'Grade every leg before spinning';
   end if;
 
   -- Keep the order the app sent (it draws the wheel in that order), drop

@@ -71,3 +71,9 @@ Vercel serves each deployment at extra addresses (`bozo-bets-<id>-<you>.vercel.a
 **2026-10-21 · Comments on picks, not a general chat**
 The group chat already handles general trash talk, and the app has no notifications, so a league-wide comment feed would go quiet fast. Comments hang off a single leg instead, so the roast stays next to the pick in History. Up to 280 characters, the latest two shown until you open the thread. No editing (what was said stays said). You can delete your own; admins can delete anyone's. A trigger fills in the league and the author, so nobody can post as someone else. Notifications were left out on purpose; revisit only if people actually use comments.
 
+**2026-10-21 · Wheel spins on the last settled week, with replays**
+- The group spins mid-week, after the weekend's bets settle. The result stays up until the next week settles, then the wheel loads that week's losers. The spin still opens the next week, as before.
+- If last week settled but was never spun (a league that started mid-season with past weeks added, or a week opened from Settings without spinning), the wheel spins on last week and sets this week's payer, instead of sitting idle until this week is graded. `spin_wheel` now requires every leg in the spun week to be graded, not just in the current week.
+- Any spin can be replayed from the result or the Wheel log. Replays reuse the saved names and result, so they always land on the same person; only the animation is new.
+- A live spin plays once per phone. On other tabs, the pop-up says "The wheel is spinning!" with a Watch button and doesn't name anyone, and the app holds back data refreshes for about 7.5 seconds so "On the hook" doesn't give it away.
+
