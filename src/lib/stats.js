@@ -14,7 +14,9 @@ export function hitPct(r) {
 export function standings({ players, weeks, legs, spins }) {
   const rows = {};
   players.forEach((p) => {
-    rows[p.id] = { p, W: 0, L: 0, P: 0, decSum: 0, n: 0, paid: 0, share: 0, landed: 0, best: null, streak: 0, streakType: null };
+    // decSum/nOdds: average odds of decided legs (pushes are voids, so their odds don't count).
+    // solo: profit if you'd bet $100 on just your own leg each week (the group's old spreadsheet stat).
+    rows[p.id] = { p, W: 0, L: 0, P: 0, decSum: 0, nOdds: 0, n: 0, solo: 0, paid: 0, share: 0, landed: 0, best: null, streak: 0, streakType: null };
   });
   const sport = {};
   let hits = 0, settled = 0, totalIn = 0, totalWon = 0;
@@ -27,9 +29,12 @@ export function standings({ players, weeks, legs, spins }) {
       if (!r || !l.result) continue;
       r[l.result]++;
       r.n++;
-      r.decSum += dec(l.odds);
+      if (l.result === 'W') r.solo += (dec(l.odds) - 1) * 100;
+      if (l.result === 'L') r.solo -= 100;
       if (l.result === 'W' && (!r.best || l.odds > r.best.odds)) r.best = { odds: l.odds, pick: l.pick, n: w.n };
       if (l.result !== 'P') {
+        r.decSum += dec(l.odds);
+        r.nOdds++;
         const k = l.sport || 'Other';
         sport[k] = sport[k] || { W: 0, L: 0 };
         sport[k][l.result]++;

@@ -33,7 +33,7 @@ export default function StandingsTab({ data, me }) {
         <h2 className="sec-title">Standings</h2>
         <div className="table-scroll">
           <table>
-            <thead><tr><th scope="col">Player</th><th scope="col">W-L-P</th><th scope="col">Hit</th><th scope="col">Avg odds</th><th scope="col">Paid</th><th scope="col">Net</th></tr></thead>
+            <thead><tr><th scope="col">Player</th><th scope="col">W-L-P</th><th scope="col">Hit</th><th scope="col">Avg odds</th><th scope="col">Solo $100</th><th scope="col">Paid</th><th scope="col">Net</th></tr></thead>
             <tbody>
               {rows.map((r) => {
                 const h = hitPct(r);
@@ -43,7 +43,8 @@ export default function StandingsTab({ data, me }) {
                     <td>{r.p.name}{r.p.id === me ? ' (you)' : ''}{!r.p.active && <span className="benched"> benched</span>}</td>
                     <td>{r.W}-{r.L}-{r.P}</td>
                     <td>{h < 0 ? '—' : Math.round(h * 100) + '%'}</td>
-                    <td>{r.n ? amerFmt(r.decSum / r.n) : '—'}</td>
+                    <td>{r.nOdds ? amerFmt(r.decSum / r.nOdds) : '—'}</td>
+                    <td className={cls(r.solo)}>{r.n ? signed(r.solo) : '—'}</td>
                     <td>{dollars(r.paid)}</td>
                     <td className={cls(mynet)}>{signed(mynet)}</td>
                   </tr>
@@ -52,7 +53,7 @@ export default function StandingsTab({ data, me }) {
             </tbody>
           </table>
         </div>
-        <p className="fine" style={{ marginTop: 10 }}>Money counts settled weeks only. Net is your share of payouts minus what you put in.</p>
+        <p className="fine" style={{ marginTop: 10 }}>Solo $100 is what you'd be up or down betting $100 on just your own leg each week. Paid and Net count settled weeks only: Net is your share of parlay payouts minus what you put in.</p>
         <div className="supers">
           <Sup label="Sharpest" who={sharp?.p.name} detail={sharp && `${sharp.W}-${sharp.L}, ${Math.round(hitPct(sharp) * 100)}% (3+ legs)`} />
           <Sup label="Head bozo" who={bozo?.p.name} detail={bozo && `${bozo.L} miss${bozo.L > 1 ? 'es' : ''}`} />

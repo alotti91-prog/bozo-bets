@@ -80,6 +80,35 @@ describe('standings', () => {
   });
 });
 
+describe('solo $100 stat matches the old spreadsheet', () => {
+  // 2026 Weeks 1-3 from the group's Google Sheet (gray "Puka 70+" = void, stored as a push).
+  const H = [
+    [1, 'Mori', -137, 'L'], [1, 'JB', -108, 'W'], [1, 'Ted', -113, 'W'], [1, 'Ben', -111, 'L'], [1, 'Chris', -228, 'L'],
+    [1, 'Lotti', 105, 'L'], [1, 'Alec', -176, 'W'], [1, 'Disco', -165, 'W'],
+    [2, 'Mori', -157, 'L'], [2, 'JB', -110, 'L'], [2, 'Ted', -122, 'L'], [2, 'Ben', -138, 'L'], [2, 'Chris', -110, 'P'],
+    [2, 'Lotti', -102, 'W'], [2, 'Tim', -168, 'L'], [2, 'Alec', -174, 'W'], [2, 'Sexton', -154, 'L'], [2, 'Disco', -135, 'L'],
+    [3, 'Mori', -165, 'L'], [3, 'JB', -103, 'W'], [3, 'Ted', -166, 'L'], [3, 'Ben', -200, 'L'], [3, 'Chris', -150, 'W'],
+    [3, 'Lotti', -102, 'W'], [3, 'Tim', -205, 'W'], [3, 'Alec', -192, 'W'], [3, 'Sexton', -113, 'W'], [3, 'Disco', -191, 'W'],
+  ];
+  const names = [...new Set(H.map((h) => h[1]))];
+  const players = names.map((n) => ({ id: n, name: n }));
+  const weeks = [W('w1', 1), W('w2', 2), W('w3', 3)];
+  const legs = H.map(([wk, p, odds, r]) => L('w' + wk, p, odds, r));
+  const s = standings({ players, weeks, legs, spins: [] });
+  // Running totals from the sheet's last filled row.
+  const sheet = { Mori: -300, JB: 90, Ted: -112, Ben: -300, Chris: -33.3, Lotti: 96.1, Tim: -51.2, Alec: 166, Sexton: -11.5, Disco: 13 };
+  it.each(Object.entries(sheet))('%s', (name, total) => {
+    expect(Math.abs(s.rows[name].solo - total)).toBeLessThan(1);
+  });
+  it('win % matches the sheet and the void is ignored', () => {
+    expect(hitPct(s.rows.Chris)).toBe(0.5);
+    expect(hitPct(s.rows.Alec)).toBe(1);
+    expect(s.rows.Chris.nOdds).toBe(2);
+    expect(s.settled).toBe(3);
+    expect(s.hits).toBe(0);
+  });
+});
+
 describe('wheel', () => {
   it('lands on the chosen segment for any start angle', () => {
     for (const n of [1, 2, 3, 6, 9]) {

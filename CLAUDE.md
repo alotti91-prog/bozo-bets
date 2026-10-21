@@ -7,6 +7,7 @@ Weekly group-parlay tracker for a group of friends. React (Vite, plain JavaScrip
 - `npm run dev`: run against Supabase (needs `.env.local`, see `.env.example`)
 - `npm test`: unit tests for odds, standings, and wheel math (`src/lib/logic.test.js`)
 - `npm run test:sql`: runs `supabase/schema.sql` in PGlite and checks the permission rules
+- `npm run test:import`: runs the 2026 Weeks 1-3 history import against a throwaway copy of the database
 - `npm run build`: production build
 
 Run all three checks before saying a change is done.
