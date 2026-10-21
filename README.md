@@ -87,7 +87,9 @@ The first few emails from a new Gmail sender can land in spam, so tell the group
    - Only share your public address (the one under **Domains** in Vercel, like `bozo-bets-psi.vercel.app`). Vercel's other addresses for each deployment ask for a Vercel login, so friends get stuck there. The invite button always uses the public address, and the app shows a yellow bar if you're on a private one.
 4. After signing in once with the email code, everyone can set a password in **Settings → Skip the sign-in email**. Next time they sign in with email + password, and no email is sent. On the same phone they stay signed in anyway.
 5. Tell everyone to add it to their home screen:
-   - **iPhone:** open the site in Safari → Share → **Add to Home Screen**.
+   - **iPhone (iOS 26):** open the site in Safari → tap **•••** next to the address bar → **Share** → **Add to Home Screen** (scroll down or tap **View More** if it's hidden) → leave **Open as Web App** on → **Add**.
+   - **iPhone (older iOS):** Safari → the Share button at the bottom → **Add to Home Screen**.
+   - Join and pick your name in Safari first, then add it. The home screen app has its own login, so sign in there once more with your password or the 6-digit code (typing the code, not tapping the email link).
    - **Android:** open in Chrome → menu → **Add to Home screen** (or **Install app**).
 
 ---
