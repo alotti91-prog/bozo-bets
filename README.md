@@ -46,12 +46,26 @@ Open the address it prints. You'll see sample data, and nothing is saved.
 
 3. Click **Deploy**. When it finishes, copy your site address (like `https://bozo-bets.vercel.app`).
 
-### 3. Point sign-in emails at your site (Supabase)
+### 3. Set up sign-in emails (Supabase), required
 
-1. In Supabase, go to **Authentication → URL Configuration**.
+Supabase's built-in email sender only delivers to members of your Supabase organization, about 2 emails an hour. Your friends would never get their sign-in emails. On new free projects it also locks the email templates. So connect your own sender. A Gmail account works and needs no domain:
+
+1. **Make a Gmail app password.** A separate account like `bozobets.app@gmail.com` is best, since sign-in emails come from it. Turn on **2-Step Verification** for that account, then go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords), create one named "Bozo Bets", and copy the 16-character code.
+2. **In Supabase, go to Authentication → Emails → SMTP Settings** and turn on custom SMTP:
+
+   | Field | Value |
+   |---|---|
+   | Sender email | the Gmail address |
+   | Sender name | `Bozo Bets` |
+   | Host | `smtp.gmail.com` |
+   | Port | `587` |
+   | Username | the Gmail address |
+   | Password | the 16-character app password (no spaces) |
+
+3. **Authentication → URL Configuration:**
    - **Site URL:** your Vercel address.
    - **Redirect URLs:** add `https://YOUR-SITE.vercel.app/**` and, for working on your own computer, `http://localhost:5173/**`.
-2. Go to **Authentication → Emails** (email templates) and open the **Magic Link** template. Add this line somewhere in the body:
+4. **Authentication → Emails → Templates → Magic link or OTP:** add this line somewhere in the body:
 
    ```
    Or type this code in the app: {{ .Token }}
@@ -59,7 +73,7 @@ Open the address it prints. You'll see sample data, and nothing is saved.
 
    This matters on iPhone. An app added to the home screen keeps a separate login from Safari, so tapping the email link signs you in to Safari instead of the app. Typing the code signs you in right in the app.
 
-> **Heads up on email limits:** Supabase's built-in email sender is meant for testing and has a low hourly cap. If sign-in emails stop arriving when the whole group signs up at once, connect a free email service (such as Resend) under **Authentication → Emails → SMTP settings**. You only sign in once per device, so after setup day you'll rarely hit the cap.
+The first few emails from a new Gmail sender can land in spam, so tell the group to check there.
 
 ### 4. Start your league
 
