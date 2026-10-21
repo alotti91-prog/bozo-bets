@@ -19,6 +19,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   });
   const [spinEvent, setSpinEvent] = useState(null);
   const [settings, setSettings] = useState(false);
+  const [pwNudgeHidden, setPwNudgeHidden] = useState(() => store.get('bz-has-pw', false) || store.get('bz-pw-nudge-off', false));
   const [skipClaim, setSkipClaim] = useState(() => store.get('bz-skip-claim-' + leagueId, false));
   const dataRef = useRef(null);
 
@@ -87,6 +88,15 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
       </header>
       <main className="wrap" role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {demo && <p className="note">Demo mode: sample data, nothing is saved. Reload to reset.</p>}
+        {tab === 'week' && !pwNudgeHidden && (
+          <div className="banner">
+            <p><strong>Skip the sign-in email next time.</strong> Set a password and sign in with just your email and password.</p>
+            <div className="btns">
+              <button className="btn small primary" onClick={() => setSettings(true)}>Set password</button>
+              <button className="link" onClick={() => { store.set('bz-pw-nudge-off', true); setPwNudgeHidden(true); }}>Not now</button>
+            </div>
+          </div>
+        )}
         {tab === 'week' && <WeekTab {...props} />}
         {tab === 'wheel' && <WheelTab {...props} spinEvent={spinEvent} />}
         {tab === 'standings' && <StandingsTab {...props} />}
@@ -94,7 +104,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
       </main>
       {settings && (
         <SettingsSheet data={data} userId={userId} member={member} isAdmin={isAdmin} isOwner={isOwner} reload={reload}
-          onClose={() => setSettings(false)} onChangePlayer={changePlayer}
+          onClose={() => { setSettings(false); if (store.get('bz-has-pw', false)) setPwNudgeHidden(true); }} onChangePlayer={changePlayer}
           leagues={leagues} onSwitchLeague={(id) => { setSettings(false); onSwitchLeague(id); }}
           onAddLeague={() => { setSettings(false); onAddLeague(); }} onSignOut={onSignOut} />
       )}

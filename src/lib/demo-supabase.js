@@ -169,5 +169,7 @@ export const demoClient = {
     async signOut() { window.location.reload(); },
     async signInWithOtp() { return { error: null }; },
     async verifyOtp() { return { error: null }; },
+    async signInWithPassword() { return { error: null }; },
+    async updateUser() { await new Promise((r) => setTimeout(r, 150)); return { data: { user: session.user }, error: null }; },
   },
 };

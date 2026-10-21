@@ -81,7 +81,8 @@ The first few emails from a new Gmail sender can land in spam, so tell the group
 2. Choose **Start a league**, list everyone in the bet, pick your own name, and set the stake. The starting week fills in with the current NFL week. You're the owner (commish).
    - **Started the season before using the app?** Open **History → Add a past week** to enter earlier weeks: who put in, plus each person's pick, odds, and W/L/P. Those weeks count in Standings.
 3. Open **Settings** (the gear) and tap **Share invite**. Send it to the group chat. Friends open it, sign in, and pick their name.
-4. Tell everyone to add it to their home screen:
+4. After signing in once with the email code, everyone can set a password in **Settings → Skip the sign-in email**. Next time they sign in with email + password, and no email is sent. On the same phone they stay signed in anyway.
+5. Tell everyone to add it to their home screen:
    - **iPhone:** open the site in Safari → Share → **Add to Home Screen**.
    - **Android:** open in Chrome → menu → **Add to Home screen** (or **Install app**).
 
