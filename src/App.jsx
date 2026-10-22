@@ -26,6 +26,7 @@ export default function App() {
   return (
     <>
       <PrivateAddressBar />
+      <UpdateBar />
       <Main />
       <Toaster />
     </>
@@ -78,6 +79,38 @@ function Home({ userId }) {
   return (
     <League key={active} leagueId={active} userId={userId} leagues={leagues}
       onSwitchLeague={pick} onAddLeague={() => setAdding(true)} onSignOut={signOut} />
+  );
+}
+
+// A phone can keep the app open for days, especially from the home screen.
+// When a newer version is online, offer a refresh.
+function UpdateBar() {
+  const [stale, setStale] = useState(false);
+  useEffect(() => {
+    const mine = import.meta.env.VITE_BUILD_ID;
+    if (!mine || import.meta.env.DEV) return undefined;
+    let checking = false;
+    const check = async () => {
+      if (checking || document.visibilityState !== 'visible') return;
+      checking = true;
+      try {
+        const r = await fetch('/version.json', { cache: 'no-store' });
+        if (r.ok) { const v = await r.json(); if (v.id && v.id !== mine) setStale(true); }
+      } catch { /* offline: try again later */ }
+      checking = false;
+    };
+    check();
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    const t = setInterval(check, 10 * 60e3);
+    return () => { document.removeEventListener('visibilitychange', check); window.removeEventListener('focus', check); clearInterval(t); };
+  }, []);
+  if (!stale) return null;
+  return (
+    <div className="offsite update-bar" role="status">
+      Bozo Bets was updated.{' '}
+      <button type="button" className="link" onClick={() => window.location.reload()}>Refresh</button>
+    </div>
   );
 }
 

@@ -83,3 +83,8 @@ When a week is re-spun, only the latest spin counts. Earlier ones stay in the Wh
 **2026-10-21 · The bozo stays hidden until you watch the spin**
 If you miss the live spin, who it landed on is hidden on every tab (Wheel result and log, "On the hook", History, the Standings wheel count) until you watch it, live or as a replay. Watching is saved per account in `spin_views`, not per phone, because an iPhone home screen app and Safari don't share storage. Only the latest spin, the one that set this week's payer, is hidden, so people who join late don't have to sit through old weeks. The person who spun it never has it hidden. All of that week's spins are hidden, re-spun ones included, so nobody can work it out by elimination. Hiding is done in the app, not the database: anyone determined could still find the name. It's for fun, not secrecy.
 
+**2026-10-22 · Fixes after the first real re-spin**
+- Bug: a spin counted as watched when its animation finished, even on a page nobody was looking at. Browsers pause animations on hidden pages and jump to the end on return, so switching apps mid-spin revealed the bozo. A spin now counts only if the page stayed on screen the whole time, and a live spin that arrives while the page is hidden doesn't auto-play.
+- Phones keep the app open for days (especially from the home screen), so people can run an old version. The build now writes `version.json`, and the app shows "Bozo Bets was updated. Refresh" when the online version differs.
+- If a table the app needs is missing (schema.sql not re-run), admins now see a "Database update needed" banner instead of the feature quietly switching off.
+

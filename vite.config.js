@@ -19,14 +19,22 @@ export default defineConfig(({ mode }) => {
   // The public address for invite and sign-in links. Vercel sets
   // VERCEL_PROJECT_PRODUCTION_URL (e.g. bozo-bets-psi.vercel.app) on every build.
   // Only production builds use it, so preview links still point at the preview.
+  // A new id on every build. The app compares it with /version.json to notice updates.
+  const buildId = env.VERCEL_GIT_COMMIT_SHA || String(Date.now())
+
   const site = env.VITE_SITE_URL
     || (env.VERCEL_ENV === 'production' && env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
 
   return {
-    plugins: [react()],
+    plugins: [react(), {
+      name: 'version-file',
+      apply: 'build',
+      generateBundle() { this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ id: buildId }) }) },
+    }],
     define: isDemo
-      ? { 'import.meta.env.VITE_DEMO': JSON.stringify('1'), 'import.meta.env.VITE_SITE_URL': JSON.stringify(site) }
+      ? { 'import.meta.env.VITE_DEMO': JSON.stringify('1'), 'import.meta.env.VITE_SITE_URL': JSON.stringify(site), 'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId) }
       : {
+          'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId),
           'import.meta.env.VITE_SITE_URL': JSON.stringify(site),
           'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(url),
           'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(key),

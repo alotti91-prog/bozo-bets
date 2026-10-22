@@ -10,7 +10,8 @@ const SEG = [
 /**
  * The Bozo Wheel. Props:
  *   names    array of display names, drawn clockwise from the pointer
- *   restAt   index to centre under the pointer when idle (or null)
+ *   restAt   index to centre under the pointer when idle, -1 to park the pointer
+ *            between two names (gives nothing away), or null to leave it be
  *   restKey  changes when a new result should be shown
  * Ref: spinTo(names, landedIndex) -> Promise that resolves when it stops.
  */
@@ -86,7 +87,7 @@ const WheelCanvas = forwardRef(function WheelCanvas({ names, restAt, restKey }, 
   useEffect(() => {
     if (animNames.current) return;
     if (restAt != null && names.length && settledKey.current !== restKey) {
-      rot.current = restRotation(names.length, restAt);
+      rot.current = restAt === -1 ? 0 : restRotation(names.length, restAt);
       settledKey.current = restKey;
     }
     draw();

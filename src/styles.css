@@ -349,3 +349,4 @@ button.placed.yes { appearance: none; cursor: pointer; color: var(--p-win); back
 /* result hidden until you watch the spin */
 .result-name.is-hidden, .log-who .is-hidden { color: var(--muted); letter-spacing: .12em; }
 .hook-hidden { padding: 0; font-weight: 700; color: var(--nose); }
+.update-bar .link { padding: 0 2px; color: var(--ink); font-weight: 700; }

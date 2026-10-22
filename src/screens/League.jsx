@@ -107,6 +107,11 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
       </header>
       <main className="wrap" role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {demo && <p className="note">Demo mode: sample data, nothing is saved. Reload to reset.</p>}
+        {isAdmin && data.missing?.length > 0 && (
+          <div className="banner">
+            <p><strong>Database update needed.</strong> {data.missing.join(' and ')} {data.missing.length > 1 ? 'are' : 'is'} turned off until you run the latest <code>schema.sql</code> in the Supabase SQL Editor.</p>
+          </div>
+        )}
         {tab === 'week' && !pwNudgeHidden && (
           <div className="banner">
             <p><strong>Skip the sign-in email next time.</strong> Set a password and sign in with just your email and password.</p>

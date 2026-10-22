@@ -46,14 +46,20 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
     animating.current = true;
     if (!replay) seenSpins?.add(spin.id);
     const isLatest = spin.id === ctx.last?.spin.id;
+    // Phones and browsers pause animations on hidden pages, then jump to the end
+    // when you come back. That isn't watching, so it doesn't count.
+    let missed = document.visibilityState !== 'visible';
+    const onVis = () => { if (document.visibilityState !== 'visible') missed = true; };
+    document.addEventListener('visibilitychange', onVis);
     setFocus(null);
     setActive({ ...spin, weekN: weekN(spin.week_id), replay });
     setRevealed(null);
     await wheelRef.current.spinTo(spin.pool.map(pname), spin.pool.indexOf(spin.landed_id), spin.id);
+    document.removeEventListener('visibilitychange', onVis);
     animating.current = false;
     setActive(null);
     setRevealed(spin.id);
-    if (!replay || isLatest) markWatched?.(spin.id);
+    if (!missed && (!replay || isLatest)) markWatched?.(spin.id);
     if (!replay) reload();
     else if (!isLatest) setFocus(spin);
   }
@@ -66,6 +72,7 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
   // Someone spun (here or on another phone): play it once.
   useEffect(() => {
     if (!spinEvent || seenSpins?.has(spinEvent.id)) return undefined;
+    if (document.visibilityState !== 'visible') return undefined; // they'll get "Watch the spin" when they're back
     const t = setTimeout(() => play(spinEvent), 0);
     return () => clearTimeout(t);
   }, [spinEvent]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -103,7 +110,10 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
     names = pool.map(pname);
   } else if (ctx.last) {
     names = ctx.last.spin.pool.map(pname);
-    if (!ctx.last.spin.hidden) { // don't park the wheel on a result they haven't watched
+    if (ctx.last.spin.hidden) { // don't leave the wheel pointing at a result they haven't watched
+      restAt = -1;
+      restKey = 'hidden-' + ctx.last.spin.id;
+    } else {
       restAt = ctx.last.spin.pool.indexOf(ctx.last.spin.landed_id);
       restKey = ctx.last.spin.id;
     }
