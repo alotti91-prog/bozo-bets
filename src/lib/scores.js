@@ -1,11 +1,13 @@
 // Live scores for the app. Goes through our /api/espn function (cached on
 // Vercel), or fake games in demo mode. In `npm run dev` there's no /api, so it
 // asks ESPN directly.
-import { espnUrl, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
+import { espnUrls, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
 import { demoScores } from './demo-supabase.js';
 
 async function direct(params) {
-  const json = await (await fetch(espnUrl(params))).json();
+  const urls = espnUrls(params);
+  const jsons = await Promise.all(urls.map((u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null)));
+  const json = urls.length > 1 ? mergeEvents(jsons) : jsons[0];
   if (params.kind === 'scoreboard') return { games: normalizeScoreboard(json, params.sport) };
   if (params.kind === 'summary') return normalizeSummary(json, params.sport, params.event);
   return { players: normalizeRoster(json) };

@@ -7,7 +7,7 @@ import { countdown, lockState, toLocalInput, ago } from './deadline.js';
 import { isPrivateAddress } from './site.js';
 import { RELEASES, unseenReleases } from './releases.js';
 import { slipPaths } from './slip.js';
-import { espnUrl, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
+import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
 import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine } from './bets.js';
 import espnHandler from '../../api/espn.js';
 
@@ -216,6 +216,16 @@ describe('ESPN feed', () => {
     expect(espnUrl({ kind: 'scoreboard', sport: 'soccer', dates: '20261020' })).toBe(null);
     expect(espnUrl({ kind: 'news', sport: 'nfl' })).toBe(null);
   });
+  it('asks for football one day at a time (ESPN refuses ranges there)', () => {
+    expect(daysIn('20261030-20261102')).toEqual(['20261030', '20261031', '20261101', '20261102']);
+    expect(daysIn('20261020')).toEqual(['20261020']);
+    expect(daysIn('20261001-20261031')).toEqual([]); // too long
+    expect(espnUrls({ kind: 'scoreboard', sport: 'nfl', dates: '20261020-20261026' })).toHaveLength(7);
+    expect(espnUrls({ kind: 'scoreboard', sport: 'nfl', dates: '20261020-20261026' })[0]).toContain('dates=20261020');
+    expect(espnUrls({ kind: 'scoreboard', sport: 'nba', dates: '20261020-20261026' })).toHaveLength(1);
+    expect(espnUrls({ kind: 'scoreboard', sport: 'nfl', dates: 'x' })).toEqual([]);
+    expect(mergeEvents([{ events: [{ id: '1' }, { id: '2' }] }, { events: [{ id: '2' }, { id: '3' }] }]).events.map((e) => e.id)).toEqual(['1', '2', '3']);
+  });
   it('finds the Tuesday-to-Monday betting week', () => {
     expect(weekDates(new Date(2026, 9, 22))).toBe('20261020-20261026'); // Thursday
     expect(weekDates(new Date(2026, 9, 20))).toBe('20261020-20261026'); // Tuesday
@@ -257,6 +267,12 @@ describe('ESPN feed', () => {
       expect(ok.code).toBe(200);
       expect(ok.body.games[0].short).toBe('NE @ CHI');
       expect(ok.headers['Cache-Control']).toContain('s-maxage=20');
+      let calls = 0;
+      globalThis.fetch = async () => { calls++; return { ok: calls !== 2, json: async () => SB }; }; // one day fails; the rest still count
+      const week = res(); await espnHandler({ query: { kind: 'scoreboard', sport: 'nfl', dates: '20261020-20261026' } }, week);
+      expect(calls).toBe(7);
+      expect(week.code).toBe(200);
+      expect(week.body.games).toHaveLength(1); // the same game from every day, once
       globalThis.fetch = async () => ({ ok: false, status: 503 });
       const down = res(); await espnHandler({ query: { kind: 'scoreboard', sport: 'nfl', dates: '20261020' } }, down);
       expect(down.code).toBe(502);

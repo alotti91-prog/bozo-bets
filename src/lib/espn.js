@@ -4,8 +4,10 @@
 // Pure, covered by logic.test.js.
 
 export const SPORTS = {
-  nfl: { label: 'NFL', path: 'football/nfl', props: true },
-  ncaaf: { label: 'NCAAF', path: 'football/college-football', props: true, query: 'groups=80&limit=400' },
+  // byDay: ESPN's football scoreboards refuse a date range, so we ask for each day.
+  // groups=80 is every FBS game, ranked or not.
+  nfl: { label: 'NFL', path: 'football/nfl', props: true, byDay: true },
+  ncaaf: { label: 'NCAAF', path: 'football/college-football', props: true, byDay: true, query: 'groups=80&limit=400' },
   nba: { label: 'NBA', path: 'basketball/nba' },
   nhl: { label: 'NHL', path: 'hockey/nhl' },
   mlb: { label: 'MLB', path: 'baseball/mlb' },
@@ -23,7 +25,39 @@ export function espnUrl({ kind, sport, dates, event, team }) {
   return null;
 }
 
-/** The betting week, Tuesday through Monday, as ESPN's dates range: "20261020-20261026". */
+/** Each day in a "20261020-20261026" range (at most 8), or [] if it isn't one. */
+export function daysIn(range) {
+  const m = /^(\d{4})(\d{2})(\d{2})(?:-(\d{4})(\d{2})(\d{2}))?$/.exec(range || '');
+  if (!m) return [];
+  const start = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  const end = m[4] ? new Date(Date.UTC(+m[4], +m[5] - 1, +m[6])) : start;
+  const out = [];
+  for (const d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    out.push(d.toISOString().slice(0, 10).replace(/-/g, ''));
+    if (out.length > 8) return [];
+  }
+  return out;
+}
+
+/** The ESPN addresses to fetch for a request: usually one, one per day for byDay scoreboards, [] if not allowed. */
+export function espnUrls(q) {
+  if (q.kind === 'scoreboard' && SPORTS[q.sport]?.byDay && String(q.dates || '').includes('-')) {
+    const days = daysIn(q.dates);
+    return days.map((d) => espnUrl({ ...q, dates: d })).filter(Boolean);
+  }
+  const u = espnUrl(q);
+  return u ? [u] : [];
+}
+
+/** Several scoreboard responses as one, without repeats. */
+export function mergeEvents(jsons) {
+  const seen = new Set();
+  const events = [];
+  for (const j of jsons) for (const e of j?.events || []) if (!seen.has(e.id)) { seen.add(e.id); events.push(e); }
+  return { events };
+}
+
+/** The betting week, Tuesday through Monday, as a dates range: "20261020-20261026". */
 export function weekDates(now = new Date()) {
   const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   d.setDate(d.getDate() - ((d.getDay() - 2 + 7) % 7)); // back to Tuesday
