@@ -216,13 +216,14 @@ describe('ESPN feed', () => {
     expect(espnUrl({ kind: 'scoreboard', sport: 'soccer', dates: '20261020' })).toBe(null);
     expect(espnUrl({ kind: 'news', sport: 'nfl' })).toBe(null);
   });
-  it('asks for football one day at a time (ESPN refuses ranges there)', () => {
+  it('asks for a week one day at a time (ESPN refuses ranges)', () => {
     expect(daysIn('20261030-20261102')).toEqual(['20261030', '20261031', '20261101', '20261102']);
     expect(daysIn('20261020')).toEqual(['20261020']);
     expect(daysIn('20261001-20261031')).toEqual([]); // too long
     expect(espnUrls({ kind: 'scoreboard', sport: 'nfl', dates: '20261020-20261026' })).toHaveLength(7);
     expect(espnUrls({ kind: 'scoreboard', sport: 'nfl', dates: '20261020-20261026' })[0]).toContain('dates=20261020');
-    expect(espnUrls({ kind: 'scoreboard', sport: 'nba', dates: '20261020-20261026' })).toHaveLength(1);
+    expect(espnUrls({ kind: 'scoreboard', sport: 'nba', dates: '20261020-20261026' })).toHaveLength(7);
+    expect(espnUrls({ kind: 'scoreboard', sport: 'nba', dates: '20261022' })).toHaveLength(1);
     expect(espnUrls({ kind: 'scoreboard', sport: 'nfl', dates: 'x' })).toEqual([]);
     expect(mergeEvents([{ events: [{ id: '1' }, { id: '2' }] }, { events: [{ id: '2' }, { id: '3' }] }]).events.map((e) => e.id)).toEqual(['1', '2', '3']);
   });

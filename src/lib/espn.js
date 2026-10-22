@@ -4,10 +4,10 @@
 // Pure, covered by logic.test.js.
 
 export const SPORTS = {
-  // byDay: ESPN's football scoreboards refuse a date range, so we ask for each day.
-  // groups=80 is every FBS game, ranked or not.
-  nfl: { label: 'NFL', path: 'football/nfl', props: true, byDay: true },
-  ncaaf: { label: 'NCAAF', path: 'football/college-football', props: true, byDay: true, query: 'groups=80&limit=400' },
+  // ESPN's scoreboards don't reliably take a date range, so a week is fetched
+  // one day at a time (see espnUrls). groups=80 is every FBS game, ranked or not.
+  nfl: { label: 'NFL', path: 'football/nfl', props: true },
+  ncaaf: { label: 'NCAAF', path: 'football/college-football', props: true, query: 'groups=80&limit=400' },
   nba: { label: 'NBA', path: 'basketball/nba' },
   nhl: { label: 'NHL', path: 'hockey/nhl' },
   mlb: { label: 'MLB', path: 'baseball/mlb' },
@@ -39,9 +39,9 @@ export function daysIn(range) {
   return out;
 }
 
-/** The ESPN addresses to fetch for a request: usually one, one per day for byDay scoreboards, [] if not allowed. */
+/** The ESPN addresses to fetch for a request: one, or one per day for a scoreboard date range; [] if not allowed. */
 export function espnUrls(q) {
-  if (q.kind === 'scoreboard' && SPORTS[q.sport]?.byDay && String(q.dates || '').includes('-')) {
+  if (q.kind === 'scoreboard' && SPORTS[q.sport] && String(q.dates || '').includes('-')) {
     const days = daysIn(q.dates);
     return days.map((d) => espnUrl({ ...q, dates: d })).filter(Boolean);
   }
