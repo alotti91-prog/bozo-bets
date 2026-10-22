@@ -94,3 +94,6 @@ When the app comes back on screen and a newer version is online, it reloads by i
 **2026-10-22 · What's new, for admins**
 Release notes live in `src/lib/releases.js`, written by hand in plain words (commit messages and this file are too technical for the group). Admins see them in Settings → What's new, with a red dot on the gear when there's something new. "Seen" is remembered per device, which is fine for a nudge. Entries can credit whoever suggested the change (`idea`), so the people asking for features see their names.
 
+**2026-10-22 · Protect main**
+Every push to `main` deploys to the whole group. A GitHub ruleset on the default branch requires a pull request with 1 approval, blocks force pushes, and blocks deleting the branch. Repository admins (the owner) can bypass it, so the owner's changes still ship directly; collaborators' changes need the owner's approval. The Claude GitHub App is deliberately not on the bypass list: collaborators also make changes through Claude, and an app bypass would let those skip review.
+

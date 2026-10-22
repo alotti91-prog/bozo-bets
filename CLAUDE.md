@@ -29,3 +29,4 @@ Run all three checks before saying a change is done.
 - Record notable choices in `DECISIONS.md` (date · decision · why).
 - When a change people will notice ships, add a plain-language entry at the top of `src/lib/releases.js` (admins see it in Settings → What's new, with a dot on the gear). Credit whoever asked for it with `idea: 'Name'`.
 - Never commit `.env.local` or any Supabase secret key. The publishable key is meant to be public.
+- `main` is protected by a GitHub ruleset and every push to it goes live. The repo owner can push directly. Everyone else: work on a branch, run the three checks, and open a pull request for the owner to approve. Vercel builds a preview for each pull request.
