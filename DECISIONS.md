@@ -97,3 +97,6 @@ Release notes live in `src/lib/releases.js`, written by hand in plain words (com
 **2026-10-22 · Protect main**
 Every push to `main` deploys to the whole group. A GitHub ruleset on the default branch requires a pull request with 1 approval, blocks force pushes, and blocks deleting the branch. Repository admins (the owner) can bypass it, so the owner's changes still ship directly; collaborators' changes need the owner's approval. The Claude GitHub App is deliberately not on the bypass list: collaborators also make changes through Claude, and an app bypass would let those skip review.
 
+**2026-10-22 · Slip screenshots replace "I placed it"**
+People screenshot the DraftKings slip, often in several pieces, so placing the bet is now just adding screenshots (up to 10, several at once). The first marks the bet placed; removing the last un-marks it. Whoever's on the hook or an admin can add or remove; everyone in the league can view. Removed screenshots are deleted from Storage (new "slips delete" policy, which checks the week folder's payer/admin), because slips can show balances. `weeks.slip_paths` holds them; `slip_path` stays as the first one, and `mark_placed` is kept and synced, so phones still on the old version keep working. "Placed by" is hidden while the bozo is hidden, though a screenshot itself may still show a DraftKings username.
+

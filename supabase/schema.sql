@@ -121,6 +121,9 @@ create index if not exists spin_views_league_idx on public.spin_views (league_id
 -- screenshot stored in the private "slips" storage bucket (set up below).
 alter table public.weeks add column if not exists placed_at timestamptz;
 alter table public.weeks add column if not exists placed_by uuid references auth.users(id) on delete set null;
+-- Several screenshots per slip (a long parlay rarely fits in one). slip_path is
+-- the first one, kept for older copies of the app.
+alter table public.weeks add column if not exists slip_paths text[] not null default '{}';
 alter table public.weeks add column if not exists slip_path text;
 
 -- Pick deadline. The league sets a weekly rule (day, time, time zone); each
@@ -702,10 +705,67 @@ begin
   end if;
   if p_placed then
     update public.weeks
-    set placed_at = coalesce(placed_at, now()), placed_by = auth.uid(), slip_path = coalesce(p_slip_path, slip_path)
+    set placed_at = coalesce(placed_at, now()), placed_by = auth.uid(), slip_path = coalesce(slip_path, p_slip_path),
+        slip_paths = case when p_slip_path is null or p_slip_path = any(slip_paths) then slip_paths else slip_paths || p_slip_path end
     where id = w.id;
   else
-    update public.weeks set placed_at = null, placed_by = null, slip_path = null where id = w.id;
+    update public.weeks set placed_at = null, placed_by = null, slip_path = null, slip_paths = '{}' where id = w.id;
+  end if;
+end $$;
+
+update public.weeks set slip_paths = array[slip_path] where slip_path is not null and cardinality(slip_paths) = 0;
+
+-- Who may attach or remove slip screenshots: whoever's on the hook, or the commish.
+create or replace function public.can_mark_placed(w public.weeks) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_admin(w.league_id) or (w.payer_id is not null and w.payer_id = public.my_player(w.league_id))
+$$;
+
+-- Attach screenshots (uploaded to <league id>/<week id>/...). The first one marks the bet placed.
+create or replace function public.add_slips(p_week uuid, p_paths text[])
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  w public.weeks;
+  p text;
+  merged text[];
+begin
+  select * into w from public.weeks where id = p_week;
+  if w.id is null then raise exception 'That week does not exist'; end if;
+  if not public.can_mark_placed(w) then
+    raise exception 'Only whoever is on the hook, or the commish, can add the slip';
+  end if;
+  if coalesce(cardinality(p_paths), 0) = 0 then raise exception 'Pick at least one screenshot'; end if;
+  foreach p in array p_paths loop
+    if p not like w.league_id::text || '/' || w.id::text || '/%' then
+      raise exception 'That screenshot isn''t for this week';
+    end if;
+  end loop;
+  select coalesce(array_agg(x order by ord), '{}') into merged
+  from (select x, min(ord) ord from unnest(w.slip_paths || p_paths) with ordinality t(x, ord) group by x) q;
+  if cardinality(merged) > 10 then raise exception 'That''s more than 10 screenshots. Remove some first.'; end if;
+  update public.weeks
+  set slip_paths = merged, slip_path = merged[1],
+      placed_at = coalesce(placed_at, now()), placed_by = coalesce(placed_by, auth.uid())
+  where id = w.id;
+end $$;
+
+-- Remove one screenshot. Removing the last one means the bet isn't marked placed anymore.
+create or replace function public.remove_slip(p_week uuid, p_path text)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  w public.weeks;
+  rest text[];
+begin
+  select * into w from public.weeks where id = p_week;
+  if w.id is null then raise exception 'That week does not exist'; end if;
+  if not public.can_mark_placed(w) then
+    raise exception 'Only whoever is on the hook, or the commish, can change the slip';
+  end if;
+  rest := array_remove(w.slip_paths, p_path);
+  if cardinality(rest) = 0 then
+    update public.weeks set slip_paths = '{}', slip_path = null, placed_at = null, placed_by = null where id = w.id;
+  else
+    update public.weeks set slip_paths = rest, slip_path = rest[1] where id = w.id;
   end if;
 end $$;
 
@@ -729,6 +789,14 @@ begin
     execute 'drop policy if exists "slips upload" on storage.objects';
     execute $p$create policy "slips upload" on storage.objects for insert to authenticated
       with check (bucket_id = 'slips' and public.is_member(public.uuid_or_null((storage.foldername(name))[1])))$p$;
+    -- Removing a screenshot deletes the file: whoever's on the hook that week, or the commish.
+    execute 'drop policy if exists "slips delete" on storage.objects';
+    execute $p$create policy "slips delete" on storage.objects for delete to authenticated
+      using (bucket_id = 'slips' and exists (
+        select 1 from public.weeks w
+        where w.id = public.uuid_or_null((storage.foldername(name))[2])
+          and w.league_id = public.uuid_or_null((storage.foldername(name))[1])
+          and public.can_mark_placed(w)))$p$;
   end if;
 end $$;
 
@@ -820,6 +888,9 @@ revoke execute on function
   public.set_deadline(uuid, int, time, text),
   public.set_week_lock(uuid, timestamptz),
   public.delete_spin(uuid),
+  public.add_slips(uuid, text[]),
+  public.remove_slip(uuid, text),
+  public.can_mark_placed(public.weeks),
   public.new_invite_code()
 from public, anon;
 
@@ -840,7 +911,10 @@ grant execute on function
   public.mark_placed(uuid, boolean, text),
   public.set_deadline(uuid, int, time, text),
   public.set_week_lock(uuid, timestamptz),
-  public.delete_spin(uuid)
+  public.delete_spin(uuid),
+  public.add_slips(uuid, text[]),
+  public.remove_slip(uuid, text),
+  public.can_mark_placed(public.weeks)
 to authenticated;
 
 -- ---------- Live updates ---------------------------------------------

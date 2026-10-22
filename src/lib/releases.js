@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-22-c',
+    date: '2026-10-22',
+    title: 'Slip screenshots',
+    items: [
+      'Placing the bet is now just adding screenshots of the slip: one or several, whatever it takes to fit every leg. The first one marks the bet placed.',
+      'Everyone in the league can flip through them from “Placed ✓ · View slip” on the slip.',
+      'Whoever’s on the hook, or an admin, can add more or remove one. Removed screenshots are deleted, not just hidden.',
+    ],
+  },
+  {
     id: '2026-10-22-b',
     date: '2026-10-22',
     title: 'Always on the latest version',

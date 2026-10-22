@@ -185,7 +185,20 @@ const rpcs = {
   mark_placed({ p_week, p_placed, p_slip_path }) {
     const w = db.weeks.find((x) => x.id === p_week);
     if (p_placed) { w.placed_at = w.placed_at || now(); w.placed_by = uid; w.slip_path = p_slip_path || w.slip_path || null; }
-    else { w.placed_at = null; w.placed_by = null; w.slip_path = null; }
+    else { w.placed_at = null; w.placed_by = null; w.slip_path = null; w.slip_paths = []; }
+    emit('weeks', 'UPDATE', w); return null;
+  },
+  add_slips({ p_week, p_paths }) {
+    const w = db.weeks.find((x) => x.id === p_week);
+    const merged = [...new Set([...(w.slip_paths || []), ...p_paths])];
+    if (merged.length > 10) throw new Error('That’s more than 10 screenshots. Remove some first.');
+    Object.assign(w, { slip_paths: merged, slip_path: merged[0], placed_at: w.placed_at || now(), placed_by: w.placed_by || uid });
+    emit('weeks', 'UPDATE', w); return null;
+  },
+  remove_slip({ p_week, p_path }) {
+    const w = db.weeks.find((x) => x.id === p_week);
+    const rest = (w.slip_paths || []).filter((p) => p !== p_path);
+    Object.assign(w, rest.length ? { slip_paths: rest, slip_path: rest[0] } : { slip_paths: [], slip_path: null, placed_at: null, placed_by: null });
     emit('weeks', 'UPDATE', w); return null;
   },
   delete_spin({ p_spin }) {
@@ -220,6 +233,7 @@ export const demoClient = {
       return {
         async upload(path, blob) { files[path] = URL.createObjectURL(blob); return { data: { path }, error: null }; },
         async createSignedUrl(path) { return files[path] ? { data: { signedUrl: files[path] }, error: null } : { data: null, error: { message: 'Object not found' } }; },
+        async remove(paths) { paths.forEach((p) => delete files[p]); return { data: null, error: null }; },
       };
     },
   },

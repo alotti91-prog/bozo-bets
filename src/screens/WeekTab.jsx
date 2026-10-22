@@ -6,6 +6,7 @@ import { lockState } from '../lib/deadline.js';
 import { IconShare, Belt } from '../components/common.jsx';
 import { LegTalk } from '../components/Comments.jsx';
 import PlacedSheet from './PlacedSheet.jsx';
+import { slipPaths } from '../lib/slip.js';
 
 const SPORTS = ['NFL', 'NCAAF', 'NBA', 'NHL', 'MLB', 'Soccer', 'Other'];
 const HINT = 'American odds, as the book shows them. Tap the sign to switch between minus and plus.';
@@ -65,6 +66,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
   const ways = new Set(legs.map((l) => l.player_id)).size;
   const sunk = [...new Set(info.losers.map((l) => l.player_id))].sort((a, b) => order[a] - order[b]).map(pname);
   const placed = !!week.placed_at;
+  const shots = slipPaths(week).length;
   const lock = lockState(week.lock_at);
   const locked = !!lock?.locked;
   const canMark = isAdmin || (!!me && week.payer_id === me);
@@ -112,7 +114,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
           <span className="t-kicker">Parlay slip</span>
           <span className="t-meta">Week {week.n} {'·'} {legs.length} leg{legs.length === 1 ? '' : 's'} {'·'} {fmtDate(week.start_date)}</span>
           {placed ? (
-            <button type="button" className="placed yes" onClick={() => setSlipOpen(true)}>Placed ✓{week.slip_path ? ' · View slip' : ''}</button>
+            <button type="button" className="placed yes" onClick={() => setSlipOpen(true)}>Placed ✓{shots ? ` · ${shots === 1 ? 'View slip' : `View slip (${shots})`}` : ''}</button>
           ) : legs.length > 0 ? <span className="placed">Not placed yet</span> : null}
         </div>
         {stamp && <div className={`stamp stamp-${info.status}`}>{stamp}</div>}
@@ -179,10 +181,10 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
       <div className="actions-row">
         <button className="btn" onClick={() => shareText(slipText(), { title: `Week ${week.n} slip` })}><IconShare />Share the slip</button>
         {canMark && !placed && legs.length > 0 && (
-          <button className="btn primary" onClick={() => setSlipOpen(true)}>I placed it</button>
+          <button className="btn primary" onClick={() => setSlipOpen(true)}>Add slip screenshots</button>
         )}
         {canMark && placed && (
-          <button className="btn" onClick={() => setSlipOpen(true)}>Edit placed slip</button>
+          <button className="btn" onClick={() => setSlipOpen(true)}>Slip screenshots{shots ? ` (${shots})` : ''}</button>
         )}
       </div>
       {slipOpen && <PlacedSheet data={data} week={week} canMark={canMark} reload={reload} nameOfUser={nameOfUser} onClose={() => setSlipOpen(false)} />}

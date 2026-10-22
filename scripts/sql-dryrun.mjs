@@ -281,6 +281,29 @@ pw = (await as(A, `select placed_at, slip_path from public.weeks where id = $1`,
 assert.equal(pw.placed_at, null); assert.equal(pw.slip_path, null);
 ok('bet placed: the payer or commish marks it (with a screenshot path in their league); others can’t');
 
+// Several screenshots: the payer (Sully = B) adds them; the first marks it placed.
+const sp = (f) => `${lid3}/${wk7}/${f}`;
+await as(A, `update public.weeks set payer_id = $2 where id = $1`, [wk7, p3.Mikey]); // B isn't on the hook now
+await fails(B, `select public.add_slips($1, $2::text[])`, [wk7, [sp('a.jpg')]], /on the hook/);
+await as(A, `update public.weeks set payer_id = $2 where id = $1`, [wk7, p3.Sully]);
+await fails(B, `select public.add_slips($1, $2::text[])`, [wk7, [`${lid3}/someotherweek/a.jpg`]], /this week/);
+await as(B, `select public.add_slips($1, $2::text[])`, [wk7, [sp('a.jpg'), sp('b.jpg')]]);
+await as(B, `select public.add_slips($1, $2::text[])`, [wk7, [sp('b.jpg'), sp('c.jpg')]]); // b again is ignored
+let sw = (await as(A, `select slip_paths, slip_path, placed_by, placed_at from public.weeks where id = $1`, [wk7])).rows[0];
+assert.deepEqual(sw.slip_paths, [sp('a.jpg'), sp('b.jpg'), sp('c.jpg')]);
+assert.equal(sw.slip_path, sp('a.jpg')); assert.equal(sw.placed_by, B); assert.ok(sw.placed_at);
+await fails(B, `select public.add_slips($1, $2::text[])`, [wk7, Array.from({ length: 8 }, (_, i) => sp(`x${i}.jpg`))], /more than 10/);
+ok('slip screenshots: the payer adds several at once, the first marks it placed, others can’t');
+
+await as(B, `select public.remove_slip($1, $2)`, [wk7, sp('a.jpg')]);
+sw = (await as(A, `select slip_paths, slip_path, placed_at from public.weeks where id = $1`, [wk7])).rows[0];
+assert.deepEqual(sw.slip_paths, [sp('b.jpg'), sp('c.jpg')]); assert.equal(sw.slip_path, sp('b.jpg')); assert.ok(sw.placed_at);
+await as(A, `select public.remove_slip($1, $2)`, [wk7, sp('b.jpg')]);
+await as(A, `select public.remove_slip($1, $2)`, [wk7, sp('c.jpg')]);
+sw = (await as(A, `select slip_paths, slip_path, placed_at, placed_by from public.weeks where id = $1`, [wk7])).rows[0];
+assert.deepEqual(sw.slip_paths, []); assert.equal(sw.placed_at, null); assert.equal(sw.placed_by, null);
+ok('slip screenshots: removing one keeps it placed; removing the last un-marks it');
+
 // ---- Pick deadline ---------------------------------------------------------
 const lid4 = (await as(A, `select public.create_league('Deadline', 10, array['Lotti','Sully','Mikey'], 'Lotti', 7) as id`)).rows[0].id;
 const p4 = Object.fromEntries((await as(A, `select id, name from public.players where league_id = $1`, [lid4])).rows.map((r) => [r.name, r.id]));
@@ -370,7 +393,7 @@ await st.exec(`
   alter table storage.objects enable row level security;
   create function storage.foldername(name text) returns text[] language plpgsql as $$
     declare _parts text[]; begin select string_to_array(name, '/') into _parts; return _parts[1:array_length(_parts,1)-1]; end $$;
-  grant usage on schema storage to authenticated; grant select, insert on storage.objects to authenticated;`);
+  grant usage on schema storage to authenticated; grant select, insert, delete on storage.objects to authenticated;`);
 await st.exec(schema);
 await st.exec(schema); // re-runnable, including the storage block
 await st.exec(`grant usage on schema public to authenticated, anon; grant select, insert, update, delete on all tables in schema public to authenticated;
@@ -391,5 +414,14 @@ assert.ok(stErr, 'upload outside a league folder should be refused');
 assert.equal((await asSt(A, `select count(*)::int c from storage.objects`)).rows[0].c, 1);
 assert.equal((await asSt(C2, `select count(*)::int c from storage.objects`)).rows[0].c, 0);
 ok('slip screenshots: private bucket; only league members can upload or view, and only in their league’s folder');
+
+// Deleting files: only for a real week in that league, by its payer or the commish.
+const swk = (await asSt(A, `select id from public.weeks where league_id = $1`, [sl])).rows[0].id;
+await asSt(A, `insert into storage.objects (bucket_id, name) values ('slips', $1), ('slips', $2)`, [`${sl}/${swk}/one.jpg`, `${sl}/${swk}/two.jpg`]);
+await asSt(C2, `delete from storage.objects where name = $1`, [`${sl}/${swk}/one.jpg`]); // stranger: 0 rows
+await asSt(A, `delete from storage.objects where name = $1`, [`${sl}/w/slip.jpg`]); // not a real week folder: 0 rows
+await asSt(A, `delete from storage.objects where name = $1`, [`${sl}/${swk}/one.jpg`]);
+assert.deepEqual((await asSt(A, `select name from storage.objects order by name`)).rows.map((r) => r.name).sort(), [`${sl}/${swk}/two.jpg`, `${sl}/w/slip.jpg`].sort());
+ok('slip screenshots: the commish (or payer) can delete a week’s files; strangers can’t');
 
 console.log(`\n${passed} checks passed.`);

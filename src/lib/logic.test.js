@@ -6,6 +6,7 @@ import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
 import { countdown, lockState, toLocalInput, ago } from './deadline.js';
 import { isPrivateAddress } from './site.js';
 import { RELEASES, unseenReleases } from './releases.js';
+import { slipPaths } from './slip.js';
 
 describe('odds', () => {
   it('converts American odds to decimal', () => {
@@ -175,6 +176,14 @@ describe('release notes', () => {
     expect(unseenReleases('c', rs)).toEqual([]);
     expect(unseenReleases(null, rs).map((r) => r.id)).toEqual(['c']);
     expect(unseenReleases('gone', rs).map((r) => r.id)).toEqual(['c']);
+  });
+});
+
+describe('slip screenshots', () => {
+  it('reads several, or the single one older weeks have', () => {
+    expect(slipPaths({ slip_paths: ['a', 'b'], slip_path: 'a' })).toEqual(['a', 'b']);
+    expect(slipPaths({ slip_paths: [], slip_path: 'old' })).toEqual(['old']);
+    expect(slipPaths({ slip_path: null })).toEqual([]);
   });
 });
 
