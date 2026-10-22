@@ -88,3 +88,6 @@ If you miss the live spin, who it landed on is hidden on every tab (Wheel result
 - Phones keep the app open for days (especially from the home screen), so people can run an old version. The build now writes `version.json`, and the app shows "Bozo Bets was updated. Refresh" when the online version differs.
 - If a table the app needs is missing (schema.sql not re-run), admins now see a "Database update needed" banner instead of the feature quietly switching off.
 
+**2026-10-22 · Auto-refresh to the newest version**
+When the app comes back on screen and a newer version is online, it reloads by itself, unless a sheet is open or something is typed in a box (people flip to DraftKings mid-pick to check odds, and a reload would wipe it). Then it shows the Refresh bar instead. Checks while the app is in use only show the bar, so a reload never interrupts a spin. It reloads at most once per version, to avoid a loop if a stale copy is cached. We don't reload on every single open: data already refreshes on return, and an unconditional reload would lose half-typed picks.
+

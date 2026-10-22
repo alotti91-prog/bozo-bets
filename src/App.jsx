@@ -83,27 +83,46 @@ function Home({ userId }) {
 }
 
 // A phone can keep the app open for days, especially from the home screen.
-// When a newer version is online, offer a refresh.
+// Each time the app comes back on screen, check for a newer version. If there
+// is one, reload right away, unless someone is mid-typing or has a sheet open
+// (they may have flipped to DraftKings to check odds). Then offer a Refresh bar.
+function busyTyping() {
+  if (document.querySelector('.overlay')) return true; // Settings or another sheet is open
+  return [...document.querySelectorAll('input, textarea')].some((el) =>
+    !el.readOnly && !el.hidden && !['hidden', 'checkbox', 'radio', 'file'].includes(el.type) && String(el.value || '').trim() !== '');
+}
+
 function UpdateBar() {
   const [stale, setStale] = useState(false);
   useEffect(() => {
     const mine = import.meta.env.VITE_BUILD_ID;
     if (!mine || import.meta.env.DEV) return undefined;
     let checking = false;
-    const check = async () => {
+    const check = async (canReload) => {
       if (checking || document.visibilityState !== 'visible') return;
       checking = true;
       try {
         const r = await fetch('/version.json', { cache: 'no-store' });
-        if (r.ok) { const v = await r.json(); if (v.id && v.id !== mine) setStale(true); }
+        const v = r.ok ? await r.json() : null;
+        if (v?.id && v.id !== mine) {
+          // Reload once per new version; if that somehow didn't take, fall back to the bar.
+          if (canReload && !busyTyping() && store.get('bz-reloaded-for') !== v.id) {
+            store.set('bz-reloaded-for', v.id);
+            window.location.reload();
+            return;
+          }
+          setStale(true);
+        }
       } catch { /* offline: try again later */ }
       checking = false;
     };
-    check();
-    document.addEventListener('visibilitychange', check);
-    window.addEventListener('focus', check);
-    const t = setInterval(check, 10 * 60e3);
-    return () => { document.removeEventListener('visibilitychange', check); window.removeEventListener('focus', check); clearInterval(t); };
+    const onShow = () => check(true); // coming back to the app: safe moment to reload
+    const onTick = () => check(false); // while in use: just offer the bar
+    onShow();
+    document.addEventListener('visibilitychange', onShow);
+    window.addEventListener('focus', onTick);
+    const t = setInterval(onTick, 10 * 60e3);
+    return () => { document.removeEventListener('visibilitychange', onShow); window.removeEventListener('focus', onTick); clearInterval(t); };
   }, []);
   if (!stale) return null;
   return (
