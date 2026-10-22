@@ -11,7 +11,7 @@ const PREVIEW = 2; // comments shown before "See all"
  * Reactions plus the comment thread under one pick on the slip. The 💬 button
  * opens the box to write one. Shows the latest two comments until opened.
  */
-export function LegTalk({ leg, data, userId, isAdmin, nameOfUser, reload, who }) {
+export function LegTalk({ leg, data, userId, isAdmin, nameOfUser, reload, who, trailing = null }) {
   const [mode, setMode] = useState('closed'); // 'closed' | 'all' | 'write'
   const here = (data.comments || []).filter((c) => c.leg_id === leg.id);
   return (
@@ -22,6 +22,7 @@ export function LegTalk({ leg, data, userId, isAdmin, nameOfUser, reload, who })
           onClick={() => setMode(mode === 'write' ? 'closed' : 'write')}>
           <span aria-hidden="true">💬</span>{here.length > 0 && <b>{here.length}</b>}
         </button>
+        {trailing && <span className="reacts-end">{trailing}</span>}
       </Reactions>
       <Comments leg={leg} comments={here} userId={userId} isAdmin={isAdmin} nameOfUser={nameOfUser} reload={reload}
         mode={mode} setMode={setMode} who={who} />

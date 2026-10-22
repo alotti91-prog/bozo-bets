@@ -76,10 +76,20 @@ export function betProblem(b) {
   return '';
 }
 
+/** ESPN's "6:12 - 3rd" as "Q3 6:12" (hockey: "P2 12:05", overtime: "OT 3:10"). Anything else is left as is. */
+export function shortClock(detail, sport) {
+  const m = /^(\d{1,2}:\d{2})\s*-\s*(1st|2nd|3rd|4th|\d?OT)$/i.exec(String(detail || '').trim());
+  if (!m) return detail || '';
+  const per = m[2].toUpperCase();
+  if (per.endsWith('OT')) return `${per} ${m[1]}`;
+  return `${sport === 'nhl' ? 'P' : 'Q'}${per[0]} ${m[1]}`;
+}
+
 /**
  * Where a leg stands right now. game is the latest from ESPN, or null.
  * Returns null without a game, else:
  *   { tone: 'pre' | 'live' | 'win' | 'loss' | 'push', label, score, clock,
+ *     away, home ({ abbr, score, mine: is it this bet's team }),
  *     progress (0..1 or null), done (final), locked (decided before the final) }
  */
 export function liveStatus(bet, game) {
@@ -89,7 +99,12 @@ export function liveStatus(bet, game) {
   const score = `${game.away.abbr} ${A}, ${game.home.abbr} ${H}`;
   if (game.state === 'pre') return { tone: 'pre', label: '', score: '', clock: game.detail, progress: null, done: false, locked: false };
   const done = game.state === 'post';
-  const out = (tone, label, extra = {}) => ({ tone, label, score, clock: done ? (game.detail || 'Final') : game.detail, progress: null, done, locked: false, ...extra });
+  const mineSide = bet.type === 'spread' || bet.type === 'ml' ? bet.side : null;
+  const isMine = (side, abbr) => mineSide === side || (bet.type === 'prop' && !!bet.player?.team && bet.player.team === abbr);
+  const away = { abbr: game.away.abbr, score: A, mine: isMine('away', game.away.abbr) };
+  const home = { abbr: game.home.abbr, score: H, mine: isMine('home', game.home.abbr) };
+  const clock = done ? (game.detail || 'Final') : shortClock(game.detail, bet.sport);
+  const out = (tone, label, extra = {}) => ({ tone, label, score, clock, away, home, progress: null, done, locked: false, ...extra });
   const line = bet.line;
 
   if (bet.type === 'spread' || bet.type === 'ml') {
@@ -129,6 +144,32 @@ export function liveStatus(bet, game) {
   if (v > line) return out('loss', bet.type === 'total' ? `Went over (${v})` : `Went over: ${v}${unit}`, { locked: true, progress: 1 });
   if (done) return v === line ? out('push', `Push at ${v}`) : out('win', `Stayed under: ${v}${unit}`);
   return out('win', `${v}${unit}, under so far`, { progress: line > 0 ? Math.min(1, v / line) : 0 });
+}
+
+/** One word for a leg's dot at the top of the slip: 'win' | 'loss' | 'push' | 'live' | 'pre'. */
+export function legState(leg, s) {
+  if (leg.result === 'W') return 'win';
+  if (leg.result === 'L') return 'loss';
+  if (leg.result === 'P') return 'push';
+  if (!s || s.tone === 'pre') return 'pre';
+  return s.tone;
+}
+
+/** The grade a finished game points to ('W' | 'L' | 'P'), or null if it isn't final. */
+export function suggestedGrade(s) {
+  if (!s || !s.done) return null;
+  return { win: 'W', loss: 'L', push: 'P' }[s.tone] || null;
+}
+
+/**
+ * Whether to hide an ungraded picked leg's W/L/P buttons: yes while its game
+ * hasn't finished (or hasn't started). Typed legs, graded legs, and legs whose
+ * game we can't see always show them, so an admin is never stuck.
+ */
+export function gradeHidden(leg, s, now = Date.now()) {
+  if (!leg.bet?.game || leg.result) return false;
+  if (s) return !s.done;
+  return !!leg.bet.game.start && new Date(leg.bet.game.start).getTime() > now;
 }
 
 /** How many legs are still alive: not graded a loss, and not already lost on the field. */

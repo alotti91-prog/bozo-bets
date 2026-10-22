@@ -11,6 +11,7 @@ const LABEL = { '🔥': 'Fire', '🙏': 'Praying', '🤡': 'Clown', '💀': 'Dea
  */
 export default function Reactions({ leg, reactions, userId, nameOfUser, reload, readOnly = false, children }) {
   const [busy, setBusy] = useState(null);
+  const [open, setOpen] = useState(false); // all four showing (otherwise just the ones used)
   const here = reactions.filter((r) => r.leg_id === leg.id);
   const counts = EMOJI.map((e) => {
     const rs = here.filter((r) => r.emoji === e);
@@ -30,13 +31,14 @@ export default function Reactions({ leg, reactions, userId, nameOfUser, reload, 
       ? await supabase.from('reactions').delete().eq('leg_id', leg.id).eq('user_id', userId).eq('emoji', c.e)
       : await supabase.from('reactions').insert({ leg_id: leg.id, emoji: c.e });
     setBusy(null);
+    setOpen(false);
     if (error) { toast(friendly(error)); return; }
     reload();
   }
 
   return (
     <div className="reacts" role="group" aria-label="Reactions">
-      {counts.map((c) => (
+      {counts.filter((c) => open || c.n > 0).map((c) => (
         <button key={c.e} type="button" className="react" aria-pressed={c.mine} disabled={busy === c.e}
           title={c.n ? c.who.join(', ') : LABEL[c.e]}
           aria-label={`${LABEL[c.e]}${c.n ? `, ${c.n}: ${c.who.join(', ')}` : ''}`}
@@ -44,6 +46,12 @@ export default function Reactions({ leg, reactions, userId, nameOfUser, reload, 
           <span aria-hidden="true">{c.e}</span>{c.n > 0 && <b>{c.n}</b>}
         </button>
       ))}
+      {userId && (
+        <button type="button" className="react react-add" aria-expanded={open} aria-label={open ? 'Hide reactions' : 'Add a reaction'}
+          title={open ? 'Hide' : 'React'} onClick={() => setOpen(!open)}>
+          <span aria-hidden="true">{open ? '×' : '☺+'}</span>
+        </button>
+      )}
       {children}
     </div>
   );

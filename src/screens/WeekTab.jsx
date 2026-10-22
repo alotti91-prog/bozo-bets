@@ -8,7 +8,8 @@ import { LegTalk } from '../components/Comments.jsx';
 import PlacedSheet from './PlacedSheet.jsx';
 import { slipPaths } from '../lib/slip.js';
 import { SPORTS as LIVE_SPORTS } from '../lib/espn.js';
-import { liveStatus, aliveCount, gameKey, pickText, betProblem, emptyPick, pickFromBet, betFromPick } from '../lib/bets.js';
+import { liveStatus, aliveCount, gameKey, pickText, betProblem, emptyPick, pickFromBet, betFromPick, legState, suggestedGrade, gradeHidden } from '../lib/bets.js';
+import { updatedAgo } from '../lib/deadline.js';
 import { useLiveGames } from '../lib/useLiveGames.js';
 import BetPicker from '../components/BetPicker.jsx';
 
@@ -20,12 +21,14 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
   const [confirmRm, setConfirmRm] = useState(null);
   const [editing, setEditing] = useState(null);
   const [slipOpen, setSlipOpen] = useState(false);
-  const [, setTick] = useState(0);
+  const [menuFor, setMenuFor] = useState(null); // leg whose ⋯ menu is open
+  const [gradeFor, setGradeFor] = useState(null); // leg whose W/L/P an admin opened early
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setTick((x) => x + 1), 30000); // keeps the countdown fresh
+    const t = setInterval(() => setNow(Date.now()), 30000); // keeps the countdown and "updated" label fresh
     return () => clearInterval(t);
   }, []);
-  const games = useLiveGames(week ? data.legs.filter((l) => l.week_id === week.id) : []);
+  const [games, updatedAt] = useLiveGames(week ? data.legs.filter((l) => l.week_id === week.id) : []);
 
   if (!week) {
     return (
@@ -44,6 +47,11 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
   const statusOf = (l) => (l.bet?.game ? liveStatus(l.bet, games[gameKey(l.bet)]) : null);
   const alive = aliveCount(legs, statusOf);
   const showAlive = info.status === 'live' && legs.some((l) => l.result || (statusOf(l) && statusOf(l).tone !== 'pre'));
+  const states = legs.map((l) => legState(l, statusOf(l)));
+  const showStrip = legs.some((l) => l.bet?.game || l.result);
+  const anyLive = legs.some((l) => statusOf(l)?.tone && statusOf(l).tone !== 'pre' && !statusOf(l).done);
+  const stripLabel = ['win', 'loss', 'live', 'push', 'pre'].map((k) => [k, states.filter((x) => x === k).length]).filter(([, n]) => n)
+    .map(([k, n]) => `${n} ${{ win: 'winning or won', loss: 'losing or lost', live: 'in progress', push: 'push', pre: 'waiting' }[k]}`).join(', ');
 
   async function act(promise, okMsg) {
     const { error } = await promise;
@@ -121,7 +129,15 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         <div className="t-head">
           <span className="t-kicker">Parlay slip</span>
           <span className="t-meta">Week {week.n} {'·'} {legs.length} leg{legs.length === 1 ? '' : 's'} {'·'} {fmtDate(week.start_date)}</span>
-          {showAlive && <span className={`t-alive${alive.alive < alive.total ? ' is-down' : ''}`}>{alive.alive} of {alive.total} legs alive</span>}
+          {showStrip && (
+            <div className="t-strip">
+              <span className="t-dots" role="img" aria-label={stripLabel}>
+                {legs.map((l, i) => <span key={l.id} className={`t-dot is-${states[i]}`} title={`${pname(l.player_id)}: ${l.pick}`} />)}
+              </span>
+              {showAlive && <span className={`t-alive${alive.alive < alive.total ? ' is-down' : ''}`}>{alive.alive} of {alive.total} alive</span>}
+            </div>
+          )}
+          {anyLive && updatedAt && <span className="t-updated">Scores updated {updatedAgo(now - updatedAt)}</span>}
           {placed ? (
             <button type="button" className="placed yes" onClick={() => setSlipOpen(true)}>Placed ✓{shots ? ` · ${shots === 1 ? 'View slip' : `View slip (${shots})`}` : ''}</button>
           ) : legs.length > 0 ? <span className="placed">Not placed yet</span> : null}
@@ -132,37 +148,53 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
           {legs.map((l) => {
             const mine = me && l.player_id === me;
             const canEdit = isAdmin || (mine && !l.result && !locked);
+            const st = statusOf(l);
+            const hideGrade = gradeHidden(l, st) && gradeFor !== l.id;
+            const suggest = isAdmin && !l.result ? suggestedGrade(st) : null;
+            const word = { W: 'Won', L: 'Lost', P: 'Push' };
+            const showPill = !isAdmin && (l.result || !l.bet?.game);
+            // Nothing to act on (a live picked leg): put the sport tag and ⋯ at the end of the reactions row.
+            const compact = !suggest && !(isAdmin && !hideGrade) && !showPill && l.result !== 'L' && confirmRm !== l.id && menuFor !== l.id;
+            const moreBtn = canEdit && <button type="button" className="more-btn" aria-label={`More for ${pname(l.player_id)}’s leg`} onClick={() => setMenuFor(l.id)}>{'⋯'}</button>;
             return (
               <li key={l.id} className={`leg${l.result ? ' is-' + l.result : ''}`}>
                 <span className="leg-who">{pname(l.player_id)}<Belt on={beltId === l.player_id} />{mine && <span className="you"> {'·'} you</span>}</span>
                 <span className="leg-odds">{fmtOdds(l.odds)}</span>
                 <span className="leg-pick">{l.pick}</span>
-                {l.bet?.game && <LiveLine bet={l.bet} s={statusOf(l)} />}
-                <div className="leg-meta">
+                {l.bet?.game && <LiveLine bet={l.bet} s={st} />}
+                {!compact && <div className="leg-meta">
                   <span className="tag">{l.sport}</span>
-                  {isAdmin ? (
+                  {suggest && (
+                    <button type="button" className="mark-btn" onClick={() => grade(l, suggest)} aria-label={`Final. Mark ${pname(l.player_id)}’s leg ${word[suggest]}`}>
+                      Mark {suggest}
+                    </button>
+                  )}
+                  {isAdmin ? (!hideGrade && (
                     <div className="grade" role="group" aria-label={`Result for ${pname(l.player_id)}`}>
                       {['W', 'L', 'P'].map((r) => (
-                        <button key={r} type="button" className={`g-${r}`} aria-pressed={l.result === r} aria-label={{ W: 'Won', L: 'Lost', P: 'Push' }[r]} onClick={() => grade(l, r)}>{r}</button>
+                        <button key={r} type="button" className={`g-${r}`} aria-pressed={l.result === r} aria-label={word[r]} onClick={() => grade(l, r)}>{r}</button>
                       ))}
                     </div>
-                  ) : (
-                    <span className={`res res-${l.result || 'none'}`}>{{ W: 'Won', L: 'Lost', P: 'Push' }[l.result] || 'Pending'}</span>
+                  )) : showPill && (
+                    <span className={`res res-${l.result || 'none'}`}>{word[l.result] || 'Pending'}</span>
                   )}
                   {canEdit && (confirmRm === l.id ? (
                     <span className="confirm">Remove this leg?
                       <button className="link danger" onClick={() => remove(l)}>Remove</button>
                       <button className="link" onClick={() => setConfirmRm(null)}>Keep</button>
                     </span>
-                  ) : (
-                    <>
-                      <button className="link" onClick={() => setEditing(l)}>Edit</button>
-                      <button className="link" onClick={() => setConfirmRm(l.id)}>Remove</button>
-                    </>
-                  ))}
+                  ) : menuFor === l.id ? (
+                    <span className="leg-menu">
+                      <button className="link" onClick={() => { setMenuFor(null); setEditing(l); }}>Edit</button>
+                      <button className="link" onClick={() => { setMenuFor(null); setConfirmRm(l.id); }}>Remove</button>
+                      {isAdmin && hideGrade && <button className="link" onClick={() => { setMenuFor(null); setGradeFor(l.id); }}>Grade now</button>}
+                      <button className="link" onClick={() => setMenuFor(null)} aria-label="Close menu">Done</button>
+                    </span>
+                  ) : moreBtn)}
                   {l.result === 'L' && <span className="bozo-mark">Bozo</span>}
-                </div>
-                <LegTalk leg={l} data={data} userId={userId} isAdmin={isAdmin} nameOfUser={nameOfUser} reload={reload} who={pname(l.player_id)} />
+                </div>}
+                <LegTalk leg={l} data={data} userId={userId} isAdmin={isAdmin} nameOfUser={nameOfUser} reload={reload} who={pname(l.player_id)}
+                  trailing={compact ? <><span className="tag">{l.sport}</span>{moreBtn}</> : null} />
               </li>
             );
           })}
@@ -249,13 +281,18 @@ function PayoutForm({ week, projected, act }) {
   );
 }
 
-// Live state under a picked leg: "Covering · DET 24, GB 17 · 6:12 - 3rd", with a bar for overs.
+// Live state under a picked leg: "Covering · DET 24, GB 17 · Q3 6:12" (your team in bold), with a bar for overs.
 function LiveLine({ bet, s }) {
   const when = bet.game.start ? new Date(bet.game.start).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
-  if (!s || s.tone === 'pre') return <span className="leg-live tone-pre">{bet.game.short}{when ? ` · ${when}` : ''}</span>;
+  if (!s || s.tone === 'pre') return <span className="leg-live tone-pre"><span className="ll-row"><span>{bet.game.short}</span>{when && <span>{when}</span>}</span></span>;
+  const team = (t) => <span className={t.mine ? 'll-mine' : undefined}>{t.abbr} {t.score}</span>;
   return (
     <span className={`leg-live tone-${s.tone}`}>
-      <span><strong>{s.label}</strong> {'·'} {s.score} {'·'} {s.clock}</span>
+      <span className="ll-row">
+        <strong>{s.label}</strong>
+        <span>{team(s.away)}, {team(s.home)}</span>
+        <span>{s.clock}</span>
+      </span>
       {s.progress != null && !s.done && <span className="leg-bar" aria-hidden="true"><span style={{ width: `${Math.round(s.progress * 100)}%` }} /></span>}
     </span>
   );

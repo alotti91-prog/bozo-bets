@@ -3,12 +3,12 @@ import { dec, amerFmt, fmtOdds, parseOdds, weekInfo, money, signed } from './odd
 import { standings, hitPct, bozoBelt } from './stats.js';
 import { indexAt, targetRotation, restRotation, wheelContext, unwatchedSpin, hideSpin, TAU } from './wheel.js';
 import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
-import { countdown, lockState, toLocalInput, ago } from './deadline.js';
+import { countdown, lockState, toLocalInput, ago, updatedAgo } from './deadline.js';
 import { isPrivateAddress } from './site.js';
 import { RELEASES, unseenReleases } from './releases.js';
 import { slipPaths } from './slip.js';
 import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
-import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine } from './bets.js';
+import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden } from './bets.js';
 import espnHandler from '../../api/espn.js';
 import { runChecks } from '../../api/health.js';
 
@@ -158,6 +158,12 @@ describe('deadline', () => {
     expect(ago(at(3 * 3600e3), now)).toBe('3h');
     expect(ago(at(2 * 86400e3), now)).toBe('2d');
     expect(ago(at(10 * 86400e3), now)).toBe('Oct 11');
+  });
+  it('says how long ago scores updated', () => {
+    expect(updatedAgo(5e3)).toBe('just now');
+    expect(updatedAgo(20e3)).toBe('20s ago');
+    expect(updatedAgo(3 * 60e3)).toBe('3m ago');
+    expect(updatedAgo(2 * 3600e3)).toBe('2h ago');
   });
   it('round-trips a datetime-local value', () => {
     const d = new Date(2026, 9, 25, 12, 55);
@@ -360,6 +366,38 @@ describe('structured legs', () => {
     expect(liveStatus(gibbs, withGibbs(60, 'post'))).toMatchObject({ tone: 'loss', done: true });
     expect(liveStatus({ ...gibbs, stat: 'td' }, withGibbs(0))).toMatchObject({ tone: 'live', label: 'No TD yet' });
     expect(liveStatus({ ...gibbs, stat: 'td' }, live(14, 7, 'in', [{ id: '7', stats: { td: 1 } }]))).toMatchObject({ tone: 'win', locked: true });
+  });
+  it('shortens the game clock and bolds the bet’s team', () => {
+    expect(shortClock('6:12 - 3rd', 'nfl')).toBe('Q3 6:12');
+    expect(shortClock('12:05 - 2nd', 'nhl')).toBe('P2 12:05');
+    expect(shortClock('3:10 - OT', 'nba')).toBe('OT 3:10');
+    expect(shortClock('Halftime', 'nfl')).toBe('Halftime');
+    expect(shortClock('Bot 7th', 'mlb')).toBe('Bot 7th');
+    const s = liveStatus({ sport: 'nfl', type: 'spread', side: 'away', line: -3.5, game }, live(24, 17));
+    expect(s.clock).toBe('Q3 6:12');
+    expect(s.away).toEqual({ abbr: 'DET', score: 24, mine: true });
+    expect(s.home.mine).toBe(false);
+    const prop = liveStatus({ sport: 'nfl', type: 'prop', side: 'over', line: 74.5, stat: 'rushYds', player: { id: '7', team: 'GB' }, game }, live(14, 7));
+    expect(prop.home.mine).toBe(true);
+    expect(liveStatus({ sport: 'nfl', type: 'total', side: 'over', line: 44.5, game }, live(14, 7)).away.mine).toBe(false);
+  });
+  it('picks a dot, a suggested grade, and when to hide the grade buttons', () => {
+    const lions = { type: 'spread', side: 'away', line: -3.5, game };
+    const s = (a, h, st) => liveStatus(lions, live(a, h, st));
+    expect(legState({ result: 'L' }, s(24, 17))).toBe('loss');
+    expect(legState({}, s(24, 17))).toBe('win');
+    expect(legState({}, null)).toBe('pre');
+    expect(legState({}, liveStatus({ type: 'total', side: 'over', line: 44.5, game }, live(10, 7)))).toBe('live');
+    expect(suggestedGrade(s(24, 17))).toBe(null); // not final yet
+    expect(suggestedGrade(s(24, 17, 'post'))).toBe('W');
+    expect(suggestedGrade(s(20, 17, 'post'))).toBe('L');
+    const leg = { bet: lions };
+    expect(gradeHidden(leg, s(24, 17))).toBe(true);
+    expect(gradeHidden(leg, s(24, 17, 'post'))).toBe(false);
+    expect(gradeHidden({ ...leg, result: 'W' }, s(24, 17))).toBe(false);
+    expect(gradeHidden({ pick: 'typed' }, null)).toBe(false);
+    expect(gradeHidden(leg, null, Date.parse('2026-10-25T12:00Z'))).toBe(true); // before kickoff
+    expect(gradeHidden(leg, null, Date.parse('2026-10-25T20:00Z'))).toBe(false); // can't see the game: show them
   });
   it('counts legs still alive', () => {
     const legs = [{ result: 'W' }, { result: 'L' }, { result: null, s: { tone: 'loss', locked: true } }, { result: null, s: { tone: 'loss' } }, { result: null }];

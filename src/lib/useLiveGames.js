@@ -6,10 +6,11 @@ import { gameKey } from './bets.js';
  * Keeps the games behind this week's structured legs up to date. Checks every
  * 30 seconds while the app is on screen, only for games that are on or about
  * to start. Finished games are fetched once and left alone.
- * Returns { "nfl:401873010": game }.
+ * Returns [games, updatedAt]: games is { "nfl:401873010": game }; updatedAt is when scores last came in (ms) or null.
  */
 export function useLiveGames(legs) {
   const [games, setGames] = useState({});
+  const [updatedAt, setUpdatedAt] = useState(null);
   const latest = useRef(games);
   useEffect(() => { latest.current = games; }, [games]);
   const wanted = [];
@@ -39,7 +40,7 @@ export function useLiveGames(legs) {
         });
         const got = await Promise.all(due.map((w) => getGame(w.sport, w.id).then((g) => [w.key, g]).catch(() => null)));
         const fresh = Object.fromEntries(got.filter(Boolean));
-        if (!stop && Object.keys(fresh).length) setGames((prev) => ({ ...prev, ...fresh }));
+        if (!stop && Object.keys(fresh).length) { setGames((prev) => ({ ...prev, ...fresh })); setUpdatedAt(Date.now()); }
       }
       if (!stop) timer = setTimeout(tick, 30000);
     };
@@ -49,5 +50,5 @@ export function useLiveGames(legs) {
     return () => { stop = true; clearTimeout(timer); document.removeEventListener('visibilitychange', onShow); };
   }, [sig]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return games;
+  return [games, updatedAt];
 }

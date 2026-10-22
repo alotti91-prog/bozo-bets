@@ -5,6 +5,19 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-22-f',
+    date: '2026-10-22',
+    title: 'A cleaner slip on game day',
+    items: [
+      'A row of dots at the top shows every leg at a glance: green winning, red losing, gold in progress, hollow waiting. Plus “Scores updated 20s ago.”',
+      'W/L/P buttons stay out of the way until a picked leg’s game is final. Typed legs still show them. Need to grade early? ⋯ → Grade now.',
+      'When a game ends, admins get a one-tap “Mark W” (or L or P) based on the final score.',
+      'Edit and Remove moved into the ⋯ menu.',
+      'Live lines read cleaner (“Q3 6:12”) and your team’s score is in bold.',
+      'Reactions only show the emojis people used. Tap ☺+ to add one.',
+    ],
+  },
+  {
     id: '2026-10-22-e',
     date: '2026-10-22',
     title: 'Outage alerts',

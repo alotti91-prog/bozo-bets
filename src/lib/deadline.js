@@ -52,6 +52,14 @@ export function ago(iso, now = Date.now()) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+/** "just now", "20s ago", "3m ago", "2h ago": for "updated …" labels. */
+export function updatedAgo(ms) {
+  if (ms < 15e3) return 'just now';
+  if (ms < MIN) return `${Math.floor(ms / 1000)}s ago`;
+  if (ms < HOUR) return `${Math.floor(ms / MIN)}m ago`;
+  return `${Math.floor(ms / HOUR)}h ago`;
+}
+
 /** Value for an <input type="datetime-local"> in the viewer's time zone. */
 export function toLocalInput(date) {
   const p = (n) => String(n).padStart(2, '0');
