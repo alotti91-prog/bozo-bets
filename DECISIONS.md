@@ -91,3 +91,6 @@ If you miss the live spin, who it landed on is hidden on every tab (Wheel result
 **2026-10-22 · Auto-refresh to the newest version**
 When the app comes back on screen and a newer version is online, it reloads by itself, unless a sheet is open or something is typed in a box (people flip to DraftKings mid-pick to check odds, and a reload would wipe it). Then it shows the Refresh bar instead. Checks while the app is in use only show the bar, so a reload never interrupts a spin. It reloads at most once per version, to avoid a loop if a stale copy is cached. We don't reload on every single open: data already refreshes on return, and an unconditional reload would lose half-typed picks.
 
+**2026-10-22 · What's new, for admins**
+Release notes live in `src/lib/releases.js`, written by hand in plain words (commit messages and this file are too technical for the group). Admins see them in Settings → What's new, with a red dot on the gear when there's something new. "Seen" is remembered per device, which is fine for a nudge. Entries can credit whoever suggested the change (`idea`), so the people asking for features see their names.
+

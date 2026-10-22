@@ -6,6 +6,7 @@ import { Brand, IconGear } from '../components/common.jsx';
 import Claim from './Claim.jsx';
 import { bozoBelt } from '../lib/stats.js';
 import { unwatchedSpin, hideSpin } from '../lib/wheel.js';
+import { RELEASES } from '../lib/releases.js';
 import WeekTab from './WeekTab.jsx';
 import WheelTab from './WheelTab.jsx';
 import StandingsTab from './StandingsTab.jsx';
@@ -25,6 +26,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   const [skipClaim, setSkipClaim] = useState(() => store.get('bz-skip-claim-' + leagueId, false));
   const [seenSpins] = useState(() => new Set()); // live spins already played, so each plays once
   const [watched, setWatched] = useState(() => new Set()); // spins watched since the last load
+  const [notesSeen, setNotesSeen] = useState(() => !RELEASES.length || store.get('bz-seen-release') === RELEASES[0].id);
 
   const go = (t) => { setTab(t); store.set('bz-tab', t); window.scrollTo(0, 0); };
 
@@ -95,7 +97,9 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
           <div className="brand-row">
             <h1 className="brand"><Brand name={data.league.name} /></h1>
             <div className="top-actions">
-              <button className="icon-btn" onClick={() => setSettings(true)} aria-label="Settings"><IconGear /></button>
+              <button className="icon-btn" onClick={() => setSettings(true)} aria-label={isAdmin && !notesSeen ? 'Settings (new updates)' : 'Settings'}>
+                <IconGear />{isAdmin && !notesSeen && <span className="dot-new" aria-hidden="true" />}
+              </button>
             </div>
           </div>
           <nav className="tabs" role="tablist" aria-label="Sections">
@@ -127,7 +131,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
         {tab === 'history' && <HistoryTab {...props} />}
       </main>
       {settings && (
-        <SettingsSheet data={data} userId={userId} member={member} isAdmin={isAdmin} isOwner={isOwner} reload={reload}
+        <SettingsSheet data={data} userId={userId} member={member} isAdmin={isAdmin} isOwner={isOwner} reload={reload} onNotesSeen={() => setNotesSeen(true)}
           onClose={() => { setSettings(false); if (store.get('bz-has-pw', false)) setPwNudgeHidden(true); }} onChangePlayer={changePlayer}
           leagues={leagues} onSwitchLeague={(id) => { setSettings(false); onSwitchLeague(id); }}
           onAddLeague={() => { setSettings(false); onAddLeague(); }} onSignOut={onSignOut} />

@@ -5,6 +5,7 @@ import { indexAt, targetRotation, restRotation, wheelContext, unwatchedSpin, hid
 import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
 import { countdown, lockState, toLocalInput, ago } from './deadline.js';
 import { isPrivateAddress } from './site.js';
+import { RELEASES, unseenReleases } from './releases.js';
 
 describe('odds', () => {
   it('converts American odds to decimal', () => {
@@ -157,6 +158,23 @@ describe('deadline', () => {
     const d = new Date(2026, 9, 25, 12, 55);
     expect(toLocalInput(d)).toBe('2026-10-25T12:55');
     expect(new Date(toLocalInput(d)).getTime()).toBe(d.getTime());
+  });
+});
+
+describe('release notes', () => {
+  it('are newest first with unique ids', () => {
+    const ids = RELEASES.map((r) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const dates = RELEASES.map((r) => r.date);
+    expect([...dates].sort().reverse()).toEqual(dates);
+    RELEASES.forEach((r) => { expect(r.title).toBeTruthy(); expect(r.items.length).toBeGreaterThan(0); });
+  });
+  it('know which ones you haven’t seen', () => {
+    const rs = [{ id: 'c' }, { id: 'b' }, { id: 'a' }];
+    expect(unseenReleases('a', rs).map((r) => r.id)).toEqual(['c', 'b']);
+    expect(unseenReleases('c', rs)).toEqual([]);
+    expect(unseenReleases(null, rs).map((r) => r.id)).toEqual(['c']);
+    expect(unseenReleases('gone', rs).map((r) => r.id)).toEqual(['c']);
   });
 });
 

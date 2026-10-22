@@ -350,3 +350,14 @@ button.placed.yes { appearance: none; cursor: pointer; color: var(--p-win); back
 .result-name.is-hidden, .log-who .is-hidden { color: var(--muted); letter-spacing: .12em; }
 .hook-hidden { padding: 0; font-weight: 700; color: var(--nose); }
 .update-bar .link { padding: 0 2px; color: var(--ink); font-weight: 700; }
+
+/* admin release notes */
+.icon-btn { position: relative; }
+.dot-new { position: absolute; top: 6px; right: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--nose); box-shadow: 0 0 0 2px var(--surface); }
+.whats-new .lbl { display: flex; align-items: center; gap: 8px; }
+.rel { padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.rel:last-of-type { border-bottom: 0; }
+.rel-title { margin: 0 0 6px; font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rel-title time { margin-left: auto; font: 500 12px/1 var(--mono); color: var(--muted); }
+.rel-new { font: 700 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--on-nose); background: var(--nose); padding: 3px 6px; border-radius: 999px; }
+.rel ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; line-height: 1.45; }

@@ -27,4 +27,5 @@ Run all three checks before saying a change is done.
 ## Conventions
 - Copy is short and plain. Errors say what happened and what to do.
 - Record notable choices in `DECISIONS.md` (date · decision · why).
+- When a change people will notice ships, add a plain-language entry at the top of `src/lib/releases.js` (admins see it in Settings → What's new, with a dot on the gear). Credit whoever asked for it with `idea: 'Name'`.
 - Never commit `.env.local` or any Supabase secret key. The publishable key is meant to be public.
