@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase, demo } from '../lib/supabase.js';
 import { useLeague } from '../lib/useLeague.js';
 import { store, toast } from '../lib/ui.js';
@@ -7,6 +7,7 @@ import Claim from './Claim.jsx';
 import { bozoBelt } from '../lib/stats.js';
 import { unwatchedSpin, hideSpin } from '../lib/wheel.js';
 import { RELEASES } from '../lib/releases.js';
+import { feedDown } from '../lib/scores.js';
 import WeekTab from './WeekTab.jsx';
 import WheelTab from './WheelTab.jsx';
 import StandingsTab from './StandingsTab.jsx';
@@ -27,6 +28,12 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   const [seenSpins] = useState(() => new Set()); // live spins already played, so each plays once
   const [watched, setWatched] = useState(() => new Set()); // spins watched since the last load
   const [notesSeen, setNotesSeen] = useState(() => !RELEASES.length || store.get('bz-seen-release') === RELEASES[0].id);
+  const [scoresDown, setScoresDown] = useState(feedDown);
+  useEffect(() => {
+    const on = () => setScoresDown(feedDown());
+    window.addEventListener('bz-feed', on);
+    return () => window.removeEventListener('bz-feed', on);
+  }, []);
 
   const go = (t) => { setTab(t); store.set('bz-tab', t); window.scrollTo(0, 0); };
 
@@ -111,6 +118,11 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
       </header>
       <main className="wrap" role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {demo && <p className="note">Demo mode: sample data, nothing is saved. Reload to reset.</p>}
+        {isAdmin && scoresDown && (
+          <div className="banner">
+            <p><strong>Live scores aren{'’'}t loading.</strong> ESPN{'’'}s feed isn{'’'}t answering right now, so legs won{'’'}t track live. People can still add legs with {'“'}Type it instead.{'”'}</p>
+          </div>
+        )}
         {isAdmin && data.missing?.length > 0 && (
           <div className="banner">
             <p><strong>Database update needed.</strong> {data.missing.join(' and ')} {data.missing.length > 1 ? 'are' : 'is'} turned off until you run the latest <code>schema.sql</code> in the Supabase SQL Editor.</p>

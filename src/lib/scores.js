@@ -13,7 +13,28 @@ async function direct(params) {
   return { players: normalizeRoster(json) };
 }
 
+// Whether the live feed is answering. Two failures in a row with no success
+// counts as down (one blip doesn't). The app listens for 'bz-feed' to warn admins.
+let fails = 0;
+export const feedDown = () => fails >= 2;
+function note(ok) {
+  const was = feedDown();
+  fails = ok ? 0 : fails + 1;
+  if (was !== feedDown()) window.dispatchEvent(new Event('bz-feed'));
+}
+
 async function get(params) {
+  try {
+    const out = await fetchScores(params);
+    note(true);
+    return out;
+  } catch (e) {
+    note(false);
+    throw e;
+  }
+}
+
+async function fetchScores(params) {
   if (demoScores) return demoScores(params);
   let r;
   try { r = await fetch(`/api/espn?${new URLSearchParams(params)}`); } catch { throw new Error('Can’t reach the scores right now.'); }

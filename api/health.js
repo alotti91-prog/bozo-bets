@@ -1,0 +1,42 @@
+// Vercel serverless function: GET /api/health
+// Checks the app's outside connections and says which one is broken. An uptime
+// monitor (UptimeRobot) opens this every few minutes and emails the commish
+// when it stops returning 200. Read-only: it never writes anything.
+import { espnUrl, normalizeScoreboard } from '../src/lib/espn.js';
+
+const env = (...names) => names.map((n) => process.env[n]).find(Boolean) || '';
+
+async function check(fn) {
+  try { return (await fn()) || 'ok'; } catch (e) { return e.message || 'failed'; }
+}
+
+const timeout = () => AbortSignal.timeout(8000);
+
+export async function runChecks(now = new Date()) {
+  const supabase = check(async () => {
+    const url = env('VITE_SUPABASE_URL', 'SUPABASE_URL');
+    const key = env('VITE_SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_PUBLISHABLE_KEY', 'VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY');
+    if (!url || !key) throw new Error('Supabase settings are missing in Vercel');
+    // A real database read. With the public key, row-level security returns no rows, but a 200 proves the database answered.
+    const r = await fetch(`${url.replace(/\/$/, '')}/rest/v1/leagues?select=id&limit=1`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: timeout() });
+    if (!r.ok) throw new Error(`Supabase answered ${r.status}${r.status === 540 || r.status === 503 ? ' (project may be paused)' : ''}`);
+    return 'ok';
+  });
+  const espn = check(async () => {
+    const d = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const r = await fetch(espnUrl({ kind: 'scoreboard', sport: 'nfl', dates: d }), { headers: { accept: 'application/json' }, signal: timeout() });
+    if (!r.ok) throw new Error(`ESPN answered ${r.status}`);
+    const json = await r.json();
+    if (!Array.isArray(json?.events)) throw new Error('ESPN’s scoreboard changed shape');
+    if (json.events.length && !normalizeScoreboard(json, 'nfl').length) throw new Error('Couldn’t read teams from ESPN’s scoreboard');
+    return 'ok';
+  });
+  const checks = { supabase: await supabase, espn: await espn };
+  return { ok: Object.values(checks).every((v) => v === 'ok'), checks, at: now.toISOString() };
+}
+
+export default async function handler(req, res) {
+  const result = await runChecks();
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=60');
+  return res.status(result.ok ? 200 : 503).json(result);
+}

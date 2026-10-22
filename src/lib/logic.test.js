@@ -10,6 +10,7 @@ import { slipPaths } from './slip.js';
 import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
 import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine } from './bets.js';
 import espnHandler from '../../api/espn.js';
+import { runChecks } from '../../api/health.js';
 
 describe('odds', () => {
   it('converts American odds to decimal', () => {
@@ -279,6 +280,34 @@ describe('ESPN feed', () => {
       expect(down.code).toBe(502);
     } finally { globalThis.fetch = realFetch; }
   });
+});
+
+describe('health check', () => {
+  const ok = (json) => ({ ok: true, status: 200, json: async () => json });
+  const withEnv = async (fn) => {
+    const saved = { url: process.env.VITE_SUPABASE_URL, key: process.env.VITE_SUPABASE_PUBLISHABLE_KEY, f: globalThis.fetch };
+    process.env.VITE_SUPABASE_URL = 'https://abc.supabase.co'; process.env.VITE_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_x';
+    try { await fn(); } finally {
+      globalThis.fetch = saved.f;
+      if (saved.url === undefined) delete process.env.VITE_SUPABASE_URL; else process.env.VITE_SUPABASE_URL = saved.url;
+      if (saved.key === undefined) delete process.env.VITE_SUPABASE_PUBLISHABLE_KEY; else process.env.VITE_SUPABASE_PUBLISHABLE_KEY = saved.key;
+    }
+  };
+  it('passes when Supabase and ESPN both answer', () => withEnv(async () => {
+    const asked = [];
+    globalThis.fetch = async (u) => { asked.push(String(u)); return String(u).includes('supabase') ? ok([]) : ok(SB); };
+    const r = await runChecks(new Date(2026, 9, 25));
+    expect(r).toMatchObject({ ok: true, checks: { supabase: 'ok', espn: 'ok' } });
+    expect(asked.some((u) => u.includes('/rest/v1/leagues'))).toBe(true);
+    expect(asked.some((u) => u.includes('dates=20261025'))).toBe(true);
+  }));
+  it('names what broke', () => withEnv(async () => {
+    globalThis.fetch = async (u) => (String(u).includes('supabase') ? { ok: false, status: 540 } : ok({ nope: true }));
+    const r = await runChecks();
+    expect(r.ok).toBe(false);
+    expect(r.checks.supabase).toMatch(/540.*paused/);
+    expect(r.checks.espn).toMatch(/changed shape/);
+  }));
 });
 
 describe('structured legs', () => {

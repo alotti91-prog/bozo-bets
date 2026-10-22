@@ -5,6 +5,15 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-22-e',
+    date: '2026-10-22',
+    title: 'Outage alerts',
+    items: [
+      'Admins see a banner when live scores stop loading, so you know it’s ESPN and not you.',
+      'The site has a health check that an uptime monitor can watch to email the owner if the database or the scores feed goes down.',
+    ],
+  },
+  {
     id: '2026-10-22-d',
     date: '2026-10-22',
     title: 'Live legs',

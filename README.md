@@ -95,6 +95,18 @@ The first few emails from a new Gmail sender can land in spam, so tell the group
 
 ---
 
+## Get an alert if something breaks
+
+`/api/health` on your site checks Supabase (the database) and ESPN's live-scores feed, and answers 200 when both work or 503 with what's broken. Point a free uptime monitor at it:
+
+1. Sign up at **uptimerobot.com** (free).
+2. **New monitor** → type **HTTP(s)** → URL `https://<your-site>/api/health` → check every **5 minutes**.
+3. Alert contact: your email. You get an email when it breaks and another when it recovers.
+
+Admins also see a banner in the app when live scores stop loading. Side effect: the monitor's check counts as database activity, so Supabase won't pause the project in the offseason.
+
+---
+
 ## Who can do what
 
 | | Member | Admin | Owner |
