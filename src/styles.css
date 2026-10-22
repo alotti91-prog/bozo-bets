@@ -126,7 +126,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
 .leg-who .you { color: var(--p-win); }
 .leg-pick { grid-column: 1; grid-row: 2; font-weight: 700; font-size: 16.5px; line-height: 1.3; margin-top: 3px; overflow-wrap: anywhere; }
 .leg-odds { grid-column: 2; grid-row: 1 / span 2; align-self: center; font: 600 17px/1 var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
-.leg-meta { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 9px; }
+.leg-meta { grid-column: 1 / -1; grid-row: 4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 9px; }
 .leg.is-L .leg-pick { text-decoration: line-through; text-decoration-color: var(--p-loss); text-decoration-thickness: 2px; }
 .leg.is-L .leg-odds { color: var(--p-loss); }
 .leg.is-W .leg-odds { color: var(--p-win); }
@@ -287,7 +287,7 @@ tr:last-child td { border-bottom: 0; }
 /* Bozo Belt, reactions, placed */
 :root { --p-pick: #FCEBB6; --p-pick-line: #D9A93A; }
 .belt { margin-left: 5px; font-size: 1.05em; letter-spacing: 0; text-transform: none; }
-.reacts { grid-column: 1 / -1; grid-row: 4; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.reacts { grid-column: 1 / -1; grid-row: 5; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 .react { appearance: none; display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 3px 9px; border: 1px solid var(--paper-line); border-radius: 999px; background: transparent; color: var(--paper-ink); font: 600 14px/1 var(--body); cursor: pointer; }
 .react b { font: 600 12px/1 var(--mono); font-variant-numeric: tabular-nums; }
 .react[aria-pressed="true"] { background: var(--p-pick); border-color: var(--p-pick-line); }
@@ -313,7 +313,7 @@ button.placed.yes { appearance: none; cursor: pointer; color: var(--p-win); back
 .offsite a { color: var(--ink); font-weight: 700; text-underline-offset: 3px; white-space: nowrap; }
 
 /* comments under a pick */
-.cmts { grid-column: 1 / -1; grid-row: 5; margin-top: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cmts { grid-column: 1 / -1; grid-row: 6; margin-top: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .cmt-list { list-style: none; margin: 0; padding: 0 0 0 10px; border-left: 2px solid var(--paper-line); display: flex; flex-direction: column; gap: 5px; }
 .cmt { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
 .cmt b { font-weight: 700; }
@@ -368,3 +368,29 @@ button.placed.yes { appearance: none; cursor: pointer; color: var(--p-win); back
 .slip-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
 .slip-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .slip-nav .btn.small { min-width: 44px; font-size: 18px; }
+
+/* live legs */
+.leg-live { grid-column: 1 / -1; grid-row: 3; display: flex; flex-direction: column; gap: 5px; margin-top: 6px; font: 500 12.5px/1.35 var(--mono); color: var(--paper-muted); }
+.leg-live strong { font-weight: 700; }
+.leg-live.tone-win { color: var(--p-win); }
+.leg-live.tone-loss { color: var(--p-loss); }
+.leg-live.tone-live { color: var(--paper-ink); }
+.leg-bar { display: block; height: 5px; border-radius: 999px; background: var(--paper-line); overflow: hidden; max-width: 260px; }
+.leg-bar > span { display: block; height: 100%; background: currentColor; border-radius: inherit; }
+.leg-live.tone-live .leg-bar > span { background: var(--gold); }
+.t-alive { align-self: flex-start; font: 700 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--p-win); padding-top: 6px; }
+.t-alive.is-down { color: var(--paper-ink); }
+/* the leg picker */
+.bp { gap: 10px; }
+.bp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bp-games { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
+.bp-game { appearance: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: 500 14px/1.2 var(--body); text-align: left; cursor: pointer; }
+.bp-game .sub { margin: 0; font-size: 12.5px; white-space: nowrap; }
+.bp-game .is-live { color: var(--nose); font-weight: 600; }
+.bp-game.is-picked { cursor: default; background: var(--sunk); }
+.bp-seg { align-self: flex-start; }
+.bp-preview { margin: 0; font-size: 14px; color: var(--muted); }
+.bp-preview strong { color: var(--ink); }
+.bp-seg button { width: auto; min-width: 84px; height: 40px; padding: 0 14px; font: 600 14px/1 var(--body); }
+button.bp-chip[aria-pressed="false"], button.bp-chip:not([aria-pressed]) { color: var(--ink); text-decoration: none; }
+.bp-seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }

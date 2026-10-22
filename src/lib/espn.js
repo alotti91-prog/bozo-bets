@@ -1,0 +1,131 @@
+// ESPN's public scores feed (unofficial, no key). Used by the server function
+// in api/espn.js, which fetches and caches it, and by the app in dev. These
+// functions turn ESPN's large responses into the small shapes the app uses.
+// Pure, covered by logic.test.js.
+
+export const SPORTS = {
+  nfl: { label: 'NFL', path: 'football/nfl', props: true },
+  ncaaf: { label: 'NCAAF', path: 'football/college-football', props: true, query: 'groups=80&limit=400' },
+  nba: { label: 'NBA', path: 'basketball/nba' },
+  nhl: { label: 'NHL', path: 'hockey/nhl' },
+  mlb: { label: 'MLB', path: 'baseball/mlb' },
+};
+
+export const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/';
+
+/** The ESPN address for a request, or null if the request isn't one we allow. */
+export function espnUrl({ kind, sport, dates, event, team }) {
+  const s = SPORTS[sport];
+  if (!s) return null;
+  if (kind === 'scoreboard' && /^\d{8}(-\d{8})?$/.test(dates || '')) return `${ESPN_BASE}${s.path}/scoreboard?dates=${dates}${s.query ? '&' + s.query : ''}`;
+  if (kind === 'summary' && /^\d{1,12}$/.test(event || '')) return `${ESPN_BASE}${s.path}/summary?event=${event}`;
+  if (kind === 'roster' && /^\d{1,8}$/.test(team || '')) return `${ESPN_BASE}${s.path}/teams/${team}/roster`;
+  return null;
+}
+
+/** The betting week, Tuesday through Monday, as ESPN's dates range: "20261020-20261026". */
+export function weekDates(now = new Date()) {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  d.setDate(d.getDate() - ((d.getDay() - 2 + 7) % 7)); // back to Tuesday
+  const end = new Date(d); end.setDate(end.getDate() + 6);
+  const f = (x) => `${x.getFullYear()}${String(x.getMonth() + 1).padStart(2, '0')}${String(x.getDate()).padStart(2, '0')}`;
+  return `${f(d)}-${f(end)}`;
+}
+
+function side(c) {
+  const t = c?.team || {};
+  const raw = c?.score;
+  const score = raw == null || raw === '' ? null : Number(typeof raw === 'object' ? raw.value ?? raw.displayValue : raw);
+  return {
+    id: String(t.id ?? c?.id ?? ''),
+    abbr: t.abbreviation || '',
+    name: t.displayName || '',
+    short: t.shortDisplayName || t.name || t.abbreviation || '',
+    score: Number.isFinite(score) ? score : null,
+  };
+}
+
+function status(st) {
+  const t = st?.type || {};
+  return { state: ['pre', 'in', 'post'].includes(t.state) ? t.state : 'pre', detail: t.shortDetail || t.detail || '' };
+}
+
+function sides(competitors = []) {
+  const home = competitors.find((c) => c.homeAway === 'home') || competitors[0];
+  const away = competitors.find((c) => c.homeAway === 'away') || competitors[1];
+  return { home: side(home), away: side(away) };
+}
+
+/** Scoreboard → [{ id, sport, start, short, state, detail, home, away, odds }] */
+export function normalizeScoreboard(json, sport) {
+  return (json?.events || []).map((e) => {
+    const comp = e.competitions?.[0] || {};
+    const o = comp.odds?.[0];
+    const { home, away } = sides(comp.competitors);
+    return {
+      id: String(e.id),
+      sport,
+      start: e.date || comp.date || null,
+      short: e.shortName || `${away.abbr} @ ${home.abbr}`,
+      ...status(e.status || comp.status),
+      home,
+      away,
+      odds: o ? { details: o.details || '', total: typeof o.overUnder === 'number' ? o.overUnder : null } : null,
+    };
+  }).filter((g) => g.home.abbr && g.away.abbr);
+}
+
+// Football box score categories → our stat names. Matched by ESPN's key,
+// falling back to the column label.
+const FOOTBALL = {
+  passing: [['passingYards', 'YDS', 'passYds'], ['passingTouchdowns', 'TD', 'passTd'], ['interceptions', 'INT', 'int'], ['completions/passingAttempts', 'C/ATT', 'passCmp']],
+  rushing: [['rushingYards', 'YDS', 'rushYds'], ['rushingAttempts', 'CAR', 'rushAtt'], ['rushingTouchdowns', 'TD', 'rushTd']],
+  receiving: [['receptions', 'REC', 'rec'], ['receivingYards', 'YDS', 'recYds'], ['receivingTouchdowns', 'TD', 'recTd']],
+};
+
+/** Game summary → { id, sport, state, detail, home, away, players: [{ id, name, team, stats }] } */
+export function normalizeSummary(json, sport, id) {
+  const comp = json?.header?.competitions?.[0] || {};
+  const { home, away } = sides(comp.competitors);
+  const byId = new Map();
+  for (const tp of json?.boxscore?.players || []) {
+    const teamAbbr = tp.team?.abbreviation || '';
+    for (const cat of tp.statistics || []) {
+      const wanted = FOOTBALL[cat.name];
+      if (!wanted) continue;
+      const keys = cat.keys || [];
+      const labels = cat.labels || [];
+      for (const a of cat.athletes || []) {
+        const pid = String(a.athlete?.id || '');
+        if (!pid) continue;
+        if (!byId.has(pid)) byId.set(pid, { id: pid, name: a.athlete.displayName || a.athlete.shortName || '', team: teamAbbr, stats: {} });
+        const p = byId.get(pid);
+        for (const [key, label, ours] of wanted) {
+          let i = keys.indexOf(key);
+          if (i < 0) i = labels.indexOf(label);
+          if (i < 0) continue;
+          const n = parseFloat(String(a.stats?.[i] ?? '').split('/')[0]);
+          p.stats[ours] = Number.isFinite(n) ? n : 0;
+        }
+      }
+    }
+  }
+  const players = [...byId.values()].map((p) => {
+    const s = p.stats;
+    s.rushRecYds = (s.rushYds || 0) + (s.recYds || 0);
+    s.td = (s.rushTd || 0) + (s.recTd || 0);
+    return p;
+  });
+  return { id: String(id || comp.id || ''), sport, ...status(comp.status), home, away, players };
+}
+
+const SKILL = ['QB', 'RB', 'WR', 'TE', 'FB'];
+
+/** Team roster → offensive skill players [{ id, name, pos }], QBs first. Handles grouped and flat shapes. */
+export function normalizeRoster(json) {
+  const list = (json?.athletes || []).flatMap((g) => (Array.isArray(g?.items) ? g.items : [g]));
+  return list
+    .map((a) => ({ id: String(a?.id || ''), name: a?.displayName || a?.fullName || '', pos: a?.position?.abbreviation || '' }))
+    .filter((a) => a.id && a.name && SKILL.includes(a.pos))
+    .sort((a, b) => SKILL.indexOf(a.pos) - SKILL.indexOf(b.pos) || a.name.localeCompare(b.name));
+}

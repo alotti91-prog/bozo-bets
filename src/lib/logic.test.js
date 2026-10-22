@@ -7,6 +7,9 @@ import { countdown, lockState, toLocalInput, ago } from './deadline.js';
 import { isPrivateAddress } from './site.js';
 import { RELEASES, unseenReleases } from './releases.js';
 import { slipPaths } from './slip.js';
+import { espnUrl, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
+import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine } from './bets.js';
+import espnHandler from '../../api/espn.js';
 
 describe('odds', () => {
   it('converts American odds to decimal', () => {
@@ -176,6 +179,145 @@ describe('release notes', () => {
     expect(unseenReleases('c', rs)).toEqual([]);
     expect(unseenReleases(null, rs).map((r) => r.id)).toEqual(['c']);
     expect(unseenReleases('gone', rs).map((r) => r.id)).toEqual(['c']);
+  });
+});
+
+// ESPN-shaped samples, trimmed to the fields we read (checked against the live feed).
+const SB = { events: [{
+  id: '401873010', date: '2026-10-23T00:15Z', shortName: 'NE @ CHI',
+  status: { displayClock: '6:12', period: 3, type: { state: 'in', completed: false, shortDetail: '6:12 - 3rd' } },
+  competitions: [{ odds: [{ details: 'CHI -3', overUnder: 50.5 }], competitors: [
+    { id: '3', homeAway: 'home', score: '17', team: { id: '3', abbreviation: 'CHI', displayName: 'Chicago Bears', shortDisplayName: 'Bears' } },
+    { id: '17', homeAway: 'away', score: '10', team: { id: '17', abbreviation: 'NE', displayName: 'New England Patriots', shortDisplayName: 'Patriots' } },
+  ] }],
+}] };
+const SUM = {
+  header: { competitions: [{ id: '401873010', status: { type: { state: 'in', shortDetail: '6:12 - 3rd' } }, competitors: [
+    { homeAway: 'home', score: '17', team: { id: '3', abbreviation: 'CHI', displayName: 'Chicago Bears', shortDisplayName: 'Bears' } },
+    { homeAway: 'away', score: '10', team: { id: '17', abbreviation: 'NE', displayName: 'New England Patriots', shortDisplayName: 'Patriots' } },
+  ] }] },
+  boxscore: { players: [{ team: { abbreviation: 'CHI' }, statistics: [
+    { name: 'passing', keys: ['completions/passingAttempts', 'passingYards', 'yardsPerPassAttempt', 'passingTouchdowns', 'interceptions'], labels: ['C/ATT', 'YDS', 'AVG', 'TD', 'INT'],
+      athletes: [{ athlete: { id: '111', displayName: 'Caleb Williams' }, stats: ['18/27', '214', '7.9', '2', '1'] }] },
+    { name: 'rushing', keys: ['rushingAttempts', 'rushingYards', 'yardsPerRushAttempt', 'rushingTouchdowns', 'longRushing'], labels: ['CAR', 'YDS', 'AVG', 'TD', 'LONG'],
+      athletes: [{ athlete: { id: '222', displayName: 'D\'Andre Swift' }, stats: ['14', '52', '3.7', '1', '12'] }] },
+    { name: 'receiving', labels: ['REC', 'YDS', 'AVG', 'TD', 'LONG'],
+      athletes: [{ athlete: { id: '222', displayName: 'D\'Andre Swift' }, stats: ['3', '21', '7.0', '0', '11'] }] },
+  ] }] },
+};
+
+describe('ESPN feed', () => {
+  it('only builds addresses we allow', () => {
+    expect(espnUrl({ kind: 'scoreboard', sport: 'nfl', dates: '20261020-20261026' })).toBe('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=20261020-20261026');
+    expect(espnUrl({ kind: 'scoreboard', sport: 'ncaaf', dates: '20261024' })).toContain('groups=80');
+    expect(espnUrl({ kind: 'summary', sport: 'nfl', event: '401873010' })).toContain('summary?event=401873010');
+    expect(espnUrl({ kind: 'roster', sport: 'nfl', team: '21' })).toContain('/teams/21/roster');
+    expect(espnUrl({ kind: 'summary', sport: 'nfl', event: '1;drop' })).toBe(null);
+    expect(espnUrl({ kind: 'scoreboard', sport: 'soccer', dates: '20261020' })).toBe(null);
+    expect(espnUrl({ kind: 'news', sport: 'nfl' })).toBe(null);
+  });
+  it('finds the Tuesday-to-Monday betting week', () => {
+    expect(weekDates(new Date(2026, 9, 22))).toBe('20261020-20261026'); // Thursday
+    expect(weekDates(new Date(2026, 9, 20))).toBe('20261020-20261026'); // Tuesday
+    expect(weekDates(new Date(2026, 9, 26))).toBe('20261020-20261026'); // Monday night
+    expect(weekDates(new Date(2026, 9, 27))).toBe('20261027-20261102');
+  });
+  it('trims the scoreboard', () => {
+    const [g] = normalizeScoreboard(SB, 'nfl');
+    expect(g).toMatchObject({ id: '401873010', short: 'NE @ CHI', state: 'in', detail: '6:12 - 3rd', odds: { details: 'CHI -3', total: 50.5 } });
+    expect(g.home).toEqual({ id: '3', abbr: 'CHI', name: 'Chicago Bears', short: 'Bears', score: 17 });
+    expect(g.away.score).toBe(10);
+  });
+  it('reads player stats from the box score, by key or by label', () => {
+    const s = normalizeSummary(SUM, 'nfl', '401873010');
+    expect(s.state).toBe('in');
+    const qb = s.players.find((p) => p.id === '111');
+    expect(qb.stats).toMatchObject({ passYds: 214, passTd: 2, int: 1, passCmp: 18 });
+    const rb = s.players.find((p) => p.id === '222');
+    expect(rb.stats).toMatchObject({ rushYds: 52, rushAtt: 14, rushTd: 1, rec: 3, recYds: 21, rushRecYds: 73, td: 1 });
+    expect(normalizeSummary({}, 'nfl', '1')).toMatchObject({ state: 'pre', players: [] });
+  });
+  it('keeps skill players from a roster, either shape', () => {
+    const grouped = { athletes: [{ position: 'offense', items: [
+      { id: '1', displayName: 'Jalen Hurts', position: { abbreviation: 'QB' } },
+      { id: '2', displayName: 'Saquon Barkley', position: { abbreviation: 'RB' } },
+      { id: '3', displayName: 'Jordan Mailata', position: { abbreviation: 'OT' } },
+    ] }] };
+    expect(normalizeRoster(grouped).map((p) => p.name)).toEqual(['Jalen Hurts', 'Saquon Barkley']);
+    expect(normalizeRoster({ athletes: [{ id: '9', displayName: 'Some WR', position: { abbreviation: 'WR' } }] })).toHaveLength(1);
+  });
+  it('the server piece refuses odd requests and caches live games briefly', async () => {
+    const res = () => { const r = { headers: {}, code: 0, body: null }; r.setHeader = (k, v) => { r.headers[k] = v; }; r.status = (c) => { r.code = c; return r; }; r.json = (b) => { r.body = b; return r; }; return r; };
+    const bad = res(); await espnHandler({ query: { kind: 'summary', sport: 'nfl', event: 'x' } }, bad);
+    expect(bad.code).toBe(400);
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, json: async () => SB });
+    try {
+      const ok = res(); await espnHandler({ query: { kind: 'scoreboard', sport: 'nfl', dates: '20261020-20261026' } }, ok);
+      expect(ok.code).toBe(200);
+      expect(ok.body.games[0].short).toBe('NE @ CHI');
+      expect(ok.headers['Cache-Control']).toContain('s-maxage=20');
+      globalThis.fetch = async () => ({ ok: false, status: 503 });
+      const down = res(); await espnHandler({ query: { kind: 'scoreboard', sport: 'nfl', dates: '20261020' } }, down);
+      expect(down.code).toBe(502);
+    } finally { globalThis.fetch = realFetch; }
+  });
+});
+
+describe('structured legs', () => {
+  const game = { id: 'g', start: '2026-10-25T17:00Z', short: 'DET @ GB', home: { id: '9', abbr: 'GB', short: 'Packers', name: 'Green Bay Packers' }, away: { id: '8', abbr: 'DET', short: 'Lions', name: 'Detroit Lions' } };
+  const live = (a, h, state = 'in', players = []) => ({ state, detail: state === 'post' ? 'Final' : '6:12 - 3rd', home: { abbr: 'GB', score: h }, away: { abbr: 'DET', score: a }, players });
+  it('writes the pick text', () => {
+    expect(pickText({ type: 'spread', side: 'away', line: -3.5, game })).toBe('Lions −3.5');
+    expect(pickText({ type: 'spread', side: 'home', line: 3.5, game })).toBe('Packers +3.5');
+    expect(pickText({ type: 'ml', side: 'home', game })).toBe('Packers ML');
+    expect(pickText({ type: 'total', side: 'over', line: 44.5, game })).toBe('DET/GB over 44.5');
+    expect(pickText({ type: 'prop', side: 'over', line: 74.5, stat: 'rushYds', player: { name: 'Jahmyr Gibbs' }, game })).toBe('Jahmyr Gibbs 75+ rush yds');
+    expect(pickText({ type: 'prop', side: 'under', line: 1.5, stat: 'passTd', player: { name: 'Jordan Love' }, game })).toBe('Jordan Love under 1.5 pass TDs');
+    expect(pickText({ type: 'prop', stat: 'td', player: { name: 'Jahmyr Gibbs' }, game })).toBe('Jahmyr Gibbs anytime TD');
+    expect(fmtLine(0)).toBe('PK');
+  });
+  it('reads lines people type, and ESPN’s line for a team', () => {
+    expect(parseLine('3.5')).toBe(3.5); expect(parseLine('-3.5')).toBe(-3.5); expect(parseLine('−7')).toBe(-7); expect(parseLine('+3')).toBe(3);
+    expect(parseLine('249.5')).toBe(249.5); expect(parseLine('abc')).toBe(null); expect(parseLine('3.25')).toBe(null);
+    expect(oddsLine({ details: 'CHI -3' }, 'CHI')).toBe(-3); expect(oddsLine({ details: 'CHI -3' }, 'NE')).toBe(3); expect(oddsLine({ details: 'EVEN' }, 'NE')).toBe(null);
+  });
+  it('says what’s missing', () => {
+    expect(betProblem({})).toBe('Pick the game.');
+    expect(betProblem({ game, type: 'spread' })).toBe('Pick the team.');
+    expect(betProblem({ game, type: 'spread', side: 'away' })).toMatch(/line/);
+    expect(betProblem({ game, type: 'ml', side: 'away' })).toBe('');
+    expect(betProblem({ game, type: 'prop', player: { id: '1' }, stat: 'td' })).toBe('');
+  });
+  it('tracks spreads and moneylines', () => {
+    const lions = { type: 'spread', side: 'away', line: -3.5, game };
+    expect(liveStatus(lions, live(24, 17)).tone).toBe('win');
+    expect(liveStatus(lions, live(20, 17)).label).toBe('Not covering');
+    expect(liveStatus(lions, live(24, 17, 'post'))).toMatchObject({ tone: 'win', label: 'Covered', done: true, clock: 'Final' });
+    expect(liveStatus({ type: 'spread', side: 'home', line: 3, game }, live(20, 17, 'post')).tone).toBe('push');
+    expect(liveStatus({ type: 'ml', side: 'home', game }, live(10, 10)).label).toBe('Tied');
+    expect(liveStatus(lions, { state: 'pre', detail: 'Sun 1:00 PM', home: {}, away: {} })).toMatchObject({ tone: 'pre', clock: 'Sun 1:00 PM' });
+    expect(liveStatus(lions, null)).toBe(null);
+  });
+  it('tracks totals and props, locking in once decided', () => {
+    const over = { type: 'total', side: 'over', line: 44.5, game };
+    expect(liveStatus(over, live(21, 10))).toMatchObject({ tone: 'live', label: '31 of 45' });
+    expect(liveStatus(over, live(28, 20))).toMatchObject({ tone: 'win', locked: true });
+    const under = { type: 'total', side: 'under', line: 44.5, game };
+    expect(liveStatus(under, live(28, 20))).toMatchObject({ tone: 'loss', locked: true });
+    expect(liveStatus(under, live(20, 17, 'post'))).toMatchObject({ tone: 'win', done: true });
+    const gibbs = { type: 'prop', side: 'over', line: 74.5, stat: 'rushYds', player: { id: '7', name: 'Jahmyr Gibbs' }, game };
+    const withGibbs = (yds, state) => live(14, 7, state, [{ id: '7', stats: { rushYds: yds, td: 0 } }]);
+    expect(liveStatus(gibbs, withGibbs(52))).toMatchObject({ tone: 'live', label: '52 of 75 rush yds' });
+    expect(liveStatus(gibbs, withGibbs(52)).progress).toBeCloseTo(52 / 74.5, 3);
+    expect(liveStatus(gibbs, withGibbs(80))).toMatchObject({ tone: 'win', locked: true });
+    expect(liveStatus(gibbs, withGibbs(60, 'post'))).toMatchObject({ tone: 'loss', done: true });
+    expect(liveStatus({ ...gibbs, stat: 'td' }, withGibbs(0))).toMatchObject({ tone: 'live', label: 'No TD yet' });
+    expect(liveStatus({ ...gibbs, stat: 'td' }, live(14, 7, 'in', [{ id: '7', stats: { td: 1 } }]))).toMatchObject({ tone: 'win', locked: true });
+  });
+  it('counts legs still alive', () => {
+    const legs = [{ result: 'W' }, { result: 'L' }, { result: null, s: { tone: 'loss', locked: true } }, { result: null, s: { tone: 'loss' } }, { result: null }];
+    expect(aliveCount(legs, (l) => l.s || null)).toEqual({ alive: 3, total: 5 });
   });
 });
 

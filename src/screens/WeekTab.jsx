@@ -7,6 +7,10 @@ import { IconShare, Belt } from '../components/common.jsx';
 import { LegTalk } from '../components/Comments.jsx';
 import PlacedSheet from './PlacedSheet.jsx';
 import { slipPaths } from '../lib/slip.js';
+import { SPORTS as LIVE_SPORTS } from '../lib/espn.js';
+import { liveStatus, aliveCount, gameKey, pickText, betProblem, emptyPick, pickFromBet, betFromPick } from '../lib/bets.js';
+import { useLiveGames } from '../lib/useLiveGames.js';
+import BetPicker from '../components/BetPicker.jsx';
 
 const SPORTS = ['NFL', 'NCAAF', 'NBA', 'NHL', 'MLB', 'Soccer', 'Other'];
 const HINT = 'American odds, as the book shows them. Tap the sign to switch between minus and plus.';
@@ -21,6 +25,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
     const t = setInterval(() => setTick((x) => x + 1), 30000); // keeps the countdown fresh
     return () => clearInterval(t);
   }, []);
+  const games = useLiveGames(week ? data.legs.filter((l) => l.week_id === week.id) : []);
 
   if (!week) {
     return (
@@ -36,6 +41,9 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
   const info = weekInfo(week, legs);
   const active = data.players.filter((p) => p.active);
   const missing = active.filter((p) => !legs.some((l) => l.player_id === p.id));
+  const statusOf = (l) => (l.bet?.game ? liveStatus(l.bet, games[gameKey(l.bet)]) : null);
+  const alive = aliveCount(legs, statusOf);
+  const showAlive = info.status === 'live' && legs.some((l) => l.result || (statusOf(l) && statusOf(l).tone !== 'pre'));
 
   async function act(promise, okMsg) {
     const { error } = await promise;
@@ -113,6 +121,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         <div className="t-head">
           <span className="t-kicker">Parlay slip</span>
           <span className="t-meta">Week {week.n} {'·'} {legs.length} leg{legs.length === 1 ? '' : 's'} {'·'} {fmtDate(week.start_date)}</span>
+          {showAlive && <span className={`t-alive${alive.alive < alive.total ? ' is-down' : ''}`}>{alive.alive} of {alive.total} legs alive</span>}
           {placed ? (
             <button type="button" className="placed yes" onClick={() => setSlipOpen(true)}>Placed ✓{shots ? ` · ${shots === 1 ? 'View slip' : `View slip (${shots})`}` : ''}</button>
           ) : legs.length > 0 ? <span className="placed">Not placed yet</span> : null}
@@ -128,6 +137,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
                 <span className="leg-who">{pname(l.player_id)}<Belt on={beltId === l.player_id} />{mine && <span className="you"> {'·'} you</span>}</span>
                 <span className="leg-odds">{fmtOdds(l.odds)}</span>
                 <span className="leg-pick">{l.pick}</span>
+                {l.bet?.game && <LiveLine bet={l.bet} s={statusOf(l)} />}
                 <div className="leg-meta">
                   <span className="tag">{l.sport}</span>
                   {isAdmin ? (
@@ -239,6 +249,18 @@ function PayoutForm({ week, projected, act }) {
   );
 }
 
+// Live state under a picked leg: "Covering · DET 24, GB 17 · 6:12 - 3rd", with a bar for overs.
+function LiveLine({ bet, s }) {
+  const when = bet.game.start ? new Date(bet.game.start).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+  if (!s || s.tone === 'pre') return <span className="leg-live tone-pre">{bet.game.short}{when ? ` · ${when}` : ''}</span>;
+  return (
+    <span className={`leg-live tone-${s.tone}`}>
+      <span><strong>{s.label}</strong> {'·'} {s.score} {'·'} {s.clock}</span>
+      {s.progress != null && !s.done && <span className="leg-bar" aria-hidden="true"><span style={{ width: `${Math.round(s.progress * 100)}%` }} /></span>}
+    </span>
+  );
+}
+
 function LegForm({ week, editing, options, me, isAdmin, locked, pname, onDone, onCancel }) {
   const draftKey = 'bz-draft-' + week.id;
   const draft = editing ? null : store.get(draftKey, null);
@@ -247,6 +269,9 @@ function LegForm({ week, editing, options, me, isAdmin, locked, pname, onDone, o
   const [sign, setSign] = useState(editing ? (editing.odds > 0 ? '+' : '-') : draft?.sign || '-');
   const [odds, setOdds] = useState(editing ? String(Math.abs(editing.odds)) : draft?.odds || '');
   const [sport, setSport] = useState(editing ? editing.sport : draft?.sport || 'NFL');
+  // 'pick' = choose the game and bet (tracks live); 'type' = free text, for anything else.
+  const [mode, setMode] = useState(editing ? (editing.bet ? 'pick' : 'type') : draft?.mode || 'pick');
+  const [b, setB] = useState(editing?.bet ? pickFromBet(editing.bet) : draft?.b || emptyPick());
   const [hint, setHint] = useState({ text: HINT, err: false });
   const [busy, setBusy] = useState(false);
   const formRef = useRef(null);
@@ -265,23 +290,48 @@ function LegForm({ week, editing, options, me, isAdmin, locked, pname, onDone, o
     return null;
   }
 
-  const saveDraft = (patch) => { if (!editing) store.set(draftKey, { player, pick, sign, odds, sport, ...patch }); };
+  const saveDraft = (patch) => { if (!editing) store.set(draftKey, { player, pick, sign, odds, sport, mode, b, ...patch }); };
+  const toType = () => {
+    const bet = betFromPick(b);
+    if (!pick.trim() && !betProblem(bet)) setPick(pickText(bet));
+    if (LIVE_SPORTS[b.sport]) setSport(LIVE_SPORTS[b.sport].label);
+    setMode('type'); saveDraft({ mode: 'type' });
+  };
 
   async function submit(e) {
     e.preventDefault();
     if (!player) { setHint({ text: 'Choose whose leg this is.', err: true }); return; }
-    if (!pick.trim()) { setHint({ text: 'Type the pick, like “Bills -3.5”.', err: true }); return; }
+    let row;
+    if (mode === 'pick') {
+      const bet = betFromPick(b);
+      const problem = betProblem(bet);
+      if (problem) { setHint({ text: problem, err: true }); return; }
+      row = { pick: pickText(bet), sport: LIVE_SPORTS[b.sport].label, bet };
+    } else {
+      if (!pick.trim()) { setHint({ text: 'Type the pick, like “Bills -3.5”.', err: true }); return; }
+      row = { pick: pick.trim().slice(0, 80), sport };
+      if (editing?.bet) row.bet = null; // was picked from a game; now typed
+    }
     const parsed = parseOdds(odds, sign);
     if (parsed.error) { setHint({ text: parsed.error, err: true }); return; }
     setBusy(true);
-    const row = { pick: pick.trim().slice(0, 80), odds: parsed.odds, sport };
-    const { error } = editing
-      ? await supabase.from('legs').update(row).eq('id', editing.id)
-      : await supabase.from('legs').insert({ ...row, week_id: week.id, league_id: week.league_id, player_id: player });
+    row.odds = parsed.odds;
+    const save = (r) => (editing
+      ? supabase.from('legs').update(r).eq('id', editing.id)
+      : supabase.from('legs').insert({ ...r, week_id: week.id, league_id: week.league_id, player_id: player }));
+    let { error } = await save(row);
+    let untracked = false;
+    if (error && 'bet' in row && /\bbet\b.*(column|schema cache)|column.*\bbet\b/i.test(error.message || '')) {
+      // The database hasn't been updated for picked legs yet: save it as a typed leg.
+      const { bet: _bet, ...plain } = row;
+      ({ error } = await save(plain));
+      untracked = !error;
+    }
     setBusy(false);
     if (error) { setHint({ text: friendly(error), err: true }); return; }
+    if (untracked) toast('Saved, but without live tracking until the commish runs the latest database update.');
     store.remove(draftKey);
-    toast(editing ? 'Leg updated.' : `Added ${pname(player)}’s leg.`);
+    if (!untracked) toast(editing ? 'Leg updated.' : `Added ${pname(player)}’s leg.`);
     onDone();
   }
 
@@ -297,11 +347,19 @@ function LegForm({ week, editing, options, me, isAdmin, locked, pname, onDone, o
           </select>
         </div>
       )}
-      <div className="field">
-        <label htmlFor="f-pick">Pick</label>
-        <input id="f-pick" maxLength={80} autoComplete="off" placeholder="Bills -3.5, Lamar 250+ pass yds" value={pick}
-          onChange={(e) => { setPick(e.target.value); saveDraft({ pick: e.target.value }); setHint({ text: HINT, err: false }); }} />
-      </div>
+      {mode === 'pick' ? (
+        <BetPicker value={b} onTypeInstead={toType}
+          onChange={(nb) => { setB(nb); saveDraft({ b: nb }); setHint({ text: HINT, err: false }); }} />
+      ) : (
+        <div className="field">
+          <label htmlFor="f-pick">Pick</label>
+          <input id="f-pick" maxLength={80} autoComplete="off" placeholder="Bills -3.5, Lamar 250+ pass yds" value={pick}
+            onChange={(e) => { setPick(e.target.value); saveDraft({ pick: e.target.value }); setHint({ text: HINT, err: false }); }} />
+          <button type="button" className="link" style={{ alignSelf: 'flex-start' }} onClick={() => { setMode('pick'); saveDraft({ mode: 'pick' }); }}>
+            Pick from this week{'’'}s games instead (tracks it live)
+          </button>
+        </div>
+      )}
       <div className="field-row">
         <div className="field">
           <label htmlFor="f-odds">Odds</label>
@@ -317,12 +375,14 @@ function LegForm({ week, editing, options, me, isAdmin, locked, pname, onDone, o
               }} />
           </div>
         </div>
-        <div className="field">
-          <label htmlFor="f-sport">Sport</label>
-          <select id="f-sport" value={sport} onChange={(e) => { setSport(e.target.value); saveDraft({ sport: e.target.value }); }}>
-            {SPORTS.map((s) => <option key={s}>{s}</option>)}
-          </select>
-        </div>
+        {mode === 'type' && (
+          <div className="field">
+            <label htmlFor="f-sport">Sport</label>
+            <select id="f-sport" value={sport} onChange={(e) => { setSport(e.target.value); saveDraft({ sport: e.target.value }); }}>
+              {SPORTS.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        )}
       </div>
       <p className={`hint${hint.err ? ' err' : ''}`} role={hint.err ? 'alert' : undefined}>{hint.text}</p>
       <div className="btns">

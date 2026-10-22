@@ -5,6 +5,18 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-22-d',
+    date: '2026-10-22',
+    title: 'Live legs',
+    items: [
+      'Add your leg by picking it from this week’s games: sport, game, then spread, moneyline, total, or a player prop (football). The pick text writes itself.',
+      'Spreads and totals come prefilled with DraftKings’ line. Change it if your bet was different.',
+      'Picked legs track live on the slip: “Covering · DET 24, GB 17”, “52 of 75 rush yds” with a progress bar, and how many legs are still alive.',
+      'Anything that doesn’t fit (same-game parlays, alternate lines, golf…) still works with “Type it instead.”',
+      'Live info is just for the sweat. Admins still grade each leg.',
+    ],
+  },
+  {
     id: '2026-10-22-c',
     date: '2026-10-22',
     title: 'Slip screenshots',

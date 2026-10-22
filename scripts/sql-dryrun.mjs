@@ -81,6 +81,14 @@ await fails(B, `update public.legs set result = 'W' where player_id = $1`, [play
 await as(B, `update public.legs set pick = 'Lions -2.5' where player_id = $1`, [players.Sully]);
 ok('friend adds and edits only their own pick, can’t grade');
 
+// Structured legs carry a bet object; anything else is refused.
+const betJson = JSON.stringify({ v: 1, sport: 'nfl', type: 'spread', side: 'away', line: -2.5, game: { id: '401873010', short: 'DET @ GB' } });
+await as(B, `update public.legs set bet = $2::jsonb where player_id = $1`, [players.Sully, betJson]);
+assert.equal((await as(A, `select bet->>'type' t from public.legs where player_id = $1`, [players.Sully])).rows[0].t, 'spread');
+await fails(B, `update public.legs set bet = '[1,2]'::jsonb where player_id = $1`, [players.Sully], /check/);
+await as(B, `update public.legs set bet = null where player_id = $1`, [players.Sully]);
+ok('legs can carry a structured bet (an object), set by whoever can edit the leg');
+
 // Owner adds legs for others and grades
 await as(A, `insert into public.legs (week_id, league_id, player_id, pick, odds) values ($1,$2,$3,'Bills ML',-180),($1,$2,$4,'Over 44.5',-110)`, [week1, lid, players.Mikey, players.Lotti]);
 await fails(B, `select public.spin_wheel($1, array[$2]::uuid[])`, [week1, players.Mikey], /commish/);

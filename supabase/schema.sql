@@ -121,6 +121,11 @@ create index if not exists spin_views_league_idx on public.spin_views (league_id
 -- screenshot stored in the private "slips" storage bucket (set up below).
 alter table public.weeks add column if not exists placed_at timestamptz;
 alter table public.weeks add column if not exists placed_by uuid references auth.users(id) on delete set null;
+-- A leg picked from a game: which game, bet type, side, line, player and stat
+-- (see src/lib/bets.js). Free-text legs leave it empty. Used for live tracking.
+alter table public.legs add column if not exists bet jsonb
+  check (bet is null or (jsonb_typeof(bet) = 'object' and length(bet::text) < 4000));
+
 -- Several screenshots per slip (a long parlay rarely fits in one). slip_path is
 -- the first one, kept for older copies of the app.
 alter table public.weeks add column if not exists slip_paths text[] not null default '{}';

@@ -22,7 +22,74 @@ const names = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris', 'T-Bone'];
 const P = names.map((n, i) => ({ id: 'p' + (i + 1), league_id: L, name: n, active: true, sort: i, created_at: now() }));
 const W = [1, 2, 3, 4].map((n) => ({ id: 'w' + n, league_id: L, n: n + 3, start_date: daysAgo(35 - n * 7), stake: 10, payer_id: null, actual_payout: null, created_at: now() }));
 W[0].payer_id = 'p1'; W[1].payer_id = 'p5'; W[2].payer_id = 'p3'; W[3].payer_id = 'p4';
-const leg = (w, p, pick, odds, sport, result) => ({ id: id(), week_id: w, league_id: L, player_id: p, pick, odds, sport, result, created_by: uid, created_at: now(), updated_at: now() });
+const leg = (w, p, pick, odds, sport, result, extra = {}) => ({ id: id(), week_id: w, league_id: L, player_id: p, pick, odds, sport, result, bet: null, created_by: uid, created_at: now(), updated_at: now(), ...extra });
+
+// ---- Fake scores for demo mode (stands in for /api/espn) ----
+const inHours = (h) => new Date(Date.now() + h * 3600e3).toISOString();
+const mkTeam = (id, abbr, name, short) => ({ id, abbr, name, short });
+const TEAMS = {
+  CHI: mkTeam('3', 'CHI', 'Chicago Bears', 'Bears'), NE: mkTeam('17', 'NE', 'New England Patriots', 'Patriots'), BUF: mkTeam('2', 'BUF', 'Buffalo Bills', 'Bills'),
+  MIA: mkTeam('15', 'MIA', 'Miami Dolphins', 'Dolphins'), NYJ: mkTeam('20', 'NYJ', 'New York Jets', 'Jets'), PHI: mkTeam('21', 'PHI', 'Philadelphia Eagles', 'Eagles'),
+  NYG: mkTeam('19', 'NYG', 'New York Giants', 'Giants'), DET: mkTeam('8', 'DET', 'Detroit Lions', 'Lions'), GB: mkTeam('9', 'GB', 'Green Bay Packers', 'Packers'),
+  KC: mkTeam('12', 'KC', 'Kansas City Chiefs', 'Chiefs'), LV: mkTeam('13', 'LV', 'Las Vegas Raiders', 'Raiders'),
+  MICH: mkTeam('130', 'MICH', 'Michigan Wolverines', 'Michigan'), OSU: mkTeam('194', 'OSU', 'Ohio State Buckeyes', 'Ohio State'),
+  TEX: mkTeam('251', 'TEX', 'Texas Longhorns', 'Texas'), UGA: mkTeam('61', 'UGA', 'Georgia Bulldogs', 'Georgia'),
+  BOS: mkTeam('2', 'BOS', 'Boston Celtics', 'Celtics'), NYK: mkTeam('18', 'NYK', 'New York Knicks', 'Knicks'), LAL: mkTeam('13', 'LAL', 'Los Angeles Lakers', 'Lakers'), GSW: mkTeam('9', 'GSW', 'Golden State Warriors', 'Warriors'),
+  NYR: mkTeam('13', 'NYR', 'New York Rangers', 'Rangers'), BOSH: mkTeam('1', 'BOS', 'Boston Bruins', 'Bruins'),
+  LAD: mkTeam('19', 'LAD', 'Los Angeles Dodgers', 'Dodgers'), NYY: mkTeam('10', 'NYY', 'New York Yankees', 'Yankees'),
+};
+const mkGame = (id, sport, away, home, start, state, detail, as = null, hs = null, odds = null, players = []) => ({
+  id, sport, start, short: `${TEAMS[away].abbr} @ ${TEAMS[home].abbr}`, state, detail,
+  away: { ...TEAMS[away], score: as }, home: { ...TEAMS[home], score: hs }, odds, players,
+});
+const mkPlayer = (id, name, team, stats) => ({ id, name, team, stats: { rushRecYds: (stats.rushYds || 0) + (stats.recYds || 0), td: (stats.rushTd || 0) + (stats.recTd || 0), ...stats } });
+const DEMO_GAMES = [
+  mkGame('900002', 'nfl', 'BUF', 'MIA', inHours(-2), 'in', '6:12 - 3rd', 17, 10, { details: 'BUF -6.5', total: 47.5 },
+    [mkPlayer('3918298', 'Josh Allen', 'BUF', { passYds: 214, passTd: 2, int: 0, passCmp: 17, rushYds: 22, rushTd: 0 }), mkPlayer('4379399', 'James Cook', 'BUF', { rushYds: 61, rushAtt: 12, rushTd: 1, rec: 2, recYds: 9 })]),
+  mkGame('900004', 'nfl', 'PHI', 'NYG', inHours(-1), 'in', '2:41 - 2nd', 14, 3, { details: 'PHI -7', total: 43.5 },
+    [mkPlayer('3929630', 'Saquon Barkley', 'PHI', { rushYds: 68, rushAtt: 11, rushTd: 1, rec: 1, recYds: 6 }), mkPlayer('4040715', 'Jalen Hurts', 'PHI', { passYds: 141, passTd: 1, int: 0, passCmp: 11, rushYds: 9 })]),
+  mkGame('900003', 'nfl', 'NYJ', 'NE', inHours(-26), 'post', 'Final', 13, 24, { details: 'NE -3', total: 41.5 }),
+  mkGame('900001', 'nfl', 'NE', 'CHI', inHours(3), 'pre', 'Tonight 8:15 PM', null, null, { details: 'CHI -3', total: 50.5 }),
+  mkGame('900005', 'nfl', 'DET', 'GB', inHours(70), 'pre', 'Sun 1:00 PM', null, null, { details: 'DET -3.5', total: 48.5 }),
+  mkGame('900006', 'nfl', 'KC', 'LV', inHours(73), 'pre', 'Sun 4:25 PM', null, null, { details: 'KC -9.5', total: 44.5 }),
+  mkGame('910001', 'ncaaf', 'MICH', 'OSU', inHours(50), 'pre', 'Sat 12:00 PM', null, null, { details: 'OSU -10.5', total: 45.5 }),
+  mkGame('910002', 'ncaaf', 'TEX', 'UGA', inHours(-1), 'in', '9:30 - 2nd', 10, 14, { details: 'UGA -2.5', total: 51.5 }),
+  mkGame('920001', 'nba', 'BOS', 'NYK', inHours(-1), 'in', '4:12 - 3rd', 71, 68, { details: 'NYK -2', total: 221.5 }),
+  mkGame('920002', 'nba', 'LAL', 'GSW', inHours(5), 'pre', 'Tonight 10:00 PM', null, null, { details: 'GSW -4.5', total: 229.5 }),
+  mkGame('930001', 'nhl', 'NYR', 'BOSH', inHours(-1), 'in', '12:05 - 2nd', 2, 1, { details: 'BOS -130', total: 6 }),
+  mkGame('940001', 'mlb', 'LAD', 'NYY', inHours(28), 'pre', 'Fri 8:08 PM', null, null, { details: 'LAD -125', total: 8.5 }),
+];
+const ROSTER = {
+  CHI: [['Caleb Williams', 'QB'], ["D'Andre Swift", 'RB'], ['DJ Moore', 'WR'], ['Rome Odunze', 'WR'], ['Cole Kmet', 'TE']],
+  NE: [['Drake Maye', 'QB'], ['Rhamondre Stevenson', 'RB'], ['Stefon Diggs', 'WR'], ['Hunter Henry', 'TE']],
+  BUF: [['Josh Allen', 'QB', '3918298'], ['James Cook', 'RB', '4379399'], ['Khalil Shakir', 'WR'], ['Dalton Kincaid', 'TE']],
+  MIA: [['Tua Tagovailoa', 'QB'], ["De'Von Achane", 'RB'], ['Tyreek Hill', 'WR'], ['Jaylen Waddle', 'WR']],
+  PHI: [['Jalen Hurts', 'QB', '4040715'], ['Saquon Barkley', 'RB', '3929630'], ['A.J. Brown', 'WR'], ['DeVonta Smith', 'WR'], ['Dallas Goedert', 'TE']],
+  NYG: [['Jaxson Dart', 'QB'], ['Cam Skattebo', 'RB'], ['Malik Nabers', 'WR']],
+  DET: [['Jared Goff', 'QB'], ['Jahmyr Gibbs', 'RB'], ['David Montgomery', 'RB'], ['Amon-Ra St. Brown', 'WR'], ['Sam LaPorta', 'TE']],
+  GB: [['Jordan Love', 'QB'], ['Josh Jacobs', 'RB'], ['Jayden Reed', 'WR'], ['Tucker Kraft', 'TE']],
+  NYJ: [['Justin Fields', 'QB'], ['Breece Hall', 'RB'], ['Garrett Wilson', 'WR']],
+  KC: [['Patrick Mahomes', 'QB'], ['Isiah Pacheco', 'RB'], ['Travis Kelce', 'TE']],
+  LV: [['Geno Smith', 'QB'], ['Ashton Jeanty', 'RB'], ['Brock Bowers', 'TE']],
+  MICH: [['Bryce Underwood', 'QB'], ['Justice Haynes', 'RB']], OSU: [['Julian Sayin', 'QB'], ['Jeremiah Smith', 'WR']],
+  TEX: [['Arch Manning', 'QB'], ['Quintrevion Wisner', 'RB']], UGA: [['Gunner Stockton', 'QB'], ['Nate Frazier', 'RB']],
+};
+const rosterFor = (sport, teamId) => {
+  const g = DEMO_GAMES.find((x) => x.sport === sport && (x.home.id === teamId || x.away.id === teamId));
+  const abbr = g ? (g.home.id === teamId ? g.home.abbr : g.away.abbr) : '';
+  return (ROSTER[abbr] || []).map(([name, pos, pid], i) => ({ id: pid || `${teamId}${i}`, name, pos }));
+};
+function demoBet(type, sport, gameId, extra) {
+  const g = DEMO_GAMES.find((x) => x.id === gameId);
+  const team = (t) => ({ id: t.id, abbr: t.abbr, short: t.short, name: t.name });
+  return { v: 1, sport, type, ...extra, game: { id: g.id, start: g.start, short: g.short, home: team(g.home), away: team(g.away) } };
+}
+export async function demoScores({ kind, sport, event, team }) {
+  await new Promise((r) => setTimeout(r, 120));
+  if (kind === 'scoreboard') return { games: DEMO_GAMES.filter((g) => g.sport === sport).map(({ players: _players, ...g }) => g) };
+  if (kind === 'summary') { const g = DEMO_GAMES.find((x) => x.id === event); if (!g) throw new Error('No such game'); const { odds: _odds, ...rest } = g; return rest; }
+  return { players: rosterFor(sport, team) };
+}
 
 const db = {
   leagues: [{ id: L, name: 'Bozo Bets', stake: 10, invite_code: 'DEMO42', created_by: uid, created_at: now(), lock_dow: 0, lock_time: '12:55:00', lock_tz: 'America/New_York' }],
@@ -40,8 +107,11 @@ const db = {
     leg('w2', 'p4', 'Packers +3', -105, 'NFL', 'W'), leg('w2', 'p5', 'Eagles game under 48.5', -110, 'NFL', 'W'), leg('w2', 'p6', 'Josh Allen 2+ pass TDs', -200, 'NFL', 'W'),
     leg('w3', 'p1', 'Texas -6.5', -110, 'NCAAF', 'L'), leg('w3', 'p2', 'Lions ML', -200, 'NFL', 'W'), leg('w3', 'p3', 'Cowboys +4.5', -110, 'NFL', 'W'),
     leg('w3', 'p4', 'Rangers ML', -130, 'NHL', 'L'), leg('w3', 'p5', 'CeeDee Lamb 70+ rec yds', -115, 'NFL', 'W'), leg('w3', 'p6', 'Bijan 90+ rush yds', 120, 'NFL', 'W'),
-    leg('w4', 'p1', 'Bills -6.5', -110, 'NFL', 'W'), leg('w4', 'p2', 'Michigan +3', -110, 'NCAAF', 'W'), leg('w4', 'p3', 'Steelers ML', 135, 'NFL', 'L'),
-    leg('w4', 'p4', 'Jets-Patriots under 41.5', -105, 'NFL', 'W'), leg('w4', 'p5', 'Rangers ML', 105, 'NHL', null),
+    leg('w4', 'p1', 'Bills −6.5', -110, 'NFL', null, { bet: demoBet('spread', 'nfl', '900002', { side: 'away', line: -6.5 }) }),
+    leg('w4', 'p2', 'Saquon Barkley 75+ rush yds', -125, 'NFL', null, { bet: demoBet('prop', 'nfl', '900004', { side: 'over', line: 74.5, stat: 'rushYds', player: { id: '3929630', name: 'Saquon Barkley', team: 'PHI' } }) }),
+    leg('w4', 'p3', 'Steelers ML', 135, 'NFL', 'L'),
+    leg('w4', 'p4', 'NYJ/NE under 41.5', -105, 'NFL', 'W', { bet: demoBet('total', 'nfl', '900003', { side: 'under', line: 41.5 }) }),
+    leg('w4', 'p5', 'Rangers ML', 105, 'NHL', null, { bet: demoBet('ml', 'nhl', '930001', { side: 'away' }) }),
   ],
   spins: [
     { id: 's1', week_id: 'w1', league_id: L, pool: ['p3', 'p5'], landed_id: 'p5', spun_by: uid, created_at: daysAgo(27) + 'T23:00:00Z' },
