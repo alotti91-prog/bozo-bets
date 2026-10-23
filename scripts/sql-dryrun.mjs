@@ -226,6 +226,27 @@ const got2 = (await as(A, `select pick from public.legs where week_id = $1`, [w3
 assert.deepEqual(got2, ['Over 44']);
 ok('editing a past week replaces its picks');
 
+// Editing keeps what it doesn't change: the game link, how far it missed, reactions, trash talk.
+const save3 = (legs) => as(A, `select public.save_past_week($1, $2, null, null, null, $3::jsonb)`, [lid2, w3, JSON.stringify(legs)]);
+await save3([{ player_id: p2.Mikey, pick: 'Over 44', odds: 120, result: 'W' }, { player_id: p2.Lotti, pick: 'Bills -3', odds: -110, result: 'L' }]);
+const lottiLeg = (await as(A, `select id from public.legs where week_id = $1 and player_id = $2`, [w3, p2.Lotti])).rows[0].id;
+await as(A, `update public.legs set bet = '{"v":1,"sport":"nfl","type":"spread","side":"home","line":-3}'::jsonb, margin = -0.5, miss = 'close' where id = $1`, [lottiLeg]);
+await as(A, `insert into public.reactions (leg_id, emoji) values ($1, '🤡')`, [lottiLeg]);
+await as(A, `insert into public.comments (leg_id, body) values ($1, 'brutal')`, [lottiLeg]);
+const lotti3 = async () => (await as(A, `select id, odds, bet->>'type' t, margin, miss,
+  (select count(*)::int from public.reactions r where r.leg_id = l.id) rx, (select count(*)::int from public.comments c where c.leg_id = l.id) cm
+  from public.legs l where week_id = $1 and player_id = $2`, [w3, p2.Lotti])).rows[0];
+await save3([{ player_id: p2.Lotti, pick: 'Bills -3', odds: -115, result: 'L' }, { player_id: p2.Mikey, pick: 'Over 44.5', odds: 120, result: 'W' }]);
+let k = await lotti3();
+assert.deepEqual([k.id, k.odds, k.t, Number(k.margin), k.miss, k.rx, k.cm], [lottiLeg, -115, 'spread', -0.5, 'close', 1, 1]);
+await save3([{ player_id: p2.Lotti, pick: 'Bills -3', odds: -115, result: 'W' }, { player_id: p2.Mikey, pick: 'Over 44.5', odds: 120, result: 'W' }]);
+k = await lotti3();
+assert.deepEqual([k.t, k.margin, k.miss, k.rx, k.cm], ['spread', null, null, 1, 1]); // new result: margin and close-call pick cleared, game link kept
+await save3([{ player_id: p2.Lotti, pick: 'Bills -2.5', odds: -115, result: 'W' }, { player_id: p2.Mikey, pick: 'Over 44.5', odds: 120, result: 'W' }]);
+k = await lotti3();
+assert.deepEqual([k.id, k.t, k.rx, k.cm], [lottiLeg, null, 1, 1]); // new pick: game link dropped, talk kept
+ok('editing a past week keeps each leg’s game link, how far it missed, reactions, and trash talk unless that part changed');
+
 await as(B, `update public.legs set result = 'L' where week_id = $1`, [w3]); // row-level security matches 0 rows
 assert.equal((await as(A, `select result from public.legs where week_id = $1`, [w3])).rows[0].result, 'W');
 ok('members still can\u2019t change past-week results');

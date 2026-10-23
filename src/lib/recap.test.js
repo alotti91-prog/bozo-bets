@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { weekRecap, personLine, recapText, FACES, lossTier, cutoffs, needsMissPick, marginFromLostBy, faceCounts, cutoffRows, FACE_ORDER } from './recap.js';
-import { liveStatus, gradeMargin } from './bets.js';
+import { liveStatus, gradeMargin, finishedGrades } from './bets.js';
 
 const players = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris'].map((name, i) => ({ id: 'p' + (i + 1), name, active: true }));
 const pname = (id) => players.find((p) => p.id === id)?.name;
@@ -222,5 +222,22 @@ describe('the faces ladder', () => {
       { label: 'MLB', close: '1 run', blowout: '5+' },
       { label: 'Player props', close: 'Within 10% of the line', blowout: 'Half the line' },
     ]);
+  });
+});
+
+describe('grading finished games in one tap', () => {
+  const game = (state, as, hs) => ({ state, detail: state === 'post' ? 'Final' : '2:10 - 4th', away: { abbr: 'BUF', score: as }, home: { abbr: 'MIA', score: hs } });
+  const games = { a: game('post', 20, 14), b: game('in', 20, 14), c: game('post', 13, 24) };
+  const l = (id, key, bet, result = null) => ({ id, result, bet: { sport: 'nfl', game: { id: key }, ...bet } });
+  const statusOf = (x) => liveStatus(x.bet, games[x.bet.game.id]);
+  it('grades only ungraded legs whose game is final, with how far each finished', () => {
+    const legs = [
+      l('bills', 'a', { type: 'spread', side: 'away', line: -6.5 }), // final, missed by 0.5
+      l('live', 'b', { type: 'spread', side: 'away', line: -6.5 }), // not final yet
+      l('under', 'c', { type: 'total', side: 'under', line: 41.5 }), // final, under by 4.5
+      l('done', 'c', { type: 'ml', side: 'home' }, 'W'), // already graded
+      { id: 'typed', result: null, bet: null },
+    ];
+    expect(finishedGrades(legs, statusOf).map((g) => [g.leg.id, g.result, g.margin])).toEqual([['bills', 'L', -0.5], ['under', 'W', 4.5]]);
   });
 });

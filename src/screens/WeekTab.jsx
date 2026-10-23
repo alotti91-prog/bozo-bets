@@ -6,7 +6,7 @@ import { lockState, updatedAgo } from '../lib/deadline.js';
 import { siteUrl } from '../lib/site.js';
 import { Sheet, IconShare, IconPhoto, IconPlus, IconClock, IconLock, IconBoard } from '../components/common.jsx';
 import { slipPaths } from '../lib/slip.js';
-import { liveStatus, aliveCount, gameKey, gradeMargin } from '../lib/bets.js';
+import { liveStatus, aliveCount, gameKey, gradeMargin, finishedGrades } from '../lib/bets.js';
 import { useLiveGames } from '../lib/useLiveGames.js';
 import PlacedSheet from './PlacedSheet.jsx';
 import LegRow from './week/LegRow.jsx';
@@ -14,6 +14,8 @@ import LegSheet from './week/LegSheet.jsx';
 import LegForm from './week/LegForm.jsx';
 import PayoutForm from './week/PayoutForm.jsx';
 import LinesSheet from './week/LinesSheet.jsx';
+
+const FINAL = { W: 'won', L: 'lost', P: 'pushed' };
 
 // The This week tab: the week and its deadline, a summary row, the slip (legs,
 // who's still missing, the total), and the actions. Tapping a leg opens its
@@ -59,6 +61,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
   const canAdd = isAdmin ? missing.length > 0 : !!me && !locked && missing.some((p) => p.id === me);
   const addLabel = !isAdmin || (missing.length === 1 && missing[0].id === me) ? 'Add your leg' : 'Add a leg';
   const openLeg = legs.find((l) => l.id === openId) || null;
+  const finished = isAdmin ? finishedGrades(legs, statusOf) : []; // games that are over but not graded yet
 
   async function act(promise, okMsg) {
     const { error } = await promise;
@@ -77,6 +80,15 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
   };
   const remove = (l) => act(supabase.from('legs').delete().eq('id', l.id), 'Leg removed.');
   const setPayer = (pid) => act(supabase.from('weeks').update({ payer_id: pid || null }).eq('id', week.id));
+
+  // The commish grades every finished game in one tap, saving how far each one finished.
+  async function gradeFinished() {
+    const done = await Promise.all(finished.map(({ leg, result, margin }) =>
+      supabase.from('legs').update('margin' in leg ? { result, margin } : { result }).eq('id', leg.id)));
+    const bad = done.find((r) => r.error);
+    toast(bad ? friendly(bad.error) : `Graded ${finished.length} leg${finished.length === 1 ? '' : 's'}.`);
+    reload();
+  }
 
   function slipText() {
     const lines = [`${data.league.name.toUpperCase()} · Week ${week.n} (${fmtDate(week.start_date)})`];
@@ -159,6 +171,16 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
                 onOpen={() => setOpenId(l.id)} onGrade={(r) => grade(l, r)} />
             ))}
           </ol>
+        )}
+
+        {finished.length > 1 && ( /* one finished game has its own "Final · Mark W" button on its row */
+          <div className="slip-waiting is-final">
+            <span className="sw-text">
+              <b>{finished.length} games are final</b>
+              <span>{finished.map(({ leg, result }) => `${pname(leg.player_id)} ${FINAL[result]}`).join(', ')}</span>
+            </span>
+            <button type="button" className="text-btn nose" onClick={gradeFinished}>Grade all</button>
+          </div>
         )}
 
         {missing.length > 0 ? (

@@ -5,6 +5,17 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-f',
+    date: '2026-10-23',
+    title: 'Grade all, safer edits, and a new Bozo Belt',
+    idea: 'Lotti',
+    items: [
+      'When two or more games are final, the slip shows “Grade all”. One tap grades every finished leg and saves how far each one finished, so the recap faces come out right.',
+      'Editing a past week in History no longer wipes its legs’ reactions, trash talk, or close-call picks. Only what you change is changed.',
+      'The Bozo Belt is now the full-bozo clown face instead of the emoji.',
+    ],
+  },
+  {
     id: '2026-10-23-e',
     date: '2026-10-23',
     title: 'A key for the faces',

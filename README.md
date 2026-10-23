@@ -7,7 +7,7 @@ A weekly group-parlay tracker. Everyone adds one leg. If the parlay hits, you sp
 - **Weekly recap:** a beat after you watch the spin, the week's recap slides up: who the wheel picked, and a clown face for everyone: won is clean; a miss gets face paint (by a hook), makeup, or the wig (a blowout), worked out from the final score, or picked by the commish for typed legs; the wheel's pick is full bozo. Share it to the group chat, or open any week's recap again from History.
 - **Standings:** records, hit %, money in and out, and superlatives.
 - **History:** every week, who sank it, and where the wheel landed. The commish can add weeks from before the league joined the app.
-- **Bozo Belt 🤡:** most misses this season wears the clown nose next to their name until someone passes him.
+- **Bozo Belt:** most misses this season wears the full-bozo clown face next to their name until someone passes him.
 - **Reactions:** 🔥 🙏 🤡 💀 on anyone's pick, live.
 - **Live legs:** pick your leg from this week's games (spread, moneyline, total, or a football player prop) and the slip tracks it live: "Covering · DET 24, GB 17", "52 of 75 rush yds", and how many legs are still alive. Anything else can still be typed in.
 - **Slip screenshots:** whoever's on the hook adds screenshots of the DraftKings slip, one or several. The first one marks the bet placed, and everyone can flip through them.

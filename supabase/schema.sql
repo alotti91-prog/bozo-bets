@@ -663,8 +663,10 @@ begin
 end $$;
 
 -- Commish tool: add or edit a past week in one go. p_week null = new week
--- numbered p_n (must come before the current week). Editing replaces that
--- week's picks with p_legs: [{player_id, pick, odds, sport, result}].
+-- numbered p_n (must come before the current week). Editing makes that week's
+-- picks match p_legs: [{player_id, pick, odds, sport, result}]. Each leg is
+-- edited in place, so its game link, how far it missed, reactions, and trash
+-- talk stay unless the part they depend on changed. Players left out lose their pick.
 create or replace function public.save_past_week(p_league uuid, p_week uuid, p_n int, p_start date, p_payer uuid, p_legs jsonb)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare
@@ -699,7 +701,8 @@ begin
     if w.id is null then raise exception 'That week isn''t in this league'; end if;
     if w.id = cur_id then raise exception 'Change the current week from This week, not here'; end if;
     update public.weeks set payer_id = p_payer where id = w.id;
-    delete from public.legs where week_id = w.id;
+    delete from public.legs where week_id = w.id
+      and player_id not in (select (x->>'player_id')::uuid from jsonb_array_elements(p_legs) as t(x));
     wid := w.id;
   end if;
 
@@ -707,9 +710,15 @@ begin
     if coalesce(leg->>'result', '') not in ('W', 'L', 'P') then
       raise exception 'Every pick in a past week needs a result: W, L or P';
     end if;
-    insert into public.legs (week_id, league_id, player_id, pick, odds, sport, result)
+    insert into public.legs as l (week_id, league_id, player_id, pick, odds, sport, result)
     values (wid, p_league, (leg->>'player_id')::uuid, left(trim(leg->>'pick'), 80), (leg->>'odds')::int,
-            coalesce(nullif(leg->>'sport', ''), 'NFL'), leg->>'result');
+            coalesce(nullif(leg->>'sport', ''), 'NFL'), leg->>'result')
+    on conflict (week_id, player_id) do update set
+      pick = excluded.pick, odds = excluded.odds, sport = excluded.sport, result = excluded.result,
+      -- A new pick no longer matches its game; a new result no longer matches how far it missed.
+      bet = case when l.pick = excluded.pick then l.bet end,
+      margin = case when l.pick = excluded.pick and l.result is not distinct from excluded.result then l.margin end,
+      miss = case when l.result is not distinct from excluded.result then l.miss end;
   end loop;
   return wid;
 end $$;

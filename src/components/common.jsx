@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import BozoFace from './BozoFace.jsx';
 
 export function Brand({ name }) {
   const n = name || 'Bozo Bets';
@@ -14,9 +15,10 @@ export function Brand({ name }) {
   );
 }
 
-export function Belt({ on }) {
+// The Bozo Belt: the full-bozo face next to whoever has the most misses this season.
+export function Belt({ on, size = 18 }) {
   if (!on) return null;
-  return <span className="belt" title="Bozo Belt: most misses this season" aria-label="(Bozo Belt holder)" role="img">🤡</span>;
+  return <span className="belt" title="Bozo Belt: most misses this season" aria-label="(Bozo Belt holder)" role="img"><BozoFace face="full" size={size} /></span>;
 }
 
 export function Toaster() {

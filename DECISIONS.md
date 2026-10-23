@@ -160,3 +160,8 @@ With five faces, people couldn't tell the scale existed: face paint and makeup l
 
 **2026-10-23 · A credit line, first names only**
 "Bozo Bets · made by Chris & Andrew" sits at the bottom of Settings. It isn't a footer on every screen: the tab bar is pinned there, and it would add clutter to every screen. First names only, because the repo is public.
+
+**2026-10-23 · Grade all, Edit Week in place, and the Belt as a face**
+- **Grade all:** when two or more legs picked from a game are final but ungraded, the slip shows "N games are final · Grade all" for the commish (`finishedGrades()` in `bets.js`). It saves each grade with its margin. With just one, the leg's own "Final · Mark W" button already does the job, so the row stays hidden.
+- **Edit Week:** `save_past_week()` used to delete and re-insert a week's legs. That silently dropped the game link, margins, close-call picks, reactions, and trash talk. It now updates each leg in place (`on conflict (week_id, player_id) do update`). A changed pick drops the game link and margin. A changed result drops the margin and close-call pick. Players removed from the week lose their leg, as before.
+- **Bozo Belt:** the 🤡 emoji is replaced with the full-bozo `BozoFace` so it matches the recap. The 🤡 reaction stays, since that's an emoji people send.

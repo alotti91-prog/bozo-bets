@@ -33,7 +33,7 @@ export default function StandingsTab({ data, me, belt }) {
   const beltRow = belt && s.rows[belt.id];
   const awards = [
     sharp && ['Sharpest', sharp.p.name, `${sharp.W}–${sharp.L}, ${pct(sharp)}`],
-    beltRow && ['Bozo Belt 🤡', beltRow.p.name, `${belt.misses} miss${belt.misses > 1 ? 'es' : ''}`],
+    beltRow && ['Bozo Belt', beltRow.p.name, `${belt.misses} miss${belt.misses > 1 ? 'es' : ''}`],
     shot && ['Longest hit', shot.p.name, `${fmtOdds(shot.best.odds)} · ${shot.best.pick}`],
     magnet && ['Wheel magnet', magnet.p.name, `Landed on ${magnet.landed}×`],
     hot && ['On a heater', hot.p.name, `${hot.streak} straight hits`],
@@ -91,7 +91,7 @@ export default function StandingsTab({ data, me, belt }) {
           <div className="awards" data-noswipe="">
             {awards.map(([label, who, detail]) => (
               <div className="award" key={label}>
-                <span className="award-label">{label}</span>
+                <span className="award-label">{label}{label === 'Bozo Belt' && <Belt on size={16} />}</span>
                 <b>{who}</b>
                 <span className="award-detail">{detail}</span>
               </div>

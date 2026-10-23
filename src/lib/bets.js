@@ -187,6 +187,19 @@ export function gradeHidden(leg, s, now = Date.now()) {
   return !!leg.bet.game.start && new Date(leg.bet.game.start).getTime() > now;
 }
 
+/**
+ * Ungraded legs whose games are final, with the grade the score points to and
+ * how far each finished from its line: [{ leg, result, margin }]. For the
+ * commish's one-tap "Grade all".
+ */
+export function finishedGrades(legs, statusOf) {
+  return legs.filter((l) => !l.result && l.bet?.game).map((l) => {
+    const s = statusOf(l);
+    const result = suggestedGrade(s);
+    return result ? { leg: l, result, margin: gradeMargin(s, result) } : null;
+  }).filter(Boolean);
+}
+
 /** How many legs are still alive: not graded a loss, and not already lost on the field. */
 export function aliveCount(legs, statusOf) {
   let alive = 0;

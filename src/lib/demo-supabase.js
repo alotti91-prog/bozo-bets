@@ -256,13 +256,22 @@ const rpcs = {
     if (p_week) {
       w = db.weeks.find((x) => x.id === p_week);
       w.payer_id = p_payer;
-      db.legs = db.legs.filter((l) => l.week_id !== w.id);
+      const keep = new Set(p_legs.map((l) => l.player_id));
+      db.legs = db.legs.filter((l) => l.week_id !== w.id || keep.has(l.player_id));
     } else {
       if (db.weeks.some((x) => x.n === p_n)) throw new Error(`Week ${p_n} is already in the league. Edit it from History instead.`);
       w = { id: id(), league_id: L, n: p_n, start_date: p_start, stake: db.leagues[0].stake, payer_id: p_payer, actual_payout: null, created_at: now() };
       db.weeks.push(w);
     }
-    p_legs.forEach((l) => db.legs.push(leg(w.id, l.player_id, l.pick, l.odds, l.sport || 'NFL', l.result)));
+    p_legs.forEach((l) => {
+      const was = db.legs.find((x) => x.week_id === w.id && x.player_id === l.player_id);
+      if (!was) { db.legs.push(leg(w.id, l.player_id, l.pick, l.odds, l.sport || 'NFL', l.result)); return; }
+      // Edited in place, like the real one: keep what the change doesn't make stale.
+      const samePick = was.pick === l.pick;
+      const sameResult = was.result === l.result;
+      Object.assign(was, { pick: l.pick, odds: l.odds, sport: l.sport || 'NFL', result: l.result,
+        bet: samePick ? was.bet : null, margin: samePick && sameResult ? was.margin : null, miss: sameResult ? was.miss : null });
+    });
     emit('weeks', 'UPDATE', w); emit('legs', 'INSERT', {});
     return w.id;
   },
