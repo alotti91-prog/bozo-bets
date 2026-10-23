@@ -136,3 +136,6 @@ Trade-offs we accepted:
 - The rubber-stamp "BUSTED" and the typewriter font are gone.
 
 The crowding that started this had a real bug under it: the wrapper added for the tab-swipe animation dropped the spacing between sections, so every tab's sections ran together. `.pane` now spaces them.
+
+**2026-10-22 · Pick legs from DraftKings' board, inside Add a leg**
+ESPN's scoreboard already carries DraftKings' full board for each game: both sides of the spread with prices, both moneylines, and the over/under with prices. We used to keep only the spread number and the total. Now the board shows in Add a leg, and tapping a price fills in the pick, the line, and the odds. We built it into Add a leg instead of a fifth tab: browsing lines mostly copies the DraftKings app, and a tab would undo the simplicity we just shipped. A read-only "This week's lines" sheet covers browsing. Boards show only for games that haven't started (started games show live or closing prices, which would mislead). Prop lines aren't in ESPN's feed and would need a paid odds service, so props are still built by hand. Lines move, so the odds stay editable and the sheet says to check DraftKings.

@@ -90,7 +90,40 @@ function sides(competitors = []) {
   return { home: side(home), away: side(away) };
 }
 
-/** Scoreboard → [{ id, sport, start, short, state, detail, home, away, odds }] */
+// ---- DraftKings lines (ESPN shows them per game) ----
+const price = (v) => { // "+145", "-175", "EVEN", or a number → 145, -175, 100
+  if (v == null || v === '') return null;
+  const s = typeof v === 'number' ? v : String(v).trim().toUpperCase().replace('−', '-');
+  if (s === 'EVEN' || s === 'EV') return 100;
+  const n = typeof s === 'number' ? s : Number(s.replace(/^\+/, ''));
+  return Number.isFinite(n) && Math.abs(n) >= 100 ? Math.round(n) : null;
+};
+const lineOf = (v) => { // "+3.5", "-3.5", "o44.5", "u44.5", "PK", or a number → 3.5, -3.5, 44.5, 0
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const s = String(v).trim().toUpperCase().replace('−', '-').replace(/^[OU]/, '');
+  if (s === 'PK' || s === 'PICK') return 0;
+  const n = Number(s.replace(/^\+/, ''));
+  return Number.isFinite(n) ? n : null;
+};
+const latest = (x) => x?.close || x?.current || x?.open || null; // ESPN calls the current line "close"
+
+/** The full board: { spread: { away: { line, price }, home }, ml: { away, home }, total: { line, over, under } }, or null. */
+export function oddsBoard(o) {
+  if (!o) return null;
+  const sa = latest(o.pointSpread?.away), sh = latest(o.pointSpread?.home);
+  const spread = lineOf(sa?.line) != null && lineOf(sh?.line) != null
+    ? { away: { line: lineOf(sa.line), price: price(sa.odds) }, home: { line: lineOf(sh.line), price: price(sh.odds) } } : null;
+  const ma = price(latest(o.moneyline?.away)?.odds ?? o.awayTeamOdds?.moneyLine);
+  const mh = price(latest(o.moneyline?.home)?.odds ?? o.homeTeamOdds?.moneyLine);
+  const ml = ma != null && mh != null ? { away: ma, home: mh } : null;
+  const ov = latest(o.total?.over), un = latest(o.total?.under);
+  const tl = lineOf(ov?.line) ?? lineOf(un?.line) ?? (typeof o.overUnder === 'number' ? o.overUnder : null);
+  const total = tl != null && (ov || un) ? { line: tl, over: price(ov?.odds), under: price(un?.odds) } : null;
+  return spread || ml || total ? { spread, ml, total } : null;
+}
+
+/** Scoreboard → [{ id, sport, start, short, state, detail, home, away, odds: { details, total, board } }] */
 export function normalizeScoreboard(json, sport) {
   return (json?.events || []).map((e) => {
     const comp = e.competitions?.[0] || {};
@@ -104,7 +137,7 @@ export function normalizeScoreboard(json, sport) {
       ...status(e.status || comp.status),
       home,
       away,
-      odds: o ? { details: o.details || '', total: typeof o.overUnder === 'number' ? o.overUnder : null } : null,
+      odds: o ? { details: o.details || '', total: typeof o.overUnder === 'number' ? o.overUnder : null, board: oddsBoard(o) } : null,
     };
   }).filter((g) => g.home.abbr && g.away.abbr);
 }

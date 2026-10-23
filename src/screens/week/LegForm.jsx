@@ -91,7 +91,16 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
       )}
       {mode === 'pick' ? (
         <BetPicker value={b} onTypeInstead={toType}
-          onChange={(nb) => { setB(nb); saveDraft({ b: nb }); setHint({ text: HINT, err: false }); }} />
+          onChange={(nb, price) => {
+            // A price from DraftKings' board fills the odds too.
+            const patch = { b: nb };
+            if (price != null) {
+              patch.sign = price > 0 ? '+' : '-';
+              patch.odds = String(Math.abs(price));
+              setSign(patch.sign); setOdds(patch.odds);
+            }
+            setB(nb); saveDraft(patch); setHint({ text: price != null ? 'DraftKings’ price right now. Change it if yours is different.' : HINT, err: false });
+          }} />
       ) : (
         <div className="field">
           <label htmlFor="f-pick">Pick</label>

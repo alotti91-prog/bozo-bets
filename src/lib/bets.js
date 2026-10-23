@@ -186,6 +186,33 @@ export function aliveCount(legs, statusOf) {
   return { alive, total: legs.length };
 }
 
+// ---- The DraftKings board (see components/GameCard.jsx) ----
+
+/** A game's board as tappable choices: both sides of the spread, the total, and the moneyline. */
+export function boardOptions(game) {
+  const bd = game?.odds?.board;
+  if (!bd) return [];
+  const out = [];
+  if (bd.spread) for (const s of ['away', 'home']) out.push({ key: `spread:${s}`, type: 'spread', side: s, line: bd.spread[s].line, price: bd.spread[s].price });
+  if (bd.total) for (const s of ['over', 'under']) out.push({ key: `total:${s}`, type: 'total', side: s, line: bd.total.line, price: bd.total[s] });
+  if (bd.ml) for (const s of ['away', 'home']) out.push({ key: `ml:${s}`, type: 'ml', side: s, line: null, price: bd.ml[s] });
+  return out;
+}
+
+/** Picker state for a tapped board choice, and its price to fill the odds (null if the board had none). */
+export function pickFromBoard(sport, game, opt) {
+  const b = { ...emptyPick(sport), game, type: opt.type, side: opt.side, lineAuto: opt.type !== 'ml' };
+  if (opt.type === 'spread') { b.lineText = String(Math.abs(opt.line)); b.lineSign = opt.line > 0 ? '+' : '-'; }
+  if (opt.type === 'total') b.lineText = String(opt.line);
+  return { b, price: opt.price };
+}
+
+/** Whether picker state is exactly this board choice (to highlight it). */
+export function isBoardPick(b, game, opt) {
+  if (!b.game || b.game.id !== game.id || b.type !== opt.type || b.side !== opt.side) return false;
+  return opt.type === 'ml' || betFromPick(b).line === opt.line;
+}
+
 // ---- Leg form state (see components/BetPicker.jsx) ----
 
 /** Blank picker state. */

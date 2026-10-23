@@ -5,6 +5,18 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-22-j',
+    date: '2026-10-22',
+    title: 'Pick from DraftKings’ lines',
+    idea: 'Lotti',
+    items: [
+      'Add your leg now shows DraftKings’ lines for every upcoming game: spread, total, and moneyline, with prices. Tap one and the pick and odds fill in.',
+      'Want a player prop or a different line? Tap “Other bets” on a game, or “Something else” after picking.',
+      'Anyone can look over the board from “This week’s lines,” under the slip.',
+      'Lines come from ESPN and move, so whoever places the bet should check DraftKings.',
+    ],
+  },
+  {
     id: '2026-10-22-i',
     date: '2026-10-22',
     title: 'A simpler look',

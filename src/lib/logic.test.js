@@ -9,8 +9,8 @@ import { isPrivateAddress } from './site.js';
 import { RELEASES, unseenReleases } from './releases.js';
 import { slipPaths } from './slip.js';
 import { swipeDirection, swipeTarget } from './swipe.js';
-import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
-import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden } from './bets.js';
+import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster, oddsBoard } from './espn.js';
+import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden, boardOptions, pickFromBoard, isBoardPick, betFromPick } from './bets.js';
 import espnHandler from '../../api/espn.js';
 import { runChecks } from '../../api/health.js';
 
@@ -569,5 +569,61 @@ describe('small labels', () => {
     expect(initials('Mori')).toBe('M');
     expect(initials('big chris')).toBe('BC');
     expect(initials('')).toBe('?');
+  });
+});
+
+// DraftKings odds as ESPN sent them for PIT @ NO (Oct 2026), trimmed to the parts we read.
+const PIT_NO = {
+  details: 'PIT -3.5', overUnder: 44.5, spread: 3.5,
+  moneyline: { home: { close: { odds: '+145' }, open: { odds: '+114' } }, away: { close: { odds: '-175' }, open: { odds: '-135' } } },
+  pointSpread: { home: { close: { line: '+3.5', odds: '-118' } }, away: { close: { line: '-3.5', odds: '-102' } } },
+  total: { over: { close: { line: 'o44.5', odds: '-110' } }, under: { close: { line: 'u44.5', odds: '-110' } } },
+};
+const PIT_NO_GAME = {
+  id: '401873011', sport: 'nfl', start: '2026-10-25T17:00Z', short: 'PIT @ NO', state: 'pre',
+  away: { id: '23', abbr: 'PIT', short: 'Steelers', name: 'Pittsburgh Steelers' },
+  home: { id: '18', abbr: 'NO', short: 'Saints', name: 'New Orleans Saints' },
+  odds: { details: 'PIT -3.5', total: 44.5, board: oddsBoard(PIT_NO) },
+};
+
+describe('the DraftKings board', () => {
+  it('reads spread, moneyline, and total with prices from ESPN', () => {
+    expect(oddsBoard(PIT_NO)).toEqual({
+      spread: { away: { line: -3.5, price: -102 }, home: { line: 3.5, price: -118 } },
+      ml: { away: -175, home: 145 },
+      total: { line: 44.5, over: -110, under: -110 },
+    });
+  });
+  it('copes with what the feed sometimes sends', () => {
+    expect(oddsBoard({ details: 'CHI -3', overUnder: 50.5 })).toBe(null); // just the summary: no board
+    expect(oddsBoard(null)).toBe(null);
+    const odd = oddsBoard({
+      awayTeamOdds: { moneyLine: -110 }, homeTeamOdds: { moneyLine: 'EVEN' },
+      pointSpread: { away: { open: { line: 'PK', odds: '-110' } }, home: { open: { line: 'PK' } } },
+    });
+    expect(odd.ml).toEqual({ away: -110, home: 100 });
+    expect(odd.spread).toEqual({ away: { line: 0, price: -110 }, home: { line: 0, price: null } });
+    expect(odd.total).toBe(null);
+    expect(normalizeScoreboard(SB, 'nfl')[0].odds.board).toBe(null);
+  });
+  it('turns a tapped price into the leg and its odds', () => {
+    const opts = boardOptions(PIT_NO_GAME);
+    expect(opts.map((o) => o.key)).toEqual(['spread:away', 'spread:home', 'total:over', 'total:under', 'ml:away', 'ml:home']);
+    const leg = (key) => {
+      const o = opts.find((x) => x.key === key);
+      const { b, price } = pickFromBoard('nfl', PIT_NO_GAME, o);
+      const bet = betFromPick(b);
+      expect(betProblem(bet)).toBe('');
+      expect(isBoardPick(b, PIT_NO_GAME, o)).toBe(true);
+      return [pickText(bet), price, bet.line];
+    };
+    expect(leg('spread:away')).toEqual(['Steelers −3.5', -102, -3.5]);
+    expect(leg('spread:home')).toEqual(['Saints +3.5', -118, 3.5]);
+    expect(leg('total:under')).toEqual(['PIT/NO under 44.5', -110, 44.5]);
+    expect(leg('ml:home')).toEqual(['Saints ML', 145, null]);
+    // Change the line by hand and it's no longer that board choice
+    const { b } = pickFromBoard('nfl', PIT_NO_GAME, opts[0]);
+    expect(isBoardPick({ ...b, lineText: '3' }, PIT_NO_GAME, opts[0])).toBe(false);
+    expect(boardOptions({ odds: { details: 'X -1' } })).toEqual([]);
   });
 });

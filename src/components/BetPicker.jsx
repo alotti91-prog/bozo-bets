@@ -1,21 +1,23 @@
 import { useEffect, useState } from 'react';
 import { SPORTS } from '../lib/espn.js';
-import { BET_TYPES, STATS, oddsLine, pickText, betProblem, emptyPick, betFromPick } from '../lib/bets.js';
+import { BET_TYPES, STATS, oddsLine, pickText, betProblem, emptyPick, betFromPick, boardOptions, pickFromBoard, isBoardPick } from '../lib/bets.js';
 import { getGames, getRoster } from '../lib/scores.js';
+import { gameWhen } from '../lib/ui.js';
+import GameCard from './GameCard.jsx';
 
-const kick = (iso) => {
-  try { return new Date(iso).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }); } catch { return ''; }
-};
-const gameWhen = (g) => (g.state === 'pre' ? kick(g.start) : g.state === 'post' ? 'Final' : `${g.away.score ?? 0}–${g.home.score ?? 0} · ${g.detail}`);
+const ORDER = { pre: 0, in: 1, post: 2 };
 
 /**
- * Pick the game, the kind of bet, and the details. The pick text writes itself.
- * value/onChange hold picker state (see emptyPick). onTypeInstead switches the
- * form to free text.
+ * Pick the bet. Upcoming games show DraftKings' board: tap a price and the
+ * pick, line, and odds fill in. "Other bets" (or "Something else") builds it by
+ * hand: the kind of bet, the side, the line, or a player prop.
+ * value/onChange hold picker state (see emptyPick); onChange(state, price) passes
+ * the board price when there is one. onTypeInstead switches the form to free text.
  */
 export default function BetPicker({ value: b, onChange, onTypeInstead }) {
   const [games, setGames] = useState({ sport: null, list: [], err: '' });
   const [find, setFind] = useState('');
+  const [custom, setCustom] = useState(false); // building the bet by hand instead of from the board
   const [roster, setRoster] = useState({ key: '', list: [], err: '' });
 
   useEffect(() => {
@@ -42,8 +44,14 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
   const set = (patch) => onChange({ ...b, ...patch });
   // A saved leg's game has no odds; borrow them from this week's list when it's there.
   const odds = b.game?.odds || games.list.find((g) => g.id === b.game?.id)?.odds || null;
-  const pickSport = (s) => { setFind(''); onChange(emptyPick(s)); };
-  const pickGame = (g) => onChange({ ...emptyPick(b.sport), game: g });
+  const pickSport = (s) => { setFind(''); setCustom(false); onChange(emptyPick(s)); };
+  const pickGame = (g) => { setCustom(!!g); onChange({ ...emptyPick(b.sport), game: g }); };
+  const pickBoard = (g, opt) => { setCustom(false); const { b: nb, price } = pickFromBoard(b.sport, g, opt); onChange(nb, price); };
+  // The picked game's board, if it has one and hasn't started.
+  const listGame = b.game ? games.list.find((g) => g.id === b.game.id) : null;
+  const boardGame = listGame && listGame.state === 'pre' && boardOptions(listGame).length ? listGame : null;
+  const onBoard = boardGame && b.type && boardOptions(boardGame).some((o) => isBoardPick(b, boardGame, o));
+  const showCustom = !boardGame || custom || (b.type && !onBoard);
   const pickType = (t) => {
     const patch = { type: t, side: null, stat: null, player: null, lineText: '', lineSign: '-', lineAuto: false };
     if (t === 'total' && odds?.total != null) Object.assign(patch, { lineText: String(odds.total), lineAuto: true });
@@ -59,7 +67,8 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
   };
 
   const q = find.trim().toLowerCase();
-  const shown = q ? games.list.filter((g) => [g.short, g.home.name, g.away.name].join(' ').toLowerCase().includes(q)) : games.list;
+  const shown = (q ? games.list.filter((g) => [g.short, g.home.name, g.away.name].join(' ').toLowerCase().includes(q)) : games.list)
+    .slice().sort((x, y) => (ORDER[x.state] ?? 1) - (ORDER[y.state] ?? 1) || String(x.start).localeCompare(String(y.start)));
   const yesNo = b.type === 'prop' && STATS[b.stat]?.yesNo;
   const bet = betFromPick(b);
   const ready = !betProblem(bet);
@@ -75,10 +84,21 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
       </div>
 
       {b.game ? (
-        <div className="bp-game is-picked">
-          <span className="bp-game-name"><strong>{b.game.short}</strong><span className="sub">{gameWhen(b.game)}</span></span>
-          <button type="button" className="text-btn nose" onClick={() => pickGame(null)}>Change</button>
-        </div>
+        <>
+          <div className="bp-game is-picked">
+            <span className="bp-game-name"><strong>{b.game.short}</strong><span className="sub">{gameWhen(listGame || b.game)}</span></span>
+            <button type="button" className="text-btn nose" onClick={() => pickGame(null)}>Change</button>
+          </div>
+          {boardGame && !showCustom && (
+            <>
+              <GameCard game={boardGame} sport={b.sport} head={false} onPick={(o) => pickBoard(boardGame, o)} selected={(o) => isBoardPick(b, boardGame, o)} />
+              <button type="button" className="text-btn muted center" onClick={() => setCustom(true)}>Something else: a player prop or another line</button>
+            </>
+          )}
+          {boardGame && showCustom && (
+            <button type="button" className="text-btn muted center" onClick={() => { setCustom(false); onChange({ ...emptyPick(b.sport), game: b.game }); }}>Back to DraftKings{'’'} lines</button>
+          )}
+        </>
       ) : (
         <div className="stack" style={{ gap: 6 }}>
           {loading && <p className="sub">Loading this week{'’'}s games{'…'}</p>}
@@ -93,15 +113,13 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
           )}
           <div className="bp-games">
             {shown.map((g) => (
-              <button key={g.id} type="button" className="bp-game" onClick={() => pickGame(g)}>
-                <strong>{g.short}</strong><span className={`sub${g.state === 'in' ? ' is-live' : ''}`}>{gameWhen(g)}</span>
-              </button>
+              <GameCard key={g.id} game={g} sport={b.sport} onPick={(o) => pickBoard(g, o)} onOpen={() => pickGame(g)} />
             ))}
           </div>
         </div>
       )}
 
-      {b.game && (
+      {b.game && showCustom && (
         <div className="segmented" role="group" aria-label="Kind of bet">
           {Object.entries(BET_TYPES).filter(([k]) => k !== 'prop' || SPORTS[b.sport]?.props).map(([k, label]) => (
             <button key={k} type="button" aria-pressed={b.type === k} onClick={() => pickType(k)}>{k === 'prop' ? 'Player' : label}</button>
@@ -109,7 +127,7 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
         </div>
       )}
 
-      {(b.type === 'spread' || b.type === 'ml') && (
+      {showCustom && (b.type === 'spread' || b.type === 'ml') && (
         <div className="choices" role="group" aria-label="Team">
           {teams.map(([side, t]) => (
             <button key={side} type="button" aria-pressed={b.side === side} onClick={() => pickTeam(side)}>
@@ -119,7 +137,7 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
         </div>
       )}
 
-      {b.type === 'prop' && (
+      {showCustom && b.type === 'prop' && (
         <>
           {roster.key !== rosterKey && <p className="sub">Loading players{'…'}</p>}
           {roster.key === rosterKey && roster.err && <p className="hint err">{roster.err} <button type="button" className="link" onClick={onTypeInstead}>Type it instead</button></p>}
@@ -149,13 +167,13 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
         </>
       )}
 
-      {(b.type === 'total' || (b.type === 'prop' && b.stat && !yesNo)) && (
+      {showCustom && (b.type === 'total' || (b.type === 'prop' && b.stat && !yesNo)) && (
         <div className="choices" role="group" aria-label="Over or under">
           {['over', 'under'].map((s) => <button key={s} type="button" aria-pressed={b.side === s} onClick={() => set({ side: s })}>{s === 'over' ? 'Over' : 'Under'}</button>)}
         </div>
       )}
 
-      {(b.type === 'spread' || b.type === 'total' || (b.type === 'prop' && b.stat && !yesNo)) && (
+      {showCustom && (b.type === 'spread' || b.type === 'total' || (b.type === 'prop' && b.stat && !yesNo)) && (
         <div className="field">
           <label htmlFor="bp-line">{b.type === 'spread' ? 'Line' : 'Number'}</label>
           <div className="odds-in" style={{ maxWidth: 200 }}>

@@ -86,6 +86,14 @@ export function secureRandom() {
 export function fmtDate(iso) {
   try { return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch { return iso; }
 }
+/** A game's kickoff: "Sun 1:00 PM". */
+export function kickoff(iso) {
+  try { return new Date(iso).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }); } catch { return ''; }
+}
+/** Where a game stands, short: kickoff before it starts, "17–10 · 6:12 - 3rd" during, "Final" after. */
+export function gameWhen(g) {
+  return g.state === 'pre' ? kickoff(g.start) : g.state === 'post' ? 'Final' : `${g.away.score ?? 0}–${g.home.score ?? 0} · ${g.detail}`;
+}
 export function fmtWhen(iso) {
   try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch { return ''; }
 }

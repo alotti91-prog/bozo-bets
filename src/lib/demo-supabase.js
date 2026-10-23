@@ -42,6 +42,10 @@ const mkGame = (id, sport, away, home, start, state, detail, as = null, hs = nul
   id, sport, start, short: `${TEAMS[away].abbr} @ ${TEAMS[home].abbr}`, state, detail,
   away: { ...TEAMS[away], score: as }, home: { ...TEAMS[home], score: hs }, odds, players,
 });
+// DraftKings board for an upcoming demo game: away spread line and both prices, both moneylines, total and both prices.
+const bd = (line, ap, hp, mla, mlh, total, over, under) => ({
+  spread: { away: { line, price: ap }, home: { line: -line, price: hp } }, ml: { away: mla, home: mlh }, total: { line: total, over, under },
+});
 const mkPlayer = (id, name, team, stats) => ({ id, name, team, stats: { rushRecYds: (stats.rushYds || 0) + (stats.recYds || 0), td: (stats.rushTd || 0) + (stats.recTd || 0), ...stats } });
 const DEMO_GAMES = [
   mkGame('900002', 'nfl', 'BUF', 'MIA', inHours(-2), 'in', '6:12 - 3rd', 17, 10, { details: 'BUF -6.5', total: 47.5 },
@@ -49,15 +53,15 @@ const DEMO_GAMES = [
   mkGame('900004', 'nfl', 'PHI', 'NYG', inHours(-1), 'in', '2:41 - 2nd', 14, 3, { details: 'PHI -7', total: 43.5 },
     [mkPlayer('3929630', 'Saquon Barkley', 'PHI', { rushYds: 68, rushAtt: 11, rushTd: 1, rec: 1, recYds: 6 }), mkPlayer('4040715', 'Jalen Hurts', 'PHI', { passYds: 141, passTd: 1, int: 0, passCmp: 11, rushYds: 9 })]),
   mkGame('900003', 'nfl', 'NYJ', 'NE', inHours(-26), 'post', 'Final', 13, 24, { details: 'NE -3', total: 41.5 }),
-  mkGame('900001', 'nfl', 'NE', 'CHI', inHours(3), 'pre', 'Tonight 8:15 PM', null, null, { details: 'CHI -3', total: 50.5 }),
-  mkGame('900005', 'nfl', 'DET', 'GB', inHours(70), 'pre', 'Sun 1:00 PM', null, null, { details: 'DET -3.5', total: 48.5 }),
-  mkGame('900006', 'nfl', 'KC', 'LV', inHours(73), 'pre', 'Sun 4:25 PM', null, null, { details: 'KC -9.5', total: 44.5 }),
-  mkGame('910001', 'ncaaf', 'MICH', 'OSU', inHours(50), 'pre', 'Sat 12:00 PM', null, null, { details: 'OSU -10.5', total: 45.5 }),
+  mkGame('900001', 'nfl', 'NE', 'CHI', inHours(3), 'pre', 'Tonight 8:15 PM', null, null, { details: 'CHI -3', total: 50.5, board: bd(3, -110, -110, 135, -160, 50.5, -112, -108) }),
+  mkGame('900005', 'nfl', 'DET', 'GB', inHours(70), 'pre', 'Sun 1:00 PM', null, null, { details: 'DET -3.5', total: 48.5, board: bd(-3.5, -105, -115, -175, 145, 48.5, -110, -110) }),
+  mkGame('900006', 'nfl', 'KC', 'LV', inHours(73), 'pre', 'Sun 4:25 PM', null, null, { details: 'KC -9.5', total: 44.5, board: bd(-9.5, -110, -110, -450, 340, 44.5, -105, -115) }),
+  mkGame('910001', 'ncaaf', 'MICH', 'OSU', inHours(50), 'pre', 'Sat 12:00 PM', null, null, { details: 'OSU -10.5', total: 45.5, board: bd(10.5, -110, -110, 320, -425, 45.5, -110, -110) }),
   mkGame('910002', 'ncaaf', 'TEX', 'UGA', inHours(-1), 'in', '9:30 - 2nd', 10, 14, { details: 'UGA -2.5', total: 51.5 }),
   mkGame('920001', 'nba', 'BOS', 'NYK', inHours(-1), 'in', '4:12 - 3rd', 71, 68, { details: 'NYK -2', total: 221.5 }),
-  mkGame('920002', 'nba', 'LAL', 'GSW', inHours(5), 'pre', 'Tonight 10:00 PM', null, null, { details: 'GSW -4.5', total: 229.5 }),
+  mkGame('920002', 'nba', 'LAL', 'GSW', inHours(5), 'pre', 'Tonight 10:00 PM', null, null, { details: 'GSW -4.5', total: 229.5, board: bd(4.5, -108, -112, 160, -190, 229.5, -110, -110) }),
   mkGame('930001', 'nhl', 'NYR', 'BOSH', inHours(-1), 'in', '12:05 - 2nd', 2, 1, { details: 'BOS -130', total: 6 }),
-  mkGame('940001', 'mlb', 'LAD', 'NYY', inHours(28), 'pre', 'Fri 8:08 PM', null, null, { details: 'LAD -125', total: 8.5 }),
+  mkGame('940001', 'mlb', 'LAD', 'NYY', inHours(28), 'pre', 'Fri 8:08 PM', null, null, { details: 'LAD -125', total: 8.5, board: bd(-1.5, 135, -160, -125, 105, 8.5, -105, -115) }),
 ];
 const ROSTER = {
   CHI: [['Caleb Williams', 'QB'], ["D'Andre Swift", 'RB'], ['DJ Moore', 'WR'], ['Rome Odunze', 'WR'], ['Cole Kmet', 'TE']],

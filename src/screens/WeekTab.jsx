@@ -4,7 +4,7 @@ import { weekInfo, amerFmt, fmtOdds, money, dollars } from '../lib/odds.js';
 import { toast, shareText, fmtDate, listNames, initials } from '../lib/ui.js';
 import { lockState, updatedAgo } from '../lib/deadline.js';
 import { siteUrl } from '../lib/site.js';
-import { Sheet, IconShare, IconPhoto, IconPlus, IconClock, IconLock } from '../components/common.jsx';
+import { Sheet, IconShare, IconPhoto, IconPlus, IconClock, IconLock, IconBoard } from '../components/common.jsx';
 import { slipPaths } from '../lib/slip.js';
 import { liveStatus, aliveCount, gameKey } from '../lib/bets.js';
 import { useLiveGames } from '../lib/useLiveGames.js';
@@ -13,6 +13,7 @@ import LegRow from './week/LegRow.jsx';
 import LegSheet from './week/LegSheet.jsx';
 import LegForm from './week/LegForm.jsx';
 import PayoutForm from './week/PayoutForm.jsx';
+import LinesSheet from './week/LinesSheet.jsx';
 
 // The This week tab: the week and its deadline, a summary row, the slip (legs,
 // who's still missing, the total), and the actions. Tapping a leg opens its
@@ -22,6 +23,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
   const [form, setForm] = useState(null); // null, 'new', or the leg being edited
   const [openId, setOpenId] = useState(null); // leg whose panel is open
   const [slipOpen, setSlipOpen] = useState(false);
+  const [linesOpen, setLinesOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000); // keeps the countdown and "updated" label fresh
@@ -197,6 +199,8 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         )}
       </div>
 
+      <button type="button" className="text-btn muted center with-icon" onClick={() => setLinesOpen(true)}><IconBoard />This week{'’'}s lines</button>
+
       {info.status === 'hit' && isAdmin && <PayoutForm week={week} projected={info.projected} act={act} />}
 
       {openLeg && (
@@ -214,6 +218,10 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
             me={me} isAdmin={isAdmin} locked={locked} pname={pname}
             onDone={() => { setForm(null); reload(); }} onCancel={() => setForm(null)} />
         </Sheet>
+      )}
+      {linesOpen && (
+        <LinesSheet onClose={() => setLinesOpen(false)} addLabel={addLabel}
+          onAdd={canAdd ? () => { setLinesOpen(false); setForm('new'); } : null} />
       )}
       {slipOpen && <PlacedSheet data={data} week={week} canMark={canMark} reload={reload} nameOfUser={nameOfUser} onClose={() => setSlipOpen(false)} />}
     </>
