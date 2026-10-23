@@ -1,8 +1,11 @@
-import { Sheet, IconShare } from '../components/common.jsx';
+import { useState } from 'react';
+import { Sheet, IconShare, IconChevR } from '../components/common.jsx';
 import BozoFace from '../components/BozoFace.jsx';
 import { FACES, personLine, recapText } from '../lib/recap.js';
 import { money, dollars, fmtOdds } from '../lib/odds.js';
 import { shareText } from '../lib/ui.js';
+import FaceLadder from './recap/FaceLadder.jsx';
+import FaceRules from './recap/FaceRules.jsx';
 
 /**
  * The weekly recap (r from weekRecap): who the wheel picked, then everyone's
@@ -11,6 +14,14 @@ import { shareText } from '../lib/ui.js';
  */
 export default function RecapSheet({ recap: r, pname, leagueName, onClose }) {
   const hit = r.info.status === 'hit';
+  const [rules, setRules] = useState(false); // showing "How the faces work"
+  if (rules) {
+    return (
+      <Sheet title="How the faces work" onClose={onClose} onBack={() => setRules(false)} backLabel="The recap">
+        <FaceRules />
+      </Sheet>
+    );
+  }
   return (
     <Sheet kicker={`Week ${r.week.n}`} title="The recap" onClose={onClose}>
       {hit ? (
@@ -45,7 +56,11 @@ export default function RecapSheet({ recap: r, pname, leagueName, onClose }) {
       )}
 
       <section aria-labelledby="recap-people">
-        <h3 className="group-label" id="recap-people">How everyone did</h3>
+        <div className="group-head">
+          <h3 className="group-label" id="recap-people">How everyone did</h3>
+          <button type="button" className="text-btn link-sm" onClick={() => setRules(true)}>How faces work<IconChevR /></button>
+        </div>
+        <FaceLadder people={r.people} hit={hit} onOpen={() => setRules(true)} />
         <ol className="rows recap-list">
           {r.people.map((p) => (
             <li key={p.id} className="row">

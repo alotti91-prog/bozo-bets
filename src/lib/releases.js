@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-e',
+    date: '2026-10-23',
+    title: 'A key for the faces',
+    idea: 'Lotti',
+    items: [
+      'The recap now has a row of all five faces, clean to full bozo, with how many people got each one that week. Faces nobody got fade out.',
+      'Tap it, or “How faces work”, to see what each face means and what counts as a close call or a blowout in each sport.',
+    ],
+  },
+  {
     id: '2026-10-23-d',
     date: '2026-10-23',
     title: 'Close calls and blowouts for typed legs',

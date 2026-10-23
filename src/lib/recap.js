@@ -4,6 +4,9 @@ import { weekInfo, money, dollars } from './odds.js';
 
 /** What each face is called, best to worst. */
 export const FACES = { clean: 'Clean', paint: 'Face paint', makeup: 'Makeup’s on', wig: 'Wig’s on', full: 'Full bozo' };
+/** The faces in order, and the short names the ladder uses to fit five across. */
+export const FACE_ORDER = Object.keys(FACES);
+export const FACE_SHORT = { clean: 'Clean', paint: 'Face paint', makeup: 'Makeup', wig: 'Wig', full: 'Full bozo' };
 const RANK = { full: 0, wig: 1, makeup: 2, paint: 3, clean: 4 };
 const RESULT = { W: 'won', L: 'lost', P: 'pushed' };
 const EMOJI = { full: '🤡', wig: '🌈', makeup: '💄', paint: '🎨', clean: '😎' };
@@ -21,6 +24,30 @@ const CUTOFFS = {
   nhl: { close: 1, closeMl: 1, blowout: 3 },
   mlb: { close: 1, closeMl: 1, blowout: 5 },
 };
+
+const SPORT_ROWS = [['Football', 'nfl', 'pt'], ['NBA', 'nba', 'pt'], ['NHL', 'nhl', 'goal'], ['MLB', 'mlb', 'run']];
+
+/**
+ * The cutoffs as rows for the "How the faces work" table, built from CUTOFFS so
+ * the table always matches: [{ label, close, blowout }].
+ */
+export function cutoffRows() {
+  const unit = (n, u) => `${n} ${u}${n === 1 ? '' : 's'}`;
+  return [
+    ...SPORT_ROWS.map(([label, key, u]) => {
+      const c = CUTOFFS[key];
+      return { label, close: unit(c.close, u) + (c.closeMl !== c.close ? ` (${c.closeMl} on a moneyline)` : ''), blowout: `${c.blowout}+` };
+    }),
+    { label: 'Player props', close: 'Within 10% of the line', blowout: 'Half the line' },
+  ];
+}
+
+/** How many people got each face: { clean: 4, paint: 1, makeup: 0, wig: 0, full: 1 }. */
+export function faceCounts(people) {
+  const counts = Object.fromEntries(FACE_ORDER.map((f) => [f, 0]));
+  people.forEach((p) => { counts[p.face]++; });
+  return counts;
+}
 
 /**
  * The cutoffs for one bet, or null when a miss is just a miss. Player props

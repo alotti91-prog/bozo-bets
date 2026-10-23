@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weekRecap, personLine, recapText, FACES, lossTier, cutoffs, needsMissPick, marginFromLostBy } from './recap.js';
+import { weekRecap, personLine, recapText, FACES, lossTier, cutoffs, needsMissPick, marginFromLostBy, faceCounts, cutoffRows, FACE_ORDER } from './recap.js';
 import { liveStatus, gradeMargin } from './bets.js';
 
 const players = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris'].map((name, i) => ({ id: 'p' + (i + 1), name, active: true }));
@@ -205,5 +205,22 @@ describe('typed legs: the commish picks how bad', () => {
     expect(marginFromLostBy('0')).toBe(undefined);
     expect(marginFromLostBy('-3')).toBe(undefined);
     expect(marginFromLostBy('a lot')).toBe(undefined);
+  });
+});
+
+describe('the faces ladder', () => {
+  it('counts how many people got each face, in ladder order', () => {
+    const r = weekRecap({ weeks, legs: busted, spins: [spin], players }, 'w7');
+    expect(faceCounts(r.people)).toEqual({ clean: 3, paint: 0, makeup: 1, wig: 0, full: 1 });
+    expect(Object.keys(faceCounts([]))).toEqual(FACE_ORDER);
+  });
+  it('builds the rules table from the real cutoffs', () => {
+    expect(cutoffRows()).toEqual([
+      { label: 'Football', close: '1 pt (3 on a moneyline)', blowout: '14+' },
+      { label: 'NBA', close: '2 pts (3 on a moneyline)', blowout: '15+' },
+      { label: 'NHL', close: '1 goal', blowout: '3+' },
+      { label: 'MLB', close: '1 run', blowout: '5+' },
+      { label: 'Player props', close: 'Within 10% of the line', blowout: 'Half the line' },
+    ]);
   });
 });

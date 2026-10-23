@@ -445,6 +445,32 @@ span.gc-cell { background: transparent; border-color: var(--hair); }
 .face-full { color: var(--nose); }
 .face-clean { color: var(--win); }
 .sheet-lede { font-size: 16px; color: var(--muted); }
+/* the faces ladder: the recap's key, best to worst */
+.group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 4px; }
+.group-head .group-label { padding: 0; }
+.link-sm { display: inline-flex; align-items: center; gap: 2px; padding: 0; font-size: 13px; }
+.link-sm svg { width: 12px; height: 12px; }
+.ladder { appearance: none; position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); width: 100%; padding: 12px 4px 10px; border: 0; border-radius: 14px; background: var(--sunk); color: var(--ink); font: inherit; text-align: center; cursor: pointer; }
+.ladder::before { content: ""; position: absolute; left: 10%; right: 10%; top: 31px; height: 2px; background: var(--line); }
+.rung { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.rung-face { position: relative; width: 38px; height: 38px; }
+.rung-face::before { content: ""; position: absolute; left: 7px; top: 8px; width: 24px; height: 24px; border-radius: 50%; background: var(--sunk); } /* hides the line behind each face */
+.rung-face svg { position: relative; display: block; }
+.rung-count { position: absolute; top: -4px; right: -8px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--ink); color: var(--surface); font: 700 11px/18px var(--body); }
+.rung-label { font: 600 11px/1.2 var(--body); color: var(--muted); white-space: nowrap; }
+.rung.is-empty svg, .rung.is-empty .rung-label { opacity: .35; }
+.rung-full .rung-count { background: var(--nose); color: var(--on-nose); }
+.rung-full:not(.is-empty) .rung-label { color: var(--nose); font-weight: 700; }
+.rung.is-win .rung-count { background: var(--win); color: var(--surface); }
+.rung.is-win .rung-label { color: var(--win); font-weight: 700; }
+.face-rules { list-style: none; margin: 0; padding: 0; }
+.face-rules .row { cursor: default; gap: 14px; }
+.cutoffs { width: 100%; border-collapse: collapse; background: var(--sunk); border-radius: 14px; overflow: hidden; font-size: 14px; }
+.cutoffs th, .cutoffs td { padding: 9px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.cutoffs tr:last-child th, .cutoffs tr:last-child td { border-bottom: 0; }
+.cutoffs thead th { font: 600 12px/1.3 var(--body); color: var(--muted); }
+.cutoffs tbody th { font-weight: 700; white-space: nowrap; padding-left: 14px; }
+.cutoffs td:last-child { padding-right: 14px; white-space: nowrap; }
 
 /* settings pages */
 .member { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
@@ -519,3 +545,5 @@ main.wrap.gate { min-height: 100dvh; display: flex; flex-direction: column; just
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
