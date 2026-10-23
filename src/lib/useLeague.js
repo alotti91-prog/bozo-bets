@@ -35,7 +35,8 @@ export function useLeague(leagueId, onSpin) {
     const err = [lg, pl, mb, wk, lgs, sp, rx].find((r) => r.error);
     // A missing table (not a network blip) means schema.sql hasn't been re-run since an update.
     const noTable = (r) => !!r.error && (r.error.code === 'PGRST205' || r.error.code === '42P01' || /does not exist|schema cache/i.test(r.error.message || ''));
-    const missing = [noTable(cm) && 'comments', noTable(vw) && 'hidden spins'].filter(Boolean);
+    const oldLegs = !lgs.error && lgs.data.length > 0 && !('margin' in lgs.data[0]); // no legs.margin column yet
+    const missing = [noTable(cm) && 'comments', noTable(vw) && 'hidden spins', oldLegs && 'close-call and blowout faces'].filter(Boolean);
     if (err) { setError(friendly(err.error)); return; }
     if (!lg.data) { setError('That league doesn’t exist or you’re not in it.'); return; }
     setError('');

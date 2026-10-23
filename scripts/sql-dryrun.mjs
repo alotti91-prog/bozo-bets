@@ -79,7 +79,9 @@ await as(B, `insert into public.legs (week_id, league_id, player_id, pick, odds,
 await fails(B, `insert into public.legs (week_id, league_id, player_id, pick, odds) values ($1,$2,$3,'Bills ML',-180)`, [week1, lid, players.Mikey]);
 await fails(B, `update public.legs set result = 'W' where player_id = $1`, [players.Sully], /commish/);
 await as(B, `update public.legs set pick = 'Lions -2.5' where player_id = $1`, [players.Sully]);
-ok('friend adds and edits only their own pick, can’t grade');
+await as(B, `update public.legs set margin = 3 where player_id = $1`, [players.Sully]); // ungraded, so it's cleared
+assert.equal((await as(B, `select margin from public.legs where player_id = $1`, [players.Sully])).rows[0].margin, null);
+ok('friend adds and edits only their own pick, can’t grade (or set how far it missed)');
 
 // Structured legs carry a bet object; anything else is refused.
 const betJson = JSON.stringify({ v: 1, sport: 'nfl', type: 'spread', side: 'away', line: -2.5, game: { id: '401873010', short: 'DET @ GB' } });
@@ -96,6 +98,16 @@ await fails(A, `select public.spin_wheel($1, array[$2]::uuid[])`, [week1, player
 await as(A, `update public.legs set result = 'W' where week_id = $1`, [week1]);
 await as(A, `update public.legs set result = 'L' where week_id = $1 and player_id in ($2, $3)`, [week1, players.Mikey, players.Lotti]);
 ok('commish adds legs for anyone and grades; spin waits for grading');
+
+// How far a leg missed is saved with the grade, and cleared if the grade is undone.
+const marginOf = async (pid) => (await as(B, `select margin from public.legs where player_id = $1`, [pid])).rows[0].margin;
+await as(A, `update public.legs set margin = -0.5 where player_id = $1`, [players.Lotti]);
+assert.equal(Number(await marginOf(players.Lotti)), -0.5);
+await as(A, `update public.legs set result = null where player_id = $1`, [players.Lotti]);
+assert.equal(await marginOf(players.Lotti), null);
+await as(A, `update public.legs set result = 'L', margin = -0.5 where player_id = $1`, [players.Lotti]);
+assert.equal(Number(await marginOf(players.Lotti)), -0.5);
+ok('the commish saves how far a leg missed; undoing the grade clears it');
 
 // Graded leg is locked for the friend
 await as(B, `delete from public.legs where player_id = $1`, [players.Sully]); // RLS silently matches 0 rows

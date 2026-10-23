@@ -5,6 +5,17 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-b',
+    date: '2026-10-23',
+    title: 'The worse the miss, the worse the makeup',
+    idea: 'Lotti',
+    items: [
+      'In the recap, a lost leg now gets a face for how badly it missed. Lose by a hook and you only get face paint. A normal miss is makeup. Get blown out (two touchdowns in football) and the wig goes on. The wheel’s pick is still full bozo.',
+      'The recap says by how much, like “missed by 0.5”.',
+      'It works for legs picked from a game and graded from this week on. Typed legs and older weeks count as a normal miss.',
+    ],
+  },
+  {
     id: '2026-10-23-a',
     date: '2026-10-23',
     title: 'The weekly recap',

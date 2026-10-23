@@ -90,7 +90,8 @@ export function shortClock(detail, sport) {
  * Returns null without a game, else:
  *   { tone: 'pre' | 'live' | 'win' | 'loss' | 'push', label, score, clock,
  *     away, home ({ abbr, score, mine: is it this bet's team }),
- *     progress (0..1 or null), done (final), locked (decided before the final) }
+ *     progress (0..1 or null), done (final), locked (decided before the final),
+ *     margin (how far from the line, in the bet's units: + ahead, − behind; null for yes/no props) }
  */
 export function liveStatus(bet, game) {
   if (!bet || !game) return null;
@@ -104,13 +105,16 @@ export function liveStatus(bet, game) {
   const away = { abbr: game.away.abbr, score: A, mine: isMine('away', game.away.abbr) };
   const home = { abbr: game.home.abbr, score: H, mine: isMine('home', game.home.abbr) };
   const clock = done ? (game.detail || 'Final') : shortClock(game.detail, bet.sport);
-  const out = (tone, label, extra = {}) => ({ tone, label, score, clock, away, home, progress: null, done, locked: false, ...extra });
+  let margin = null;
+  const out = (tone, label, extra = {}) => ({ tone, label, score, clock, away, home, progress: null, done, locked: false, margin, ...extra });
   const line = bet.line;
+  const round = (x) => Math.round(x * 10) / 10;
 
   if (bet.type === 'spread' || bet.type === 'ml') {
     const mine = bet.side === 'home' ? H : A;
     const theirs = bet.side === 'home' ? A : H;
     const m = mine - theirs + (bet.type === 'spread' ? line : 0);
+    margin = round(m);
     if (bet.type === 'spread') {
       if (m > 0) return out('win', done ? 'Covered' : 'Covering');
       if (m < 0) return out('loss', done ? 'Didn’t cover' : 'Not covering');
@@ -136,6 +140,7 @@ export function liveStatus(bet, game) {
     }
   }
   const target = Number.isInteger(line) ? line : Math.ceil(line);
+  margin = round(bet.side === 'over' ? v - line : line - v);
   if (bet.side === 'over') {
     if (v > line) return out('win', bet.type === 'total' ? `Over hit (${v})` : `Hit: ${v}${unit}`, { locked: true, progress: 1 });
     if (done) return v === line ? out('push', `Push at ${v}`) : out('loss', `Fell short: ${v}${unit}`);
@@ -159,6 +164,16 @@ export function legState(leg, s) {
 export function suggestedGrade(s) {
   if (!s || !s.done) return null;
   return { win: 'W', loss: 'L', push: 'P' }[s.tone] || null;
+}
+
+/**
+ * How far a leg finished from its line, to save with its grade: only when the
+ * game is final and agrees with the grade (a hand grade that disagrees, say
+ * after a stat correction, saves nothing). null otherwise.
+ */
+export function gradeMargin(s, result) {
+  if (!result || result === 'P' || suggestedGrade(s) !== result || s.margin == null) return null;
+  return s.margin;
 }
 
 /**

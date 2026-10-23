@@ -6,7 +6,7 @@ import { lockState, updatedAgo } from '../lib/deadline.js';
 import { siteUrl } from '../lib/site.js';
 import { Sheet, IconShare, IconPhoto, IconPlus, IconClock, IconLock, IconBoard } from '../components/common.jsx';
 import { slipPaths } from '../lib/slip.js';
-import { liveStatus, aliveCount, gameKey } from '../lib/bets.js';
+import { liveStatus, aliveCount, gameKey, gradeMargin } from '../lib/bets.js';
 import { useLiveGames } from '../lib/useLiveGames.js';
 import PlacedSheet from './PlacedSheet.jsx';
 import LegRow from './week/LegRow.jsx';
@@ -67,7 +67,14 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
     reload();
     return true;
   }
-  const grade = (l, r) => act(supabase.from('legs').update({ result: l.result === r ? null : r }).eq('id', l.id));
+  const grade = (l, r) => {
+    const result = l.result === r ? null : r;
+    const patch = { result };
+    // Save how far it missed with the grade, so the recap can tell a close call
+    // from a blowout. Skipped until the database has the column (schema.sql).
+    if ('margin' in l) patch.margin = gradeMargin(statusOf(l), result);
+    return act(supabase.from('legs').update(patch).eq('id', l.id));
+  };
   const remove = (l) => act(supabase.from('legs').delete().eq('id', l.id), 'Leg removed.');
   const setPayer = (pid) => act(supabase.from('weeks').update({ payer_id: pid || null }).eq('id', week.id));
 

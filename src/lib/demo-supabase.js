@@ -22,7 +22,7 @@ const names = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris', 'T-Bone'];
 const P = names.map((n, i) => ({ id: 'p' + (i + 1), league_id: L, name: n, active: true, sort: i, created_at: now() }));
 const W = [1, 2, 3, 4].map((n) => ({ id: 'w' + n, league_id: L, n: n + 3, start_date: daysAgo(35 - n * 7), stake: 10, payer_id: null, actual_payout: null, created_at: now() }));
 W[0].payer_id = 'p1'; W[1].payer_id = 'p5'; W[2].payer_id = 'p3'; W[3].payer_id = 'p4';
-const leg = (w, p, pick, odds, sport, result, extra = {}) => ({ id: id(), week_id: w, league_id: L, player_id: p, pick, odds, sport, result, bet: null, created_by: uid, created_at: now(), updated_at: now(), ...extra });
+const leg = (w, p, pick, odds, sport, result, extra = {}) => ({ id: id(), week_id: w, league_id: L, player_id: p, pick, odds, sport, result, bet: null, margin: null, created_by: uid, created_at: now(), updated_at: now(), ...extra });
 
 // ---- Fake scores for demo mode (stands in for /api/espn) ----
 const inHours = (h) => new Date(Date.now() + h * 3600e3).toISOString();
@@ -105,11 +105,11 @@ const db = {
   ],
   weeks: W,
   legs: [
-    leg('w1', 'p1', 'Lions -3.5', -110, 'NFL', 'W'), leg('w1', 'p2', 'Bills ML', -180, 'NFL', 'W'), leg('w1', 'p3', 'Chiefs game over 44.5', -110, 'NFL', 'L'),
+    leg('w1', 'p1', 'Lions -3.5', -110, 'NFL', 'W'), leg('w1', 'p2', 'Bills ML', -180, 'NFL', 'W'), leg('w1', 'p3', 'Chiefs game over 44.5', -110, 'NFL', 'L', { margin: -17.5, bet: { v: 1, sport: 'nfl', type: 'total', side: 'over', line: 44.5 } }) /* a blowout */,
     leg('w1', 'p4', 'Ohio State -10.5', -110, 'NCAAF', 'W'), leg('w1', 'p5', 'Saquon 75+ rush yds', -125, 'NFL', 'L'), leg('w1', 'p6', 'Gibbs anytime TD', -140, 'NFL', 'W'),
     leg('w2', 'p1', 'Ravens -2.5', -115, 'NFL', 'W'), leg('w2', 'p2', 'Georgia ML', -250, 'NCAAF', 'W'), leg('w2', 'p3', 'Dodgers ML', -160, 'MLB', 'W'),
     leg('w2', 'p4', 'Packers +3', -105, 'NFL', 'W'), leg('w2', 'p5', 'Eagles game under 48.5', -110, 'NFL', 'W'), leg('w2', 'p6', 'Josh Allen 2+ pass TDs', -200, 'NFL', 'W'),
-    leg('w3', 'p1', 'Texas -6.5', -110, 'NCAAF', 'L'), leg('w3', 'p2', 'Lions ML', -200, 'NFL', 'W'), leg('w3', 'p3', 'Cowboys +4.5', -110, 'NFL', 'W'),
+    leg('w3', 'p1', 'Texas -6.5', -110, 'NCAAF', 'L', { margin: -0.5, bet: { v: 1, sport: 'ncaaf', type: 'spread', side: 'home', line: -6.5 } }) /* missed by a hook */, leg('w3', 'p2', 'Lions ML', -200, 'NFL', 'W'), leg('w3', 'p3', 'Cowboys +4.5', -110, 'NFL', 'W'),
     leg('w3', 'p4', 'Rangers ML', -130, 'NHL', 'L'), leg('w3', 'p5', 'CeeDee Lamb 70+ rec yds', -115, 'NFL', 'W'), leg('w3', 'p6', 'Bijan 90+ rush yds', 120, 'NFL', 'W'),
     leg('w4', 'p1', 'Bills −6.5', -110, 'NFL', null, { bet: demoBet('spread', 'nfl', '900002', { side: 'away', line: -6.5 }) }),
     leg('w4', 'p2', 'Saquon Barkley 75+ rush yds', -125, 'NFL', null, { bet: demoBet('prop', 'nfl', '900004', { side: 'over', line: 74.5, stat: 'rushYds', player: { id: '3929630', name: 'Saquon Barkley', team: 'PHI' } }) }),
@@ -177,6 +177,7 @@ function query(table) {
       const rows = (Array.isArray(payload) ? payload : [payload]).map((r) => ({ id: id(), created_at: now(), active: true, result: null, ...r }));
       if (table === 'reactions' || table === 'comments' || table === 'spin_views') rows.forEach((r) => { r.user_id = uid; r.league_id = L; });
       if (table === 'spin_views' && rows.some((r) => db.spin_views.some((v) => v.spin_id === r.spin_id))) return { data: null, error: { message: 'duplicate key value violates unique constraint "spin_views_pkey"' } };
+      if (table === 'legs') rows.forEach((r) => { r.bet = r.bet ?? null; r.margin = null; }); // like the real columns' defaults
       if (table === 'comments') rows.forEach((r) => { r.body = String(r.body || '').trim(); });
       if (table === 'comments' && rows.some((r) => !r.body)) return { data: null, error: { message: 'Write something first' } };
       if (table === 'reactions' && rows.some((r) => db.reactions.some((x) => x.leg_id === r.leg_id && x.user_id === r.user_id && x.emoji === r.emoji))) {
@@ -190,7 +191,11 @@ function query(table) {
       return { data: returnRows ? (single ? rows[0] : rows) : null, error: null };
     }
     if (op === 'update') {
-      db[table].filter(match).forEach((r) => { Object.assign(r, payload); emit(table, 'UPDATE', r); });
+      db[table].filter(match).forEach((r) => {
+        Object.assign(r, payload);
+        if (table === 'legs' && !r.result) r.margin = null; // as the database does when a grade is undone
+        emit(table, 'UPDATE', r);
+      });
       return { data: null, error: null };
     }
     if (op === 'delete') {

@@ -4,7 +4,7 @@ A weekly group-parlay tracker. Everyone adds one leg. If the parlay hits, you sp
 
 - **This week:** the parlay as a bet slip, with combined odds and payout. Everyone adds their own leg from their phone.
 - **Wheel:** once a week's bets settle, the wheel loads everyone who missed and the commish spins whenever you're ready (say, mid-week). Each spin knocks out a name (they're safe) until one is left: the bozo. The server decides every spin, so nobody can rig it. Every open phone watches the same spins live, and anyone can replay it after. Miss it, and the bozo stays hidden everywhere in the app until you watch the replay (the app offers it the first time you open it after a spin). The result stays up until the next week settles.
-- **Weekly recap:** a beat after you watch the spin, the week's recap slides up: who the wheel picked, and a clown face for everyone (won: clean, missed: makeup, the wheel's pick: full bozo). Share it to the group chat, or open any week's recap again from History.
+- **Weekly recap:** a beat after you watch the spin, the week's recap slides up: who the wheel picked, and a clown face for everyone: won is clean; a miss gets face paint (by a hook), makeup, or the wig (a blowout); the wheel's pick is full bozo. Share it to the group chat, or open any week's recap again from History.
 - **Standings:** records, hit %, money in and out, and superlatives.
 - **History:** every week, who sank it, and where the wheel landed. The commish can add weeks from before the league joined the app.
 - **Bozo Belt 🤡:** most misses this season wears the clown nose next to their name until someone passes him.

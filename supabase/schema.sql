@@ -128,6 +128,12 @@ alter table public.weeks add column if not exists placed_by uuid references auth
 -- (see src/lib/bets.js). Free-text legs leave it empty. Used for live tracking.
 alter table public.legs add column if not exists bet jsonb
   check (bet is null or (jsonb_typeof(bet) = 'object' and length(bet::text) < 4000));
+-- How far a graded leg finished from its line, in the bet's own units (points,
+-- goals, runs, yards): positive = won by, negative = missed by. The app saves it
+-- with the grade when the final score is in; free-text legs leave it empty. The
+-- weekly recap uses it to pick a face (a close miss gets off lighter than a blowout).
+alter table public.legs add column if not exists margin numeric
+  check (margin is null or abs(margin) < 100000);
 
 -- Several screenshots per slip (a long parlay rarely fits in one). slip_path is
 -- the first one, kept for older copies of the app.
@@ -236,12 +242,16 @@ begin
   if tg_op = 'INSERT' then
     new.created_by := auth.uid();
   end if;
+  if new.result is null then
+    new.margin := null; -- un-graded: how far it missed no longer applies
+  end if;
 
   if not public.is_admin(w_league) then
     if tg_op = 'INSERT' then
       new.result := null;
+      new.margin := null;
     else
-      if new.result is distinct from old.result then
+      if new.result is distinct from old.result or new.margin is distinct from old.margin then
         raise exception 'Only the commish can grade legs';
       end if;
       if new.player_id <> old.player_id or new.week_id <> old.week_id then

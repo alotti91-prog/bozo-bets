@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { weekRecap, personLine, recapText, FACES } from './recap.js';
+import { weekRecap, personLine, recapText, FACES, lossTier, cutoffs } from './recap.js';
+import { liveStatus, gradeMargin } from './bets.js';
 
 const players = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris'].map((name, i) => ({ id: 'p' + (i + 1), name, active: true }));
 const pname = (id) => players.find((p) => p.id === id)?.name;
@@ -101,6 +102,78 @@ describe('recap text', () => {
   });
 
   it('has a name for every face', () => {
-    expect(Object.keys(FACES)).toEqual(['clean', 'makeup', 'full']);
+    expect(Object.keys(FACES)).toEqual(['clean', 'paint', 'makeup', 'wig', 'full']);
+  });
+});
+
+describe('how bad a loss was', () => {
+  const spread = (sport, margin) => ({ result: 'L', margin, bet: { sport, type: 'spread', side: 'away', line: -6.5 } });
+  it('football: a hook is close, two touchdowns is a blowout', () => {
+    expect(lossTier(spread('nfl', -0.5))).toBe('close');
+    expect(lossTier(spread('nfl', -1))).toBe('close');
+    expect(lossTier(spread('nfl', -1.5))).toBe('normal');
+    expect(lossTier(spread('ncaaf', -13.5))).toBe('normal');
+    expect(lossTier(spread('ncaaf', -14))).toBe('blowout');
+    expect(lossTier({ result: 'L', margin: -3, bet: { sport: 'nfl', type: 'ml', side: 'home' } })).toBe('close'); // lost by a field goal
+  });
+  it('other sports use their own scale', () => {
+    expect(lossTier(spread('nhl', -0.5))).toBe('close');
+    expect(lossTier({ result: 'L', margin: -3, bet: { sport: 'nhl', type: 'ml' } })).toBe('blowout');
+    expect(lossTier({ result: 'L', margin: -5, bet: { sport: 'mlb', type: 'total', line: 8.5 } })).toBe('blowout');
+    expect(lossTier({ result: 'L', margin: -2, bet: { sport: 'nba', type: 'spread', line: 4.5 } })).toBe('close');
+    expect(lossTier({ result: 'L', margin: -15, bet: { sport: 'nba', type: 'total', line: 229.5 } })).toBe('blowout');
+  });
+  it('props scale with the line; small lines have no close call', () => {
+    const prop = (line, margin) => ({ result: 'L', margin, bet: { sport: 'nfl', type: 'prop', side: 'over', line, stat: 'rushYds' } });
+    expect(lossTier(prop(74.5, -6.5))).toBe('close'); // 68 yards, needed 75
+    expect(lossTier(prop(74.5, -20))).toBe('normal');
+    expect(lossTier(prop(74.5, -44.5))).toBe('blowout'); // 30 yards
+    expect(lossTier(prop(1.5, -1.5))).toBe('normal'); // 0 pass TDs: a miss is a miss
+    expect(cutoffs({ type: 'prop', line: 5.5 })).toEqual({ close: 1, blowout: 2.75 });
+  });
+  it('typed legs and legs without a saved margin are a normal miss', () => {
+    expect(lossTier({ result: 'L', margin: null, bet: { sport: 'nfl', type: 'spread' } })).toBe('normal');
+    expect(lossTier({ result: 'L', margin: -0.5, bet: null })).toBe('normal');
+    expect(lossTier({ result: 'L', margin: -0.5, bet: { sport: 'soccer', type: 'spread' } })).toBe('normal');
+  });
+  it('turns into faces: close → face paint, blowout → wig; the wheel’s pick stays full bozo', () => {
+    const legs = [
+      { ...leg('p1', 'Bills −6.5', -110, 'L'), margin: -0.5, bet: { sport: 'nfl', type: 'spread', line: -6.5 } },
+      { ...leg('p2', 'Saquon 75+ rush yds', -125, 'L'), margin: -44.5, bet: { sport: 'nfl', type: 'prop', line: 74.5 } },
+      { ...leg('p3', 'Steelers ML', 135, 'L'), margin: -21, bet: { sport: 'nfl', type: 'ml' } },
+      leg('p4', 'NYJ/NE under 41.5', -105, 'L'),
+      leg('p5', 'Rangers ML', 105, 'W'),
+    ];
+    const r = weekRecap({ weeks, legs, spins: [spin], players }, 'w7');
+    expect(r.people.map((p) => [p.id, p.face])).toEqual([['p3', 'full'], ['p2', 'wig'], ['p4', 'makeup'], ['p1', 'paint'], ['p5', 'clean']]);
+    expect(personLine(r.people.find((p) => p.id === 'p1'))).toBe('Bills −6.5 · missed by 0.5');
+    expect(personLine(r.people.find((p) => p.id === 'p3'))).toBe('Steelers ML · lost by 21');
+    expect(personLine(r.people.find((p) => p.id === 'p4'))).toBe('NYJ/NE under 41.5 · lost');
+  });
+  it('someone with two lost legs gets the worse face', () => {
+    const legs = [
+      { ...leg('p1', 'A', -110, 'L'), id: 'a', margin: -0.5, bet: { sport: 'nfl', type: 'spread' } },
+      { ...leg('p1', 'B', -110, 'L'), id: 'b', margin: -20, bet: { sport: 'nfl', type: 'spread' } },
+    ];
+    expect(weekRecap({ weeks, legs, spins: [], players }, 'w7').people[0].face).toBe('wig');
+  });
+});
+
+describe('saving the margin with a grade', () => {
+  const game = (state, as, hs) => ({ state, detail: state === 'post' ? 'Final' : '2:10 - 4th', away: { abbr: 'BUF', score: as }, home: { abbr: 'MIA', score: hs } });
+  const bills = { sport: 'nfl', type: 'spread', side: 'away', line: -6.5 };
+  it('live status knows how far from the line a leg is', () => {
+    expect(liveStatus(bills, game('in', 20, 14)).margin).toBe(-0.5);
+    expect(liveStatus({ ...bills, type: 'ml' }, game('post', 17, 24)).margin).toBe(-7);
+    expect(liveStatus({ sport: 'nfl', type: 'total', side: 'under', line: 41.5 }, game('post', 13, 24)).margin).toBe(4.5);
+    expect(liveStatus({ sport: 'nfl', type: 'total', side: 'over', line: 41.5 }, game('post', 13, 24)).margin).toBe(-4.5);
+  });
+  it('is saved only when the game is final and agrees with the grade', () => {
+    expect(gradeMargin(liveStatus(bills, game('post', 20, 14)), 'L')).toBe(-0.5);
+    expect(gradeMargin(liveStatus(bills, game('post', 20, 14)), 'W')).toBe(null); // hand grade disagrees
+    expect(gradeMargin(liveStatus(bills, game('in', 20, 14)), 'L')).toBe(null); // not final
+    expect(gradeMargin(liveStatus(bills, game('post', 27, 14)), 'W')).toBe(6.5);
+    expect(gradeMargin(null, 'L')).toBe(null); // typed leg, or no score
+    expect(gradeMargin(liveStatus(bills, game('post', 20, 14)), null)).toBe(null); // un-graded
   });
 });
