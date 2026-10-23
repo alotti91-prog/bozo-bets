@@ -5,6 +5,15 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-22-g',
+    date: '2026-10-22',
+    title: 'Swipe between tabs',
+    items: [
+      'Swipe left or right anywhere on the page to move between This week, Wheel, Standings, and History.',
+      'Scrolling, typing, and Safari’s edge swipe for “back” work like before.',
+    ],
+  },
+  {
     id: '2026-10-22-f',
     date: '2026-10-22',
     title: 'A cleaner slip on game day',

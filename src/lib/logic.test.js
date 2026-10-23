@@ -7,6 +7,7 @@ import { countdown, lockState, toLocalInput, ago, updatedAgo } from './deadline.
 import { isPrivateAddress } from './site.js';
 import { RELEASES, unseenReleases } from './releases.js';
 import { slipPaths } from './slip.js';
+import { swipeDirection, swipeTarget } from './swipe.js';
 import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
 import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden } from './bets.js';
 import espnHandler from '../../api/espn.js';
@@ -402,6 +403,26 @@ describe('structured legs', () => {
   it('counts legs still alive', () => {
     const legs = [{ result: 'W' }, { result: 'L' }, { result: null, s: { tone: 'loss', locked: true } }, { result: null, s: { tone: 'loss' } }, { result: null }];
     expect(aliveCount(legs, (l) => l.s || null)).toEqual({ alive: 3, total: 5 });
+  });
+});
+
+describe('swiping between tabs', () => {
+  const base = { dy: 10, dt: 250, startX: 200, width: 390 };
+  it('counts only quick, clearly sideways swipes away from the edges', () => {
+    expect(swipeDirection({ ...base, dx: -120 })).toBe('next');
+    expect(swipeDirection({ ...base, dx: 120 })).toBe('prev');
+    expect(swipeDirection({ ...base, dx: -40 })).toBe(null); // too short
+    expect(swipeDirection({ ...base, dx: -120, dy: 90 })).toBe(null); // scrolling
+    expect(swipeDirection({ ...base, dx: -120, dt: 900 })).toBe(null); // slow drag
+    expect(swipeDirection({ ...base, dx: 120, startX: 10 })).toBe(null); // Safari's back-swipe edge
+    expect(swipeDirection({ ...base, dx: -120, startX: 380 })).toBe(null);
+  });
+  it('moves one tab and stops at the ends', () => {
+    const tabs = ['week', 'wheel', 'standings', 'history'];
+    expect(swipeTarget(tabs, 'week', 'next')).toBe('wheel');
+    expect(swipeTarget(tabs, 'wheel', 'prev')).toBe('week');
+    expect(swipeTarget(tabs, 'week', 'prev')).toBe(null);
+    expect(swipeTarget(tabs, 'history', 'next')).toBe(null);
   });
 });
 

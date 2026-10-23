@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, demo } from '../lib/supabase.js';
 import { useLeague } from '../lib/useLeague.js';
 import { store, toast } from '../lib/ui.js';
@@ -8,6 +8,7 @@ import { bozoBelt } from '../lib/stats.js';
 import { unwatchedSpin, hideSpin } from '../lib/wheel.js';
 import { RELEASES } from '../lib/releases.js';
 import { feedDown } from '../lib/scores.js';
+import { swipeDirection, swipeTarget } from '../lib/swipe.js';
 import WeekTab from './WeekTab.jsx';
 import WheelTab from './WheelTab.jsx';
 import StandingsTab from './StandingsTab.jsx';
@@ -35,7 +36,39 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
     return () => window.removeEventListener('bz-feed', on);
   }, []);
 
-  const go = (t) => { setTab(t); store.set('bz-tab', t); window.scrollTo(0, 0); };
+  const [slide, setSlide] = useState(''); // 'next' | 'prev': which way the new tab slides in
+  const go = (t) => {
+    const keys = TABS.map(([k]) => k);
+    setSlide(keys.indexOf(t) > keys.indexOf(tab) ? 'next' : 'prev');
+    setTab(t); store.set('bz-tab', t); window.scrollTo(0, 0);
+  };
+  const goRef = useRef(go);
+  useEffect(() => { goRef.current = go; });
+  const tabRef = useRef(tab);
+  useEffect(() => { tabRef.current = tab; }, [tab]);
+
+  // Swipe left or right on the page to change tabs.
+  useEffect(() => {
+    const el = document;
+    let start = null;
+    const skip = (t) => !t.closest?.('[role="tabpanel"]') || !!t.closest('input, textarea, select, [contenteditable="true"], .overlay, [data-noswipe]');
+    const onStart = (e) => {
+      start = e.touches.length === 1 && !skip(e.target) ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() } : null;
+    };
+    const onEnd = (e) => {
+      if (!start || e.changedTouches.length !== 1) { start = null; return; }
+      const c = e.changedTouches[0];
+      const dir = swipeDirection({ dx: c.clientX - start.x, dy: c.clientY - start.y, dt: Date.now() - start.t, startX: start.x, width: window.innerWidth });
+      start = null;
+      const to = dir && swipeTarget(TABS.map(([k]) => k), tabRef.current, dir);
+      if (to) goRef.current(to);
+    };
+    const onCancel = () => { start = null; };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    el.addEventListener('touchcancel', onCancel, { passive: true });
+    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); el.removeEventListener('touchcancel', onCancel); };
+  }, []);
 
   // Someone spun. On the Wheel tab it animates right away. Anywhere else, offer
   // to watch without naming who it landed on.
@@ -137,10 +170,12 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
             </div>
           </div>
         )}
+        <div key={tab} className={`pane${slide ? ` pane-${slide}` : ''}`}>
         {tab === 'week' && <WeekTab {...props} />}
         {tab === 'wheel' && <WheelTab {...props} spinEvent={spinEvent} seenSpins={seenSpins} />}
         {tab === 'standings' && <StandingsTab {...props} />}
         {tab === 'history' && <HistoryTab {...props} />}
+        </div>
       </main>
       {settings && (
         <SettingsSheet data={data} userId={userId} member={member} isAdmin={isAdmin} isOwner={isOwner} reload={reload} onNotesSeen={() => setNotesSeen(true)}

@@ -414,3 +414,10 @@ button.bp-chip[aria-pressed="false"], button.bp-chip:not([aria-pressed]) { color
 .mark-btn { appearance: none; height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--paper-ink); color: var(--paper); font: 700 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 .react-add { color: var(--paper-muted); font-size: 13px; padding: 3px 10px; }
 .reacts-end { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+
+/* tab change: the new tab slides in from the side you're heading */
+.pane-next { animation: pane-next .22s ease-out; }
+.pane-prev { animation: pane-prev .22s ease-out; }
+@keyframes pane-next { from { opacity: .4; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes pane-prev { from { opacity: .4; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pane-next, .pane-prev { animation: none; } }

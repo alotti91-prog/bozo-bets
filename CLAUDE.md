@@ -24,6 +24,7 @@ Run all three checks before saying a change is done.
 - `api/health.js` checks Supabase (a read with the public key) and ESPN, answering 200 or 503 with which one failed. An uptime monitor watches it. Keep it read-only and fast; add a check there when the app gains another outside dependency.
 - Pure logic lives in `src/lib/odds.js`, `stats.js`, `wheel.js`, `espn.js`, and `bets.js`, with tests. Put new math there, not in components.
 - `src/lib/demo-supabase.js` fakes the Supabase calls the app uses. If you add a new query or RPC, add it there too so `npm run demo` keeps working.
+- Swiping left or right changes tabs (`src/lib/swipe.js`, wired in `League.jsx`). Anything that needs its own sideways swipe or drag must carry `data-noswipe`.
 - Styling is one file, `src/styles.css`, with color tokens on `:root` and a dark-mode override. Use the tokens rather than new hard-coded colors.
 
 ## Conventions
