@@ -5,6 +5,15 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-g',
+    date: '2026-10-23',
+    title: '“Type it instead” up top',
+    idea: 'Lotti',
+    items: [
+      'Add your leg now shows “Type it instead” right under the sports, so you don’t have to scroll past every game to type a leg in.',
+    ],
+  },
+  {
     id: '2026-10-23-f',
     date: '2026-10-23',
     title: 'Grade all, safer edits, and a new Bozo Belt',

@@ -12,7 +12,8 @@ const ORDER = { pre: 0, in: 1, post: 2 };
  * pick, line, and odds fill in. "Other bets" (or "Something else") builds it by
  * hand: the kind of bet, the side, the line, or a player prop.
  * value/onChange hold picker state (see emptyPick); onChange(state, price) passes
- * the board price when there is one. onTypeInstead switches the form to free text.
+ * the board price when there is one. onTypeInstead switches the form to free text
+ * ("Type it instead", right under the sports so nobody scrolls past the games for it).
  */
 export default function BetPicker({ value: b, onChange, onTypeInstead }) {
   const [games, setGames] = useState({ sport: null, list: [], err: '' });
@@ -81,6 +82,10 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
           <button key={k} type="button" aria-pressed={b.sport === k} onClick={() => pickSport(k)}>{s.label}</button>
         ))}
         <button type="button" aria-pressed={false} onClick={onTypeInstead}>Other</button>
+      </div>
+      <div className="bp-lead">
+        {!b.game && <span className="hint">Tap a price to pick it.</span>}
+        <button type="button" className="text-btn link-sm" onClick={onTypeInstead}>Type it instead</button>
       </div>
 
       {b.game ? (
@@ -195,7 +200,6 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
       )}
 
       {ready && <p className="bp-preview">Saves as <strong>{pickText(bet)}</strong></p>}
-      <button type="button" className="text-btn muted center" onClick={onTypeInstead}>Type it instead</button>
     </div>
   );
 }

@@ -450,6 +450,8 @@ span.gc-cell { background: transparent; border-color: var(--hair); }
 .group-head .group-label { padding: 0; }
 .link-sm { display: inline-flex; align-items: center; gap: 2px; padding: 0; font-size: 13px; }
 .link-sm svg { width: 12px; height: 12px; }
+.bp-lead { display: flex; align-items: baseline; gap: 10px; margin-top: -6px; padding: 0 2px; }
+.bp-lead .text-btn { margin-left: auto; font-size: 14px; }
 .ladder { appearance: none; position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); width: 100%; padding: 12px 4px 10px; border: 0; border-radius: 14px; background: var(--sunk); color: var(--ink); font: inherit; text-align: center; cursor: pointer; }
 .ladder::before { content: ""; position: absolute; left: 10%; right: 10%; top: 31px; height: 2px; background: var(--line); }
 .rung { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
