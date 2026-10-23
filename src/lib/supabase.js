@@ -20,5 +20,6 @@ export function friendly(error) {
   if (/duplicate key.*legs_week_id_player_id/i.test(m)) return 'That player already has a leg this week.';
   if (/duplicate key.*players_league_id_name/i.test(m)) return 'There’s already a player with that name.';
   if (/row-level security/i.test(m)) return 'You don’t have permission to do that.';
+  if (error.code === 'PGRST202' || /Could not find the function/i.test(m)) return 'This needs a database update. Run the latest schema.sql in the Supabase SQL Editor, then try again.';
   return m;
 }

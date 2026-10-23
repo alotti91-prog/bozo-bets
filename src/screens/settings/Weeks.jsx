@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { nflWeek } from '../../lib/nfl.js';
 import WeekNumberForm from './WeekNumberForm.jsx';
+import ResetWeekForm from './ResetWeekForm.jsx';
 import { settingsRpc } from './rpc.js';
 
-// Admins only: this week's number, opening the next week by hand, and (owner only) a new season.
+// Admins only: this week's number, opening the next week by hand, going back to
+// an earlier week, and (owner only) a new season.
 export default function Weeks({ data, isOwner, reload }) {
   const [confirm, setConfirm] = useState(null); // 'next' | 'season'
   const league = data.league;
@@ -21,6 +23,8 @@ export default function Weeks({ data, isOwner, reload }) {
           </div>
         </div>
       ) : <button type="button" className="btn" onClick={() => setConfirm('next')}>Open next week without spinning</button>}
+
+      <ResetWeekForm data={data} reload={reload} />
 
       {isOwner && (confirm === 'season' ? (
         <div className="confirm-box">

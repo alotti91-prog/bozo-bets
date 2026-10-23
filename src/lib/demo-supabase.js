@@ -271,6 +271,16 @@ const rpcs = {
     db.spins = db.spins.filter((s) => s.week_id !== p_week);
     emit('weeks', 'DELETE', {}); return null;
   },
+  reset_to_week({ p_week, p_clear_grades }) {
+    const w = db.weeks.find((x) => x.id === p_week);
+    if (w.n === Math.max(...db.weeks.map((x) => x.n))) throw new Error(`Week ${w.n} is already this week`);
+    const gone = new Set(db.weeks.filter((x) => x.n > w.n).map((x) => x.id));
+    db.weeks = db.weeks.filter((x) => !gone.has(x.id));
+    db.legs = db.legs.filter((l) => !gone.has(l.week_id));
+    db.spins = db.spins.filter((x) => !gone.has(x.week_id) && x.week_id !== w.id);
+    if (p_clear_grades) db.legs.filter((l) => l.week_id === w.id).forEach((l) => { l.result = null; l.margin = null; });
+    emit('weeks', 'DELETE', {}); return null;
+  },
   mark_placed({ p_week, p_placed, p_slip_path }) {
     const w = db.weeks.find((x) => x.id === p_week);
     if (p_placed) { w.placed_at = w.placed_at || now(); w.placed_by = uid; w.slip_path = p_slip_path || w.slip_path || null; }

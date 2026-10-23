@@ -719,6 +719,28 @@ begin
   delete from public.weeks where id = w.id;
 end $$;
 
+-- Commish tool: go back to an earlier week (say, after a test spin). Every week
+-- after it is deleted, with its picks, spins, and trash talk. That week's spins
+-- are undone, so its wheel can spin again, and its grades can be cleared too.
+-- Slip photos for the deleted weeks are removed by the app (Storage API).
+create or replace function public.reset_to_week(p_week uuid, p_clear_grades boolean default false)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  w public.weeks;
+  latest int;
+begin
+  select * into w from public.weeks where id = p_week;
+  if w.id is null then raise exception 'That week does not exist'; end if;
+  if not public.is_admin(w.league_id) then raise exception 'Only the commish can reset weeks'; end if;
+  select max(n) into latest from public.weeks where league_id = w.league_id;
+  if w.n = latest then raise exception 'Week % is already this week', w.n; end if;
+  delete from public.weeks where league_id = w.league_id and n > w.n;
+  delete from public.spins where week_id = w.id;
+  if p_clear_grades then
+    update public.legs set result = null where week_id = w.id; -- the leg guard clears margin with it
+  end if;
+end $$;
+
 -- Mark this week's bet as placed (or not). Whoever's on the hook or the
 -- commish can do it. p_slip_path is the screenshot's path in the "slips"
 -- bucket, which must sit under this league's folder.
@@ -916,6 +938,7 @@ revoke execute on function
   public.set_week_number(uuid, int),
   public.save_past_week(uuid, uuid, int, date, uuid, jsonb),
   public.delete_past_week(uuid),
+  public.reset_to_week(uuid, boolean),
   public.mark_placed(uuid, boolean, text),
   public.set_deadline(uuid, int, time, text),
   public.set_week_lock(uuid, timestamptz),
@@ -940,6 +963,7 @@ grant execute on function
   public.set_week_number(uuid, int),
   public.save_past_week(uuid, uuid, int, date, uuid, jsonb),
   public.delete_past_week(uuid),
+  public.reset_to_week(uuid, boolean),
   public.mark_placed(uuid, boolean, text),
   public.set_deadline(uuid, int, time, text),
   public.set_week_lock(uuid, timestamptz),

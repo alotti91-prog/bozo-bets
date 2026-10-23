@@ -248,6 +248,23 @@ await as(A, `insert into public.legs (week_id, league_id, player_id, pick, odds)
 await fails(A, `select public.spin_wheel($1, $2::uuid[])`, [w7x, [p5.Mikey]], /Grade every leg/);
 ok('commish can spin last week if it was never spun; it sets this week’s payer');
 
+// Going back to an earlier week (after a test spin): later weeks go, its spin is undone.
+const weeksOf = async (l) => (await as(A, `select n from public.weeks where league_id = $1 order by n`, [l])).rows.map((r) => r.n);
+await fails(B, `select public.reset_to_week($1, false)`, [w6x], /commish/);
+await fails(A, `select public.reset_to_week($1, false)`, [w7x], /already this week/);
+await as(A, `update public.legs set margin = -0.5 where week_id = $1 and player_id = $2`, [w6x, p5.Lotti]);
+await as(A, `select public.reset_to_week($1, false)`, [w6x]);
+assert.deepEqual(await weeksOf(lid5), [6]);
+assert.equal((await as(A, `select count(*)::int c from public.spins where league_id = $1`, [lid5])).rows[0].c, 0);
+assert.equal((await as(A, `select count(*)::int c from public.legs where week_id = $1`, [w7x])).rows[0].c, 0);
+assert.deepEqual((await as(A, `select result from public.legs where week_id = $1 order by pick`, [w6x])).rows.map((r) => r.result), ['L', 'W']);
+await as(A, `select public.spin_wheel($1, $2::uuid[])`, [w6x, [p5.Lotti]]);
+assert.deepEqual(await weeksOf(lid5), [6, 7]);
+await as(A, `select public.reset_to_week($1, true)`, [w6x]);
+assert.deepEqual((await as(A, `select result, margin from public.legs where week_id = $1`, [w6x])).rows, [{ result: null, margin: null }, { result: null, margin: null }]);
+assert.deepEqual(await weeksOf(lid5), [6]);
+ok('commish can go back to an earlier week: later weeks go, its spin is undone, grades kept or cleared');
+
 await fails(A, `select public.delete_past_week((select id from public.weeks where league_id = $1 and n = 9))`, [lid2], /current week/);
 await fails(B, `select public.delete_past_week($1)`, [w3], /commish/);
 await as(A, `select public.delete_past_week($1)`, [w3]);

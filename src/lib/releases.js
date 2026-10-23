@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-c',
+    date: '2026-10-23',
+    title: 'Go back to an earlier week',
+    idea: 'Lotti',
+    items: [
+      'Settings → Weeks → “Go back to an earlier week” makes a past week this week again. Use it to undo a test or a mistake.',
+      'Every later week is deleted, that week’s spin is undone so the wheel can spin it again, and its grades can be cleared too. It shows exactly what will happen before you confirm.',
+    ],
+  },
+  {
     id: '2026-10-23-b',
     date: '2026-10-23',
     title: 'The worse the miss, the worse the makeup',

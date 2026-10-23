@@ -116,7 +116,7 @@ Admins also see a banner in the app when live scores stop loading. Side effect: 
 | React to and comment on any pick, delete **their own** comments | ✓ | ✓ | ✓ |
 | Add, edit, or remove **their own** leg (current week, before it's graded and before the pick deadline) | ✓ | ✓ | ✓ |
 | Add or edit anyone's leg (even after the deadline), grade legs, set the payer, enter the actual payout | | ✓ | ✓ |
-| Spin and re-spin the wheel, delete replaced spins, add or bench players, open the next week, set the pick deadline, delete anyone's comment | | ✓ | ✓ |
+| Spin and re-spin the wheel, delete replaced spins, add or bench players, open the next week, go back to an earlier week, set the pick deadline, delete anyone's comment | | ✓ | ✓ |
 | See the app as a member (Settings → Member view; only hides buttons) | | ✓ | ✓ |
 | Make someone an admin, remove a login, new invite code, new season | | | ✓ |
 
