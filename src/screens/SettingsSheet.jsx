@@ -84,6 +84,8 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
             <Row icon={<IconKey />} tint="gray" label="Password" value={hasPw ? 'Set' : 'Not set'} onClick={() => setPage('password')} />
             <button type="button" className="row is-danger" onClick={onSignOut}><span className="row-label">Sign out</span></button>
           </Group>
+
+          <p className="fine center">Bozo Bets · made by Chris &amp; Andrew</p>
         </>
       )}
     </Sheet>

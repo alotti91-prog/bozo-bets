@@ -157,3 +157,6 @@ A typed leg has no bet type or line, so a "lost by" number alone can't be judged
 
 **2026-10-23 · A faces key in the recap**
 With five faces, people couldn't tell the scale existed: face paint and makeup look alike at row size, and the wig and full bozo differ only by the nose. The recap now has a one-row ladder (`recap/FaceLadder.jsx`) above "How everyone did". It shows all five faces in order, with a count badge for how many people got each, and faces nobody got fade out. It's the key and a summary of the week in one row, about the height of one person's row. Tapping it, or "How faces work", opens a rules page inside the same sheet (`recap/FaceRules.jsx`). Its cutoffs table is built from the `CUTOFFS` in `recap.js` (`cutoffRows()`), so it can't drift from the real rules. We passed on a big meme-style ladder because it would push the bozo and the list below the fold.
+
+**2026-10-23 · A credit line, first names only**
+"Bozo Bets · made by Chris & Andrew" sits at the bottom of Settings. It isn't a footer on every screen: the tab bar is pinned there, and it would add clutter to every screen. First names only, because the repo is public.
