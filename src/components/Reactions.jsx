@@ -6,12 +6,12 @@ export const EMOJI = ['🔥', '🙏', '🤡', '💀'];
 const LABEL = { '🔥': 'Fire', '🙏': 'Praying', '🤡': 'Clown', '💀': 'Dead' };
 
 /**
- * Emoji reactions under one pick. Tapping adds yours; tapping again takes it
- * back. Counts update live for everyone. readOnly shows just the counts.
+ * Emoji reactions on one pick: four buttons with counts (the leg panel).
+ * Tapping adds yours; tapping again takes it back. readOnly shows just the
+ * counts as text (History).
  */
-export default function Reactions({ leg, reactions, userId, nameOfUser, reload, readOnly = false, children }) {
+export default function Reactions({ leg, reactions, userId, nameOfUser, reload, readOnly = false }) {
   const [busy, setBusy] = useState(null);
-  const [open, setOpen] = useState(false); // all four showing (otherwise just the ones used)
   const here = reactions.filter((r) => r.leg_id === leg.id);
   const counts = EMOJI.map((e) => {
     const rs = here.filter((r) => r.emoji === e);
@@ -21,7 +21,7 @@ export default function Reactions({ leg, reactions, userId, nameOfUser, reload, 
   if (readOnly) {
     const shown = counts.filter((c) => c.n);
     if (!shown.length) return null;
-    return <span className="hl-reacts" aria-label={shown.map((c) => `${c.n} ${LABEL[c.e]}`).join(', ')}>{shown.map((c) => `${c.e}${c.n}`).join(' ')}</span>;
+    return <span className="react-sum" aria-label={shown.map((c) => `${c.n} ${LABEL[c.e]}`).join(', ')}>{shown.map((c) => `${c.e} ${c.n}`).join('  ')}</span>;
   }
 
   async function toggle(c) {
@@ -31,28 +31,20 @@ export default function Reactions({ leg, reactions, userId, nameOfUser, reload, 
       ? await supabase.from('reactions').delete().eq('leg_id', leg.id).eq('user_id', userId).eq('emoji', c.e)
       : await supabase.from('reactions').insert({ leg_id: leg.id, emoji: c.e });
     setBusy(null);
-    setOpen(false);
     if (error) { toast(friendly(error)); return; }
     reload();
   }
 
   return (
-    <div className="reacts" role="group" aria-label="Reactions">
-      {counts.filter((c) => open || c.n > 0).map((c) => (
-        <button key={c.e} type="button" className="react" aria-pressed={c.mine} disabled={busy === c.e}
+    <div className="react-grid" role="group" aria-label="Reactions">
+      {counts.map((c) => (
+        <button key={c.e} type="button" className="react" aria-pressed={c.mine} disabled={!userId || busy === c.e}
           title={c.n ? c.who.join(', ') : LABEL[c.e]}
           aria-label={`${LABEL[c.e]}${c.n ? `, ${c.n}: ${c.who.join(', ')}` : ''}`}
           onClick={() => toggle(c)}>
           <span aria-hidden="true">{c.e}</span>{c.n > 0 && <b>{c.n}</b>}
         </button>
       ))}
-      {userId && (
-        <button type="button" className="react react-add" aria-expanded={open} aria-label={open ? 'Hide reactions' : 'Add a reaction'}
-          title={open ? 'Hide' : 'React'} onClick={() => setOpen(!open)}>
-          <span aria-hidden="true">{open ? '×' : '☺+'}</span>
-        </button>
-      )}
-      {children}
     </div>
   );
 }

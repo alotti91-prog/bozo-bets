@@ -174,8 +174,8 @@ src/lib/demo-supabase.js   sample data for `npm run demo`
 src/lib/bets.js, espn.js    live legs: bet text, live status, ESPN data
 api/                       Vercel functions: ESPN proxy, health check
 src/screens/               sign-in, onboarding, and the four tabs + settings
-src/screens/week/          This week's pieces: one leg row, the leg form, payout
-src/screens/settings/      one file per Settings form (deadline, players, …)
+src/screens/week/          This week's pieces: leg row, leg panel, leg form, payout
+src/screens/settings/      one file per Settings page (deadline, players, people, …)
 src/components/            the wheel canvas, bet picker, comments, sheet, toasts
 ```
 

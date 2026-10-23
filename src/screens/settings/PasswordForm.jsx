@@ -28,8 +28,7 @@ export default function PasswordForm() {
     toast('Password saved. Next time, sign in with your email and password.');
   }
   return (
-    <section>
-      <span className="lbl">{hasPw ? 'Change password' : 'Skip the sign-in email'}</span>
+    <div className="stack">
       <p className="sub">{hasPw
         ? 'You can sign in with your email and password on any device.'
         : 'Set a password and you can sign in with just your email and password next time. No code needed.'}</p>
@@ -49,6 +48,6 @@ export default function PasswordForm() {
         <button className="btn small primary" style={{ alignSelf: 'flex-start' }} disabled={busy}>{busy ? 'Saving…' : 'Save password'}</button>
         <p className="fine">At least 8 characters. Don{'’'}t reuse a password from your bank or email.</p>
       </form>
-    </section>
+    </div>
   );
 }

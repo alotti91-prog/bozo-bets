@@ -1,146 +1,112 @@
 import { useState } from 'react';
-import { supabase, friendly } from '../lib/supabase.js';
-import { toast, shareText } from '../lib/ui.js';
-import { Sheet, IconShare } from '../components/common.jsx';
-import { nflWeek } from '../lib/nfl.js';
-import { siteUrl } from '../lib/site.js';
+import { store, initials } from '../lib/ui.js';
+import { dollars } from '../lib/odds.js';
+import { weeklyRule } from '../lib/deadline.js';
+import { unseenReleases } from '../lib/releases.js';
+import { Sheet, IconChevR, IconShare, IconClock } from '../components/common.jsx';
 import WhatsNew from './settings/WhatsNew.jsx';
 import PasswordForm from './settings/PasswordForm.jsx';
 import DeadlineForm from './settings/DeadlineForm.jsx';
 import LeagueForm from './settings/LeagueForm.jsx';
 import PlayersForm from './settings/PlayersForm.jsx';
-import WeekNumberForm from './settings/WeekNumberForm.jsx';
+import People from './settings/People.jsx';
+import Weeks from './settings/Weeks.jsx';
+import Invite from './settings/Invite.jsx';
+import Profile from './settings/Profile.jsx';
 
-// The Settings sheet: you, invite, members, and weeks live here.
-// Each form is its own file in ./settings/.
+const ROLE = { owner: 'Owner', admin: 'Admin', member: 'Member' };
+const svg = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.3, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
+const IconPeople = () => <svg {...svg}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.5A6.5 6.5 0 0 1 21.5 20" /></svg>;
+const IconCheckIn = () => <svg {...svg}><circle cx="10" cy="8" r="3.5" /><path d="M3.5 20a6.5 6.5 0 0 1 11-4.7M15.5 18.5l2 2 4-4.5" /></svg>;
+const IconStar = () => <svg {...svg}><path d="m12 3 2.4 5.6 5.6.8-4.3 3.9 1.3 5.9L12 16.3 7 19.2l1.3-5.9L4 9.4l5.6-.8z" /></svg>;
+const IconEye = () => <svg {...svg}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></svg>;
+const IconKey = () => <svg {...svg}><circle cx="8" cy="15" r="4" /><path d="m11 12 9-9M17 6l3 3M14.5 8.5l2 2" /></svg>;
+
+// Settings: a short list of rows. Each opens its own page (the forms live in ./settings/).
 export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, reload, onClose, onChangePlayer, leagues, onSwitchLeague, onAddLeague, onSignOut, onNotesSeen, canPreview, previewing, onPreview }) {
-  const [confirm, setConfirm] = useState(null);
+  const [page, setPage] = useState(null);
   const league = data.league;
+  const cur = data.weeks[data.weeks.length - 1];
   const pname = (id) => data.players.find((p) => p.id === id)?.name || 'Unknown';
-  const inviteLink = `${siteUrl()}${window.location.pathname}?join=${league.invite_code}`;
+  const myName = member?.player_id ? pname(member.player_id) : null;
+  const hasPw = store.get('bz-has-pw', false);
+  const unseen = isAdmin ? unseenReleases(store.get('bz-seen-release')).length : 0;
 
-  async function rpc(fn, args, okMsg) {
-    const { data: out, error } = await supabase.rpc(fn, args);
-    if (error) { toast(friendly(error)); return null; }
-    if (okMsg) toast(okMsg);
-    reload();
-    return out ?? true;
-  }
+  const pages = {
+    profile: ['You', <Profile key="p" data={data} member={member} pname={pname} leagues={leagues} onChangePlayer={onChangePlayer} onSwitchLeague={onSwitchLeague} onAddLeague={onAddLeague} />],
+    invite: ['Invite friends', <Invite key="i" league={league} isOwner={isOwner} reload={reload} />],
+    deadline: ['Pick deadline', <DeadlineForm key={`${league.lock_dow}-${league.lock_time}-${cur?.lock_at}`} data={data} reload={reload} />],
+    players: ['Players', <PlayersForm key="pl" data={data} reload={reload} />],
+    people: ['People signed in', <People key="pe" data={data} userId={userId} isOwner={isOwner} reload={reload} />],
+    league: ['League name and stake', <LeagueForm key="l" league={league} reload={reload} />],
+    weeks: ['Weeks', <Weeks key="w" data={data} isOwner={isOwner} reload={reload} />],
+    whatsnew: ['What’s new', <WhatsNew key="n" onSeen={onNotesSeen} />],
+    password: [hasPw ? 'Change password' : 'Set a password', <PasswordForm key="pw" />],
+  };
+  const open = page && pages[page];
 
   return (
-    <Sheet title="Settings" onClose={onClose}>
-      <section style={{ borderTop: 0, paddingTop: 0 }}>
-        <span className="lbl">You</span>
-        <p>{member?.player_id ? <>You{'’'}re <strong>{pname(member.player_id)}</strong> in {league.name}.</> : 'You’re not linked to a player yet.'}{' '}
-          <span className="role">{member?.role === 'owner' ? 'Owner' : member?.role === 'admin' ? 'Admin' : 'Member'}</span>
-        </p>
-        <div className="btns">
-          <button className="btn small" onClick={onChangePlayer}>{member?.player_id ? 'I’m someone else' : 'Pick my name'}</button>
-          {leagues.length > 1 && (
-            <select aria-label="Switch league" value={league.id} onChange={(e) => onSwitchLeague(e.target.value)} style={{ width: 'auto', minHeight: 34 }}>
-              {leagues.map((l) => <option key={l.league_id} value={l.league_id}>{l.leagues?.name || 'League'}</option>)}
-            </select>
-          )}
-          <button className="btn small" onClick={onAddLeague}>Join or start another league</button>
-          <button className="btn small" onClick={onSignOut}>Sign out</button>
-        </div>
-      </section>
+    <Sheet title={open ? open[0] : 'Settings'} onClose={onClose} onBack={open ? () => setPage(null) : undefined} backLabel="Settings">
+      {open ? open[1] : (
+        <>
+          <button type="button" className="profile-row" onClick={() => setPage('profile')}>
+            <span className="avatar" aria-hidden="true">{initials(myName || member?.email || '?')}</span>
+            <span className="profile-text"><b>{myName || 'Not linked to a player'}</b><span>{ROLE[member?.role] || 'Member'} · {league.name}</span></span>
+            <IconChevR />
+          </button>
 
-      {canPreview && (
-        <section>
-          <span className="lbl">Member view</span>
-          <p className="sub">{previewing
-            ? 'You’re seeing the app the way members do.'
-            : 'Check what members see: no grading, no wheel controls, no admin settings.'} It only hides buttons. Anything you do still counts, with your admin powers.</p>
-          <div className="btns">
-            <button className="btn small" onClick={() => onPreview(!previewing)}>{previewing ? 'Back to admin view' : 'View as a member'}</button>
+          <div className="rows">
+            <Row icon={<IconShare />} tint="nose" label="Invite friends" value={league.invite_code} onClick={() => setPage('invite')} />
           </div>
-        </section>
-      )}
 
-      {isAdmin && <WhatsNew onSeen={onNotesSeen} />}
+          {isAdmin && (
+            <Group label="League">
+              <Row icon={<IconClock />} tint="orange" label="Pick deadline" value={weeklyRule(league)} onClick={() => setPage('deadline')} />
+              <Row icon={<IconPeople />} tint="blue" label="Players" value={data.players.filter((p) => p.active).length} onClick={() => setPage('players')} />
+              <Row icon={<IconCheckIn />} tint="teal" label="People signed in" value={data.members.length} onClick={() => setPage('people')} />
+              <Row icon={<b>$</b>} tint="green" label="League name and stake" value={dollars(league.stake)} onClick={() => setPage('league')} />
+            </Group>
+          )}
 
-      <PasswordForm />
-
-      <section>
-        <span className="lbl">Invite the group</span>
-        <p className="invite-code" aria-label={`Invite code ${league.invite_code.split('').join(' ')}`}>{league.invite_code}</p>
-        <p className="sub">Friends open the link, sign in with their email, and pick their name.</p>
-        <div className="btns">
-          <button className="btn primary" onClick={() => shareText(`Join our Bozo Bets league: ${inviteLink}\nInvite code: ${league.invite_code}`, { title: 'Join Bozo Bets', successMsg: 'Invite copied. Paste it in the group chat.' })}><IconShare />Share invite</button>
-          {isOwner && (confirm === 'code' ? (
-            <span className="btns">
-              <button className="btn small nose" onClick={async () => { setConfirm(null); await rpc('regenerate_invite', { p_league: league.id }, 'New code ready. The old one stopped working.'); }}>Replace code</button>
-              <button className="btn small" onClick={() => setConfirm(null)}>Keep it</button>
-            </span>
-          ) : <button className="link" onClick={() => setConfirm('code')}>New code</button>)}
-        </div>
-        <p className="fine" style={{ userSelect: 'all', overflowWrap: 'anywhere' }}>{inviteLink}</p>
-      </section>
-
-      {isAdmin && <DeadlineForm key={`${league.lock_dow}-${league.lock_time}-${data.weeks[data.weeks.length - 1]?.lock_at}`} data={data} reload={reload} />}
-      {isAdmin && <LeagueForm league={league} reload={reload} />}
-      {isAdmin && <PlayersForm data={data} reload={reload} />}
-
-      {isAdmin && (
-        <section>
-          <span className="lbl">People signed in ({data.members.length})</span>
-          {data.members.map((m) => (
-            <div className="member" key={m.user_id}>
-              <div className="member-top">
-                <span className="member-email">{m.email || 'Signed-in member'}{m.user_id === userId ? ' (you)' : ''}</span>
-                <span className="role">{m.role === 'owner' ? 'Owner' : m.role === 'admin' ? 'Admin' : 'Member'}</span>
+          {canPreview && (
+            <Group label="Admin">
+              {isAdmin && <Row icon={<IconStar />} tint="purple" label="What’s new" badge={unseen ? `${unseen} new` : null} onClick={() => setPage('whatsnew')} />}
+              <div className="row">
+                <span className="row-icon tint-gold" aria-hidden="true"><IconEye /></span>
+                <span className="row-label" id="member-view-label">Member view<span className="row-note">Only hides buttons. Anything you do still counts.</span></span>
+                <button type="button" role="switch" className="switch" aria-checked={previewing} aria-labelledby="member-view-label" onClick={() => onPreview(!previewing)}><span /></button>
               </div>
-              <div className="p-row">
-                <select aria-label={`Player for ${m.email || 'member'}`} value={m.player_id || ''}
-                  onChange={(e) => rpc('assign_player', { p_league: league.id, p_user: m.user_id, p_player: e.target.value || null }, 'Updated.')}>
-                  <option value="">Not linked to a player</option>
-                  {data.players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              {isOwner && m.role !== 'owner' && (
-                <div className="btns">
-                  <button className="btn small" onClick={() => rpc('set_member_role', { p_league: league.id, p_user: m.user_id, p_role: m.role === 'admin' ? 'member' : 'admin' }, m.role === 'admin' ? 'No longer an admin.' : 'Now an admin.')}>
-                    {m.role === 'admin' ? 'Remove admin' : 'Make admin'}
-                  </button>
-                  {confirm === 'rm:' + m.user_id ? (
-                    <>
-                      <button className="btn small nose" onClick={() => { setConfirm(null); rpc('remove_member', { p_league: league.id, p_user: m.user_id }, 'Removed. Their picks and history stay.'); }}>Remove login</button>
-                      <button className="btn small" onClick={() => setConfirm(null)}>Keep</button>
-                    </>
-                  ) : <button className="link danger" onClick={() => setConfirm('rm:' + m.user_id)}>Remove</button>}
-                </div>
-              )}
-            </div>
-          ))}
-          <p className="fine">Admins (co-commishes) can grade legs, spin the wheel, set the deadline, and edit players. Only the owner makes or removes admins. Someone has to open the invite and sign in before they show up here.</p>
-        </section>
-      )}
+              {isAdmin && <Row icon={<b>#</b>} tint="gray" label="Weeks" value={cur ? `Week ${cur.n}` : null} onClick={() => setPage('weeks')} />}
+            </Group>
+          )}
 
-      {isAdmin && (
-        <section>
-          <span className="lbl">Weeks</span>
-          <WeekNumberForm data={data} reload={reload} />
-          {confirm === 'next' ? (
-            <div className="confirm-box">
-              <p>Open the next week without spinning? You{'’'}ll pick who puts in by hand.</p>
-              <div className="btns">
-                <button className="btn small primary" onClick={() => { setConfirm(null); rpc('start_next_week', { p_league: league.id }, 'Next week is open.'); }}>Open next week</button>
-                <button className="btn small" onClick={() => setConfirm(null)}>Never mind</button>
-              </div>
-            </div>
-          ) : <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setConfirm('next')}>Open next week without spinning</button>}
-          {isOwner && (confirm === 'season' ? (
-            <div className="confirm-box">
-              <p>Delete every week, pick, and spin, and start over at Week {nflWeek().week} (the current NFL week)? Players and logins stay. This can{'’'}t be undone.</p>
-              <div className="btns">
-                <button className="btn small nose" onClick={() => { setConfirm(null); rpc('new_season', { p_league: league.id, p_first_week: nflWeek().week }, 'New season started.'); }}>Delete and restart</button>
-                <button className="btn small" onClick={() => setConfirm(null)}>Keep everything</button>
-              </div>
-            </div>
-          ) : <button className="link danger" style={{ alignSelf: 'flex-start' }} onClick={() => setConfirm('season')}>Start a new season</button>)}
-        </section>
+          <Group label="Account">
+            <Row icon={<IconKey />} tint="gray" label="Password" value={hasPw ? 'Set' : 'Not set'} onClick={() => setPage('password')} />
+            <button type="button" className="row is-danger" onClick={onSignOut}><span className="row-label">Sign out</span></button>
+          </Group>
+        </>
       )}
     </Sheet>
+  );
+}
+
+function Group({ label, children }) {
+  return (
+    <div className="group">
+      <span className="group-label">{label}</span>
+      <div className="rows">{children}</div>
+    </div>
+  );
+}
+
+function Row({ icon, tint, label, value, badge, onClick }) {
+  return (
+    <button type="button" className="row" onClick={onClick}>
+      {icon && <span className={`row-icon tint-${tint}`} aria-hidden="true">{icon}</span>}
+      <span className="row-label">{label}</span>
+      {badge && <span className="badge">{badge}</span>}
+      {value != null && <span className="row-value">{value}</span>}
+      <IconChevR />
+    </button>
   );
 }

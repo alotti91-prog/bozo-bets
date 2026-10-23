@@ -67,17 +67,17 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
 
   return (
     <div className="stack bp">
-      <div className="bp-chips" role="group" aria-label="Sport">
+      <div className="segmented" role="group" aria-label="Sport">
         {Object.entries(SPORTS).map(([k, s]) => (
-          <button key={k} type="button" className="chip bp-chip" aria-pressed={b.sport === k} onClick={() => pickSport(k)}>{s.label}</button>
+          <button key={k} type="button" aria-pressed={b.sport === k} onClick={() => pickSport(k)}>{s.label}</button>
         ))}
-        <button type="button" className="chip bp-chip" onClick={onTypeInstead}>Other</button>
+        <button type="button" aria-pressed={false} onClick={onTypeInstead}>Other</button>
       </div>
 
       {b.game ? (
         <div className="bp-game is-picked">
-          <span><strong>{b.game.short}</strong> <span className="sub">{b.game.start ? kick(b.game.start) : ''}</span></span>
-          <button type="button" className="link" onClick={() => pickGame(null)}>Change</button>
+          <span className="bp-game-name"><strong>{b.game.short}</strong><span className="sub">{gameWhen(b.game)}</span></span>
+          <button type="button" className="text-btn nose" onClick={() => pickGame(null)}>Change</button>
         </div>
       ) : (
         <div className="stack" style={{ gap: 6 }}>
@@ -102,17 +102,19 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
       )}
 
       {b.game && (
-        <div className="bp-chips" role="group" aria-label="Kind of bet">
+        <div className="segmented" role="group" aria-label="Kind of bet">
           {Object.entries(BET_TYPES).filter(([k]) => k !== 'prop' || SPORTS[b.sport]?.props).map(([k, label]) => (
-            <button key={k} type="button" className="chip bp-chip" aria-pressed={b.type === k} onClick={() => pickType(k)}>{label}</button>
+            <button key={k} type="button" aria-pressed={b.type === k} onClick={() => pickType(k)}>{k === 'prop' ? 'Player' : label}</button>
           ))}
         </div>
       )}
 
       {(b.type === 'spread' || b.type === 'ml') && (
-        <div className="seg bp-seg" role="group" aria-label="Team">
+        <div className="choices" role="group" aria-label="Team">
           {teams.map(([side, t]) => (
-            <button key={side} type="button" aria-pressed={b.side === side} onClick={() => pickTeam(side)}>{t.short}</button>
+            <button key={side} type="button" aria-pressed={b.side === side} onClick={() => pickTeam(side)}>
+              {t.short}<span>{side === 'away' ? 'Away' : 'Home'} · {t.abbr}</span>
+            </button>
           ))}
         </div>
       )}
@@ -148,7 +150,7 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
       )}
 
       {(b.type === 'total' || (b.type === 'prop' && b.stat && !yesNo)) && (
-        <div className="seg bp-seg" role="group" aria-label="Over or under">
+        <div className="choices" role="group" aria-label="Over or under">
           {['over', 'under'].map((s) => <button key={s} type="button" aria-pressed={b.side === s} onClick={() => set({ side: s })}>{s === 'over' ? 'Over' : 'Under'}</button>)}
         </div>
       )}
@@ -174,8 +176,8 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
         </div>
       )}
 
-      {ready && <p className="bp-preview">Saves as: <strong>{pickText(bet)}</strong></p>}
-      <button type="button" className="link" style={{ alignSelf: 'flex-start' }} onClick={onTypeInstead}>Type it instead</button>
+      {ready && <p className="bp-preview">Saves as <strong>{pickText(bet)}</strong></p>}
+      <button type="button" className="text-btn muted center" onClick={onTypeInstead}>Type it instead</button>
     </div>
   );
 }

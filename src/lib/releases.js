@@ -5,6 +5,22 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-22-i',
+    date: '2026-10-22',
+    title: 'A simpler look',
+    idea: 'Lotti',
+    items: [
+      'Tabs moved to the bottom, like an iPhone app.',
+      'This week opens with one summary row: who’s on the hook, how many legs are still alive, and what it pays.',
+      'Each leg on the slip is one clean line. Tap it for reactions, trash talk, grading, edit, and remove.',
+      '“Still waiting on” is one line on the slip, with a Remind button that copies a nudge for the group chat.',
+      'Adding a leg opens its own panel instead of a long form at the bottom of the page.',
+      'Settings is a short list. Each row opens its own page.',
+      'Wheel, Standings, and History say the same things with fewer words. Tap a name in Standings for more.',
+      'Fixed: sections on every tab were running into each other.',
+    ],
+  },
+  {
     id: '2026-10-22-h',
     date: '2026-10-22',
     title: 'The elimination wheel',

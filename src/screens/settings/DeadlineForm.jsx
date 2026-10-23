@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase, friendly } from '../../lib/supabase.js';
 import { toast } from '../../lib/ui.js';
-import { DAYS, lockState, toLocalInput } from '../../lib/deadline.js';
+import { DAYS, lockState, toLocalInput, fmtTime } from '../../lib/deadline.js';
 
 // Admins only: the weekly pick deadline, plus a one-off change for this week.
 export default function DeadlineForm({ data, reload }) {
@@ -39,8 +39,7 @@ export default function DeadlineForm({ data, reload }) {
   }
 
   return (
-    <section>
-      <span className="lbl">Pick deadline</span>
+    <div className="stack">
       <p className="sub">After the deadline, people can{'’'}t add or change their own leg. Admins still can. Anyone without a leg goes in the wheel.</p>
       <form className="stack" onSubmit={save} noValidate>
         <div className="dl-row">
@@ -65,11 +64,6 @@ export default function DeadlineForm({ data, reload }) {
         </form>
       )}
       {err && <p className="hint err">{err}</p>}
-    </section>
+    </div>
   );
-}
-
-function fmtTime(hhmm) {
-  const [h, m] = hhmm.split(':').map(Number);
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 }

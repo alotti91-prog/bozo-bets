@@ -1,86 +1,54 @@
 import { fmtOdds } from '../../lib/odds.js';
-import { suggestedGrade, gradeHidden } from '../../lib/bets.js';
-import { Belt } from '../../components/common.jsx';
-import { LegTalk } from '../../components/Comments.jsx';
+import { legState, suggestedGrade } from '../../lib/bets.js';
+import { Belt, IconComment } from '../../components/common.jsx';
+import { EMOJI } from '../../components/Reactions.jsx';
+import LiveLine from './LiveLine.jsx';
 
 const WORD = { W: 'Won', L: 'Lost', P: 'Push' };
+const TONE = { W: 'win', L: 'loss', P: 'pre' };
 
 /**
- * One leg on the slip: who, odds, pick, the live line, grading, the ⋯ menu, reactions and comments.
- * Which menu or confirm is open lives in WeekTab, so only one is open at a time.
- *   st          live status from liveStatus() (null for typed legs or no feed)
- *   menuOpen    the ⋯ menu is open; onMenu(true|false)
- *   confirming  "Remove this leg?" is showing; onConfirm(true|false)
- *   gradeNow    an admin chose "Grade now" before the game ended; onGradeNow()
+ * One leg on the slip: a status dot, who, the pick and odds, one live line, and
+ * reaction and comment counts once there are any. Tapping it opens the leg
+ * panel (LegSheet). Admins get a one-tap "Mark W" when a picked leg's game is final.
+ *   st  live status from liveStatus() (null for typed legs or no feed)
  */
-export default function LegRow({ leg, st, me, isAdmin, locked, beltId, pname, menuOpen, onMenu, confirming, onConfirm, gradeNow, onGradeNow,
-  onGrade, onRemove, onEdit, data, userId, nameOfUser, reload }) {
+export default function LegRow({ leg, st, me, isAdmin, beltId, pname, reactions, comments, onOpen, onGrade }) {
   const who = pname(leg.player_id);
   const mine = me && leg.player_id === me;
-  const canEdit = isAdmin || (mine && !leg.result && !locked);
-  const hideGrade = gradeHidden(leg, st) && !gradeNow;
+  const state = legState(leg, st);
   const suggest = isAdmin && !leg.result ? suggestedGrade(st) : null;
-  const showPill = !isAdmin && (leg.result || !leg.bet?.game);
-  // Nothing to act on (a live picked leg): put the sport tag and ⋯ at the end of the reactions row.
-  const compact = !suggest && !(isAdmin && !hideGrade) && !showPill && leg.result !== 'L' && !confirming && !menuOpen;
-  const moreBtn = canEdit && <button type="button" className="more-btn" aria-label={`More for ${who}’s leg`} onClick={() => onMenu(true)}>{'⋯'}</button>;
+  const reacts = EMOJI.map((e) => [e, reactions.filter((r) => r.leg_id === leg.id && r.emoji === e).length]).filter(([, n]) => n);
+  const talk = comments.filter((c) => c.leg_id === leg.id).length;
+  // A graded leg whose game we can't see (no feed, or not started) shows its grade instead.
+  const showLive = leg.bet?.game && !(leg.result && (!st || st.tone === 'pre'));
 
   return (
-    <li className={`leg${leg.result ? ' is-' + leg.result : ''}`}>
-      <span className="leg-who">{who}<Belt on={beltId === leg.player_id} />{mine && <span className="you"> {'·'} you</span>}</span>
-      <span className="leg-odds">{fmtOdds(leg.odds)}</span>
-      <span className="leg-pick">{leg.pick}</span>
-      {leg.bet?.game && <LiveLine bet={leg.bet} s={st} />}
-      {!compact && <div className="leg-meta">
-        <span className="tag">{leg.sport}</span>
-        {suggest && (
-          <button type="button" className="mark-btn" onClick={() => onGrade(suggest)} aria-label={`Final. Mark ${who}’s leg ${WORD[suggest]}`}>
-            Mark {suggest}
-          </button>
-        )}
-        {isAdmin ? (!hideGrade && (
-          <div className="grade" role="group" aria-label={`Result for ${who}`}>
-            {['W', 'L', 'P'].map((r) => (
-              <button key={r} type="button" className={`g-${r}`} aria-pressed={leg.result === r} aria-label={WORD[r]} onClick={() => onGrade(r)}>{r}</button>
-            ))}
-          </div>
-        )) : showPill && (
-          <span className={`res res-${leg.result || 'none'}`}>{WORD[leg.result] || 'Pending'}</span>
-        )}
-        {canEdit && (confirming ? (
-          <span className="confirm">Remove this leg?
-            <button className="link danger" onClick={onRemove}>Remove</button>
-            <button className="link" onClick={() => onConfirm(false)}>Keep</button>
-          </span>
-        ) : menuOpen ? (
-          <span className="leg-menu">
-            <button className="link" onClick={() => { onMenu(false); onEdit(); }}>Edit</button>
-            <button className="link" onClick={() => { onMenu(false); onConfirm(true); }}>Remove</button>
-            {isAdmin && hideGrade && <button className="link" onClick={() => { onMenu(false); onGradeNow(); }}>Grade now</button>}
-            <button className="link" onClick={() => onMenu(false)} aria-label="Close menu">Done</button>
-          </span>
-        ) : moreBtn)}
-        {leg.result === 'L' && <span className="bozo-mark">Bozo</span>}
-      </div>}
-      <LegTalk leg={leg} data={data} userId={userId} isAdmin={isAdmin} nameOfUser={nameOfUser} reload={reload} who={who}
-        trailing={compact ? <><span className="tag">{leg.sport}</span>{moreBtn}</> : null} />
+    <li className={`leg is-${state}`}>
+      <button type="button" className="leg-main" onClick={onOpen} aria-haspopup="dialog">
+        <span className="leg-dot" aria-hidden="true" />
+        <span className="leg-body">
+          <span className="leg-who">{who}<Belt on={beltId === leg.player_id} />{mine && <span className="you"> · you</span>}</span>
+          <span className="leg-pick">{leg.pick}</span>
+          {showLive ? <LiveLine bet={leg.bet} s={st} /> : (
+            <span className={`leg-live tone-${TONE[leg.result] || 'pre'}`}>
+              <span className="ll-row">{leg.result && <strong>{WORD[leg.result]}</strong>}<span>{leg.sport}</span></span>
+            </span>
+          )}
+          {(reacts.length > 0 || talk > 0) && (
+            <span className="leg-social">
+              {reacts.map(([e, n]) => <span key={e}>{e} {n}</span>)}
+              {talk > 0 && <span className="leg-talk"><IconComment />{talk}</span>}
+            </span>
+          )}
+        </span>
+        <span className="leg-odds">{fmtOdds(leg.odds)}</span>
+      </button>
+      {suggest && (
+        <button type="button" className="mark-btn" onClick={() => onGrade(suggest)} aria-label={`Final. Mark ${who}’s leg ${WORD[suggest]}`}>
+          Final · Mark {suggest}
+        </button>
+      )}
     </li>
-  );
-}
-
-// Live state under a picked leg: "Covering · DET 24, GB 17 · Q3 6:12" (your team in bold), with a bar for overs.
-function LiveLine({ bet, s }) {
-  const when = bet.game.start ? new Date(bet.game.start).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
-  if (!s || s.tone === 'pre') return <span className="leg-live tone-pre"><span className="ll-row"><span>{bet.game.short}</span>{when && <span>{when}</span>}</span></span>;
-  const team = (t) => <span className={t.mine ? 'll-mine' : undefined}>{t.abbr} {t.score}</span>;
-  return (
-    <span className={`leg-live tone-${s.tone}`}>
-      <span className="ll-row">
-        <strong>{s.label}</strong>
-        <span>{team(s.away)}, {team(s.home)}</span>
-        <span>{s.clock}</span>
-      </span>
-      {s.progress != null && !s.done && <span className="leg-bar" aria-hidden="true"><span style={{ width: `${Math.round(s.progress * 100)}%` }} /></span>}
-    </span>
   );
 }

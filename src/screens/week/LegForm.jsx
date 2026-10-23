@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { supabase, friendly } from '../../lib/supabase.js';
 import { parseOdds } from '../../lib/odds.js';
 import { toast, store } from '../../lib/ui.js';
@@ -7,9 +7,10 @@ import { pickText, betProblem, emptyPick, pickFromBet, betFromPick } from '../..
 import BetPicker from '../../components/BetPicker.jsx';
 
 const SPORTS = ['NFL', 'NCAAF', 'NBA', 'NHL', 'MLB', 'Soccer', 'Other'];
-const HINT = 'American odds, as the book shows them. Tap the sign to switch between minus and plus.';
+const HINT = 'American odds, like −110 or +150. Tap the sign to flip it.';
 
-// Add or edit a leg: pick it from this week's games (tracks live) or type it. Keeps a draft until saved.
+// Add or edit a leg, inside the Add-a-leg sheet: pick it from this week's games (tracks live)
+// or type it. Keeps a draft until saved, so closing the sheet loses nothing.
 export default function LegForm({ week, editing, options, me, isAdmin, locked, pname, onDone, onCancel }) {
   const draftKey = 'bz-draft-' + week.id;
   const draft = editing ? null : store.get(draftKey, null);
@@ -23,13 +24,6 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
   const [b, setB] = useState(editing?.bet ? pickFromBet(editing.bet) : draft?.b || emptyPick());
   const [hint, setHint] = useState({ text: HINT, err: false });
   const [busy, setBusy] = useState(false);
-  const formRef = useRef(null);
-  useEffect(() => {
-    if (editing && formRef.current) {
-      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      formRef.current.querySelector('#f-pick')?.focus({ preventScroll: true });
-    }
-  }, [editing]);
 
   if (locked && !isAdmin) {
     return options.length ? <p className="note">Picks are locked for this week. Ask the commish if you need a change.</p> : null;
@@ -85,8 +79,7 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
   }
 
   return (
-    <form ref={formRef} className="card stack" onSubmit={submit} noValidate>
-      <h3 className="sec-title-sm">{editing ? `Edit ${pname(editing.player_id)}’s leg` : player === me ? 'Add your leg' : 'Add a leg'}</h3>
+    <form className="stack" onSubmit={submit} noValidate>
       {locked && <p className="hint">Picks are locked. As an admin you can still add or fix legs.</p>}
       {!editing && options.length > 1 && (
         <div className="field">
@@ -135,7 +128,7 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
       </div>
       <p className={`hint${hint.err ? ' err' : ''}`} role={hint.err ? 'alert' : undefined}>{hint.text}</p>
       <div className="btns">
-        <button className="btn primary" style={{ flex: 1 }} type="submit" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Add leg'}</button>
+        <button className="btn primary big" style={{ flex: 1 }} type="submit" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Add leg'}</button>
         {editing && <button className="btn" type="button" onClick={onCancel}>Cancel</button>}
       </div>
     </form>

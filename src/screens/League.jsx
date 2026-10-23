@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, demo } from '../lib/supabase.js';
 import { useLeague } from '../lib/useLeague.js';
 import { store, toast } from '../lib/ui.js';
-import { Brand, IconGear } from '../components/common.jsx';
+import { Brand, IconGear, IconTicket, IconWheel, IconBars, IconHistory } from '../components/common.jsx';
 import Claim from './Claim.jsx';
 import { bozoBelt } from '../lib/stats.js';
 import { unwatchedSpin, hideSpin } from '../lib/wheel.js';
@@ -16,6 +16,7 @@ import HistoryTab from './HistoryTab.jsx';
 import SettingsSheet from './SettingsSheet.jsx';
 
 const TABS = [['week', 'This week'], ['wheel', 'Wheel'], ['standings', 'Standings'], ['history', 'History']];
+const TAB_ICON = { week: IconTicket, wheel: IconWheel, standings: IconBars, history: IconHistory };
 
 export default function League({ leagueId, userId, leagues, onSwitchLeague, onAddLeague, onSignOut }) {
   const [tab, setTab] = useState(() => {
@@ -24,7 +25,6 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   });
   const [spinEvent, setSpinEvent] = useState(null);
   const [settings, setSettings] = useState(false);
-  const [pwNudgeHidden, setPwNudgeHidden] = useState(() => store.get('bz-has-pw', false) || store.get('bz-pw-nudge-off', false));
   const [skipClaim, setSkipClaim] = useState(() => store.get('bz-skip-claim-' + leagueId, false));
   const [seenSpins] = useState(() => new Set()); // live spins already played, so each plays once
   const [watched, setWatched] = useState(() => new Set()); // spins watched since the last load
@@ -137,27 +137,20 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   return (
     <>
       <header className="top">
-        <div className="wrap">
-          <div className="brand-row">
-            <h1 className="brand"><Brand name={data.league.name} /></h1>
-            <div className="top-actions">
-              <button className="icon-btn" onClick={() => setSettings(true)} aria-label={isAdmin && !notesSeen ? 'Settings (new updates)' : 'Settings'}>
-                <IconGear />{isAdmin && !notesSeen && <span className="dot-new" aria-hidden="true" />}
-              </button>
+        <div className="wrap brand-row">
+          <h1 className="brand"><Brand name={data.league.name} /></h1>
+          <button className="icon-btn" onClick={() => setSettings(true)} aria-label={isAdmin && !notesSeen ? 'Settings (new updates)' : 'Settings'}>
+            <IconGear />{isAdmin && !notesSeen && <span className="dot-new" aria-hidden="true" />}
+          </button>
+        </div>
+        {previewing && (
+          <div className="preview-bar" role="status">
+            <div className="wrap">
+              <span><strong>Member view.</strong> What members see. Anything you do still counts.</span>
+              <button type="button" className="text-btn" onClick={() => setAsMember(false)}>Back to admin</button>
             </div>
           </div>
-          <nav className="tabs" role="tablist" aria-label="Sections">
-            {TABS.map(([k, label]) => (
-              <button key={k} className="tab" role="tab" id={`tab-${k}`} aria-selected={tab === k} onClick={() => go(k)}>{label}</button>
-            ))}
-          </nav>
-          {previewing && (
-            <div className="preview-bar" role="status">
-              <span><strong>Member view.</strong> What members see. Anything you do still counts.</span>
-              <button type="button" className="link" onClick={() => setAsMember(false)}>Back to admin</button>
-            </div>
-          )}
-        </div>
+        )}
       </header>
       <main className="wrap" role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {demo && <p className="note">Demo mode: sample data, nothing is saved. Reload to reset.</p>}
@@ -171,15 +164,6 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
             <p><strong>Database update needed.</strong> {data.missing.join(' and ')} {data.missing.length > 1 ? 'are' : 'is'} turned off until you run the latest <code>schema.sql</code> in the Supabase SQL Editor.</p>
           </div>
         )}
-        {tab === 'week' && !pwNudgeHidden && (
-          <div className="banner">
-            <p><strong>Skip the sign-in email next time.</strong> Set a password and sign in with just your email and password.</p>
-            <div className="btns">
-              <button className="btn small primary" onClick={() => setSettings(true)}>Set password</button>
-              <button className="link" onClick={() => { store.set('bz-pw-nudge-off', true); setPwNudgeHidden(true); }}>Not now</button>
-            </div>
-          </div>
-        )}
         <div key={tab} className={`pane${slide ? ` pane-${slide}` : ''}`}>
         {tab === 'week' && <WeekTab {...props} />}
         {tab === 'wheel' && <WheelTab {...props} spinEvent={spinEvent} seenSpins={seenSpins} />}
@@ -187,10 +171,20 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
         {tab === 'history' && <HistoryTab {...props} />}
         </div>
       </main>
+      <nav className="tabbar" role="tablist" aria-label="Sections">
+        {TABS.map(([k, label]) => {
+          const Icon = TAB_ICON[k];
+          return (
+            <button key={k} type="button" className="tab" role="tab" id={`tab-${k}`} aria-selected={tab === k} onClick={() => go(k)}>
+              <Icon /><span>{label}</span>
+            </button>
+          );
+        })}
+      </nav>
       {settings && (
         <SettingsSheet data={data} userId={userId} member={member} isAdmin={isAdmin} isOwner={isOwner} reload={reload} onNotesSeen={() => setNotesSeen(true)}
           canPreview={realAdmin} previewing={previewing} onPreview={(on) => { setAsMember(on); setSettings(false); window.scrollTo(0, 0); }}
-          onClose={() => { setSettings(false); if (store.get('bz-has-pw', false)) setPwNudgeHidden(true); }} onChangePlayer={changePlayer}
+          onClose={() => setSettings(false)} onChangePlayer={changePlayer}
           leagues={leagues} onSwitchLeague={(id) => { setSettings(false); onSwitchLeague(id); }}
           onAddLeague={() => { setSettings(false); onAddLeague(); }} onSignOut={onSignOut} />
       )}

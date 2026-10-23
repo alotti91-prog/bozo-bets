@@ -36,8 +36,7 @@ export default function PlayersForm({ data, reload }) {
   }
 
   return (
-    <section>
-      <span className="lbl">Players</span>
+    <div className="stack">
       <div className="p-list">
         {rows.map((r, i) => (
           <div key={r.id} className={`p-row${r.active ? '' : ' off'}`}>
@@ -52,6 +51,6 @@ export default function PlayersForm({ data, reload }) {
         <button className="btn small" type="submit">Add</button>
       </form>
       <p className="fine">Benched players keep their history but drop out of new weeks.</p>
-    </section>
+    </div>
   );
 }

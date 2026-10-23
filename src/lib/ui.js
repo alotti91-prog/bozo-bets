@@ -89,6 +89,13 @@ export function fmtDate(iso) {
 export function fmtWhen(iso) {
   try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch { return ''; }
 }
+/** Up to two letters for a name bubble: "Danny B" → "DB", "T-Bone" → "TB", "Mori" → "M". */
+export function initials(name) {
+  const words = String(name || '').trim().split(/[\s-]+/).filter(Boolean);
+  if (!words.length) return '?';
+  return (words.length > 1 ? words[0][0] + words[1][0] : words[0][0]).toUpperCase();
+}
+
 export function listNames(names) {
   if (names.length <= 1) return names.join('');
   return names.slice(0, -1).join(', ') + ' & ' + names[names.length - 1];

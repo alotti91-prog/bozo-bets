@@ -121,3 +121,18 @@ Lotti's idea: each spin knocks a name out (that person is safe) until one is lef
 
 **2026-10-22 · Member view for admins**
 Settings → Member view hides every admin control so an admin can check what members see. It's a preview, not a security test: the database still treats you as an admin, so anything you do counts, and a yellow strip under the tabs says so. It resets when the app reloads, so nobody gets stuck in it. The real member permissions are covered by the database checks (`npm run test:sql`). For a true end-to-end member test, sign in with a second address in a private window.
+
+**2026-10-22 · A simpler look ("say a lot with a little")**
+Lotti asked for an Apple-like UI with less on screen. Mockups first, then built as drawn:
+- Tabs moved to a bottom bar.
+- This week leads with one summary row, and each leg is one line: dot, who, pick, odds, live status. Reactions, comments, grading, edit, and remove moved into a panel you open by tapping the leg.
+- "Still waiting on" became one line inside the slip with a Remind button.
+- The leg form opens in its own panel.
+- Settings became a list of rows that open pages.
+
+Trade-offs we accepted:
+- The password reminder banner is gone; Settings shows "Password · Not set" instead.
+- Standings' Hit % and Avg odds moved behind a tap on the player.
+- The rubber-stamp "BUSTED" and the typewriter font are gone.
+
+The crowding that started this had a real bug under it: the wrapper added for the tab-swipe animation dropped the spacing between sections, so every tab's sections ran together. `.pane` now spaces them.

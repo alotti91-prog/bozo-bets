@@ -3,7 +3,8 @@ import { dec, amerFmt, fmtOdds, parseOdds, weekInfo, money, signed } from './odd
 import { standings, hitPct, bozoBelt } from './stats.js';
 import { indexAt, targetRotation, restRotation, wheelContext, unwatchedSpin, hideSpin, TAU, spinRounds, spinMs, isElimination, SPIN_MS } from './wheel.js';
 import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
-import { countdown, lockState, toLocalInput, ago, updatedAgo } from './deadline.js';
+import { countdown, lockState, toLocalInput, ago, updatedAgo, fmtTime, weeklyRule } from './deadline.js';
+import { initials } from './ui.js';
 import { isPrivateAddress } from './site.js';
 import { RELEASES, unseenReleases } from './releases.js';
 import { slipPaths } from './slip.js';
@@ -551,5 +552,22 @@ describe('wheel', () => {
     const open = wheelContext({ weeks, legs: [L('w6', 'a', -110, null), L('w7', 'a', -110, null)], spins: [] });
     expect(open.mode).toBe('waiting');
     expect(open.last).toBe(null);
+  });
+});
+
+describe('small labels', () => {
+  it('formats a deadline time and the weekly rule', () => {
+    expect(fmtTime('12:55')).toBe('12:55 PM');
+    expect(fmtTime('00:05')).toBe('12:05 AM');
+    expect(fmtTime('19:00')).toBe('7:00 PM');
+    expect(weeklyRule({ lock_dow: 0, lock_time: '12:55:00' })).toBe('Sun 12:55 PM');
+    expect(weeklyRule({ lock_dow: null, lock_time: null })).toBe('Off');
+  });
+  it('makes name bubbles', () => {
+    expect(initials('Danny B')).toBe('DB');
+    expect(initials('T-Bone')).toBe('TB');
+    expect(initials('Mori')).toBe('M');
+    expect(initials('big chris')).toBe('BC');
+    expect(initials('')).toBe('?');
   });
 });

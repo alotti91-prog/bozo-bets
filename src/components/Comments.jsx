@@ -2,35 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase, friendly } from '../lib/supabase.js';
 import { toast } from '../lib/ui.js';
 import { ago } from '../lib/deadline.js';
-import Reactions from './Reactions.jsx';
 
 const MAX = 280;
-const PREVIEW = 2; // comments shown before "See all"
+const PREVIEW = 2; // comments shown before "See all" when the thread is closed
 
 /**
- * Reactions plus the comment thread under one pick on the slip. The 💬 button
- * opens the box to write one. Shows the latest two comments until opened.
+ * The comment thread on one pick. mode 'all' lists every comment with a box to
+ * add one (the leg panel); 'write' also focuses the box. readOnly lists every
+ * comment with no box or delete (History).
  */
-export function LegTalk({ leg, data, userId, isAdmin, nameOfUser, reload, who, trailing = null }) {
-  const [mode, setMode] = useState('closed'); // 'closed' | 'all' | 'write'
-  const here = (data.comments || []).filter((c) => c.leg_id === leg.id);
-  return (
-    <>
-      <Reactions leg={leg} reactions={data.reactions || []} userId={userId} nameOfUser={nameOfUser} reload={reload}>
-        <button type="button" className="react" aria-expanded={mode === 'write'}
-          aria-label={here.length ? `Comments, ${here.length}. Add one` : 'Add a comment'} title="Comment"
-          onClick={() => setMode(mode === 'write' ? 'closed' : 'write')}>
-          <span aria-hidden="true">💬</span>{here.length > 0 && <b>{here.length}</b>}
-        </button>
-        {trailing && <span className="reacts-end">{trailing}</span>}
-      </Reactions>
-      <Comments leg={leg} comments={here} userId={userId} isAdmin={isAdmin} nameOfUser={nameOfUser} reload={reload}
-        mode={mode} setMode={setMode} who={who} />
-    </>
-  );
-}
-
-/** The thread itself. readOnly lists every comment with no box or delete (History). */
 export default function Comments({ leg, comments, userId, isAdmin, nameOfUser, reload, mode = 'all', setMode, who, readOnly = false }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);

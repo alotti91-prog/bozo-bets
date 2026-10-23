@@ -19,8 +19,7 @@ export default function LeagueForm({ league, reload }) {
     reload();
   }
   return (
-    <section>
-      <span className="lbl">League</span>
+    <div className="stack">
       <form className="stack" onSubmit={save} noValidate>
         <div className="field-row">
           <div className="field"><label htmlFor="s-name">Name</label><input id="s-name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} /></div>
@@ -29,6 +28,6 @@ export default function LeagueForm({ league, reload }) {
         {err && <p className="hint err">{err}</p>}
         <button className="btn small primary" style={{ alignSelf: 'flex-start' }}>Save league</button>
       </form>
-    </section>
+    </div>
   );
 }

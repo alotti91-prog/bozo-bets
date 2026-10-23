@@ -65,3 +65,15 @@ export function toLocalInput(date) {
   const p = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}`;
 }
+
+/** "13:05" → "1:05 PM". */
+export function fmtTime(hhmm) {
+  const [h, m] = String(hhmm).split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/** The league's weekly deadline, short: "Sun 12:55 PM", or "Off". */
+export function weeklyRule(league) {
+  if (league?.lock_dow == null || !league.lock_time) return 'Off';
+  return `${DAYS[league.lock_dow].slice(0, 3)} ${fmtTime(league.lock_time.slice(0, 5))}`;
+}
