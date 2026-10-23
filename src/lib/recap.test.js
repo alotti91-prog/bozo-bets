@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weekRecap, personLine, recapText, FACES, lossTier, cutoffs } from './recap.js';
+import { weekRecap, personLine, recapText, FACES, lossTier, cutoffs, needsMissPick, marginFromLostBy } from './recap.js';
 import { liveStatus, gradeMargin } from './bets.js';
 
 const players = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris'].map((name, i) => ({ id: 'p' + (i + 1), name, active: true }));
@@ -175,5 +175,35 @@ describe('saving the margin with a grade', () => {
     expect(gradeMargin(liveStatus(bills, game('post', 27, 14)), 'W')).toBe(6.5);
     expect(gradeMargin(null, 'L')).toBe(null); // typed leg, or no score
     expect(gradeMargin(liveStatus(bills, game('post', 20, 14)), null)).toBe(null); // un-graded
+  });
+});
+
+describe('typed legs: the commish picks how bad', () => {
+  it('the pick decides the face, even without a number', () => {
+    expect(lossTier({ result: 'L', miss: 'blowout', margin: null, bet: null })).toBe('blowout');
+    expect(lossTier({ result: 'L', miss: 'close', margin: -7, bet: null })).toBe('close');
+    expect(lossTier({ result: 'L', miss: null, margin: -7, bet: null })).toBe('normal'); // a number alone can't be judged
+  });
+  it('shows the number they typed in the recap', () => {
+    const legs = [{ ...leg('p1', 'Steelers ML', 135, 'L'), miss: 'blowout', margin: -17 }];
+    const r = weekRecap({ weeks, legs, spins: [], players }, 'w7');
+    expect(r.people[0]).toMatchObject({ id: 'p1', face: 'wig' });
+    expect(personLine(r.people[0])).toBe('Steelers ML · missed by 17');
+  });
+  it('is offered for typed legs, and for picked legs graded without a final score', () => {
+    expect(needsMissPick({ result: 'L', bet: null, margin: null })).toBe(true);
+    expect(needsMissPick({ result: 'L', bet: null, margin: -6 })).toBe(true); // still typed after entering a number
+    expect(needsMissPick({ result: 'L', bet: { type: 'spread' }, margin: null })).toBe(true);
+    expect(needsMissPick({ result: 'L', bet: { type: 'spread' }, margin: -0.5 })).toBe(false); // measured from the score
+    expect(needsMissPick({ result: 'W', bet: null, margin: null })).toBe(false);
+  });
+  it('reads what was typed for "lost by"', () => {
+    expect(marginFromLostBy('7')).toBe(-7);
+    expect(marginFromLostBy(' 3.5 ')).toBe(-3.5);
+    expect(marginFromLostBy('0,5')).toBe(-0.5);
+    expect(marginFromLostBy('')).toBe(null);
+    expect(marginFromLostBy('0')).toBe(undefined);
+    expect(marginFromLostBy('-3')).toBe(undefined);
+    expect(marginFromLostBy('a lot')).toBe(undefined);
   });
 });

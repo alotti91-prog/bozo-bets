@@ -242,6 +242,8 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
 .sheet-actions .btn { flex: 1; }
 .confirm-box { display: flex; flex-direction: column; gap: 10px; background: var(--sunk); border-radius: 12px; padding: 12px 14px; font-size: 14px; }
 .confirm-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.miss-pick { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.lost-by > span { font: 600 15px/1.2 var(--body); color: var(--ink); white-space: nowrap; }
 
 /* rows (Settings, the leg panel) */
 .rows { background: var(--sunk); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; }

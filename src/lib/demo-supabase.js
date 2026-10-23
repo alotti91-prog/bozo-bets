@@ -22,7 +22,7 @@ const names = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris', 'T-Bone'];
 const P = names.map((n, i) => ({ id: 'p' + (i + 1), league_id: L, name: n, active: true, sort: i, created_at: now() }));
 const W = [1, 2, 3, 4].map((n) => ({ id: 'w' + n, league_id: L, n: n + 3, start_date: daysAgo(35 - n * 7), stake: 10, payer_id: null, actual_payout: null, created_at: now() }));
 W[0].payer_id = 'p1'; W[1].payer_id = 'p5'; W[2].payer_id = 'p3'; W[3].payer_id = 'p4';
-const leg = (w, p, pick, odds, sport, result, extra = {}) => ({ id: id(), week_id: w, league_id: L, player_id: p, pick, odds, sport, result, bet: null, margin: null, created_by: uid, created_at: now(), updated_at: now(), ...extra });
+const leg = (w, p, pick, odds, sport, result, extra = {}) => ({ id: id(), week_id: w, league_id: L, player_id: p, pick, odds, sport, result, bet: null, margin: null, miss: null, created_by: uid, created_at: now(), updated_at: now(), ...extra });
 
 // ---- Fake scores for demo mode (stands in for /api/espn) ----
 const inHours = (h) => new Date(Date.now() + h * 3600e3).toISOString();
@@ -177,7 +177,7 @@ function query(table) {
       const rows = (Array.isArray(payload) ? payload : [payload]).map((r) => ({ id: id(), created_at: now(), active: true, result: null, ...r }));
       if (table === 'reactions' || table === 'comments' || table === 'spin_views') rows.forEach((r) => { r.user_id = uid; r.league_id = L; });
       if (table === 'spin_views' && rows.some((r) => db.spin_views.some((v) => v.spin_id === r.spin_id))) return { data: null, error: { message: 'duplicate key value violates unique constraint "spin_views_pkey"' } };
-      if (table === 'legs') rows.forEach((r) => { r.bet = r.bet ?? null; r.margin = null; }); // like the real columns' defaults
+      if (table === 'legs') rows.forEach((r) => { r.bet = r.bet ?? null; r.margin = null; r.miss = null; }); // like the real columns' defaults
       if (table === 'comments') rows.forEach((r) => { r.body = String(r.body || '').trim(); });
       if (table === 'comments' && rows.some((r) => !r.body)) return { data: null, error: { message: 'Write something first' } };
       if (table === 'reactions' && rows.some((r) => db.reactions.some((x) => x.leg_id === r.leg_id && x.user_id === r.user_id && x.emoji === r.emoji))) {
@@ -194,6 +194,7 @@ function query(table) {
       db[table].filter(match).forEach((r) => {
         Object.assign(r, payload);
         if (table === 'legs' && !r.result) r.margin = null; // as the database does when a grade is undone
+        if (table === 'legs' && r.result !== 'L') r.miss = null;
         emit(table, 'UPDATE', r);
       });
       return { data: null, error: null };

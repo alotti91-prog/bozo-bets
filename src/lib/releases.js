@@ -5,6 +5,17 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-d',
+    date: '2026-10-23',
+    title: 'Close calls and blowouts for typed legs',
+    idea: 'Lotti',
+    items: [
+      'When the commish grades a typed leg Lost, the leg’s panel asks “How bad was the miss?”: Close call, Regular, or Blowout. That sets the face in the recap: face paint, makeup, or the wig.',
+      'There’s an optional “Lost by” box too. The number shows in the recap, like “missed by 7”.',
+      'Legs picked from a game still work it out from the final score. If one was graded before the game ended, the commish can pick for it the same way.',
+    ],
+  },
+  {
     id: '2026-10-23-c',
     date: '2026-10-23',
     title: 'Go back to an earlier week',

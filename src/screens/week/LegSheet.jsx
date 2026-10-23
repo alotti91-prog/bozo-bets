@@ -5,6 +5,8 @@ import { Sheet, IconChevR } from '../../components/common.jsx';
 import Reactions from '../../components/Reactions.jsx';
 import Comments from '../../components/Comments.jsx';
 import LiveLine from './LiveLine.jsx';
+import MissPicker from './MissPicker.jsx';
+import { needsMissPick } from '../../lib/recap.js';
 
 const WORD = { W: 'Won', L: 'Lost', P: 'Push' };
 
@@ -13,7 +15,7 @@ const WORD = { W: 'Won', L: 'Lost', P: 'Push' };
  * reactions, trash talk, and, for whoever is allowed, grading (admins),
  * editing, and removing it. The database enforces who can do what.
  */
-export default function LegSheet({ leg, st, data, me, isAdmin, locked, pname, userId, nameOfUser, reload, onGrade, onEdit, onRemove, onClose }) {
+export default function LegSheet({ leg, st, data, me, isAdmin, locked, pname, userId, nameOfUser, reload, onGrade, onMiss, onEdit, onRemove, onClose }) {
   const [gradeNow, setGradeNow] = useState(false); // an admin grading before the game is final
   const [confirmRm, setConfirmRm] = useState(false);
   const who = pname(leg.player_id);
@@ -60,6 +62,7 @@ export default function LegSheet({ leg, st, data, me, isAdmin, locked, pname, us
             </div>
           )}
           {suggest && <p className="hint">The final score says {WORD[suggest].toLowerCase()}.</p>}
+          {onMiss && 'miss' in leg && needsMissPick(leg) && <MissPicker key={leg.id} leg={leg} onSave={onMiss} />}
         </div>
       )}
 

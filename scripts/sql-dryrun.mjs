@@ -109,6 +109,17 @@ await as(A, `update public.legs set result = 'L', margin = -0.5 where player_id 
 assert.equal(Number(await marginOf(players.Lotti)), -0.5);
 ok('the commish saves how far a leg missed; undoing the grade clears it');
 
+// Typed legs: the commish picks how bad the miss was (close or blowout).
+const missOf = async (pid) => (await as(B, `select miss from public.legs where player_id = $1`, [pid])).rows[0].miss;
+await as(A, `update public.legs set miss = 'blowout' where player_id = $1`, [players.Mikey]);
+assert.equal(await missOf(players.Mikey), 'blowout');
+await fails(A, `update public.legs set miss = 'meh' where player_id = $1`, [players.Mikey], /check/);
+await as(A, `update public.legs set result = 'W' where player_id = $1`, [players.Mikey]);
+assert.equal(await missOf(players.Mikey), null);
+await as(A, `update public.legs set result = 'L', miss = 'close' where player_id = $1`, [players.Mikey]);
+assert.equal(await missOf(players.Mikey), 'close');
+ok('the commish marks a typed leg a close call or a blowout; a win clears it');
+
 // Graded leg is locked for the friend
 await as(B, `delete from public.legs where player_id = $1`, [players.Sully]); // RLS silently matches 0 rows
 const stillThere = (await as(A, `select count(*)::int as c from public.legs where player_id = $1`, [players.Sully])).rows[0].c;

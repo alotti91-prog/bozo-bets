@@ -38,17 +38,39 @@ export function cutoffs(bet) {
 }
 
 /**
- * How bad a lost leg was: 'close' | 'normal' | 'blowout'. Uses legs.margin
- * (saved with the grade, negative = missed by). Typed legs, and legs graded
- * before the margin was saved, count as 'normal'.
+ * How bad a lost leg was: 'close' | 'normal' | 'blowout'. The commish's pick
+ * (legs.miss, for legs the app can't measure) comes first; otherwise legs.margin
+ * (saved with the grade, negative = missed by) against the cutoffs. Anything
+ * else counts as 'normal'.
  */
 export function lossTier(leg) {
+  if (leg.miss === 'close' || leg.miss === 'blowout') return leg.miss;
   const c = cutoffs(leg.bet);
   const missed = leg.margin == null ? NaN : -Number(leg.margin);
   if (!c || !(missed > 0)) return 'normal';
   if (missed <= c.close) return 'close';
   if (missed >= c.blowout) return 'blowout';
   return 'normal';
+}
+
+/**
+ * Whether the commish picks how bad a lost leg was by hand: a typed leg, or a
+ * picked leg that was graded without a final score (no margin saved).
+ */
+export function needsMissPick(leg) {
+  return leg.result === 'L' && (!leg.bet || leg.margin == null);
+}
+
+/**
+ * What the commish typed for "lost by" → the margin to save (negative), null
+ * when it's empty, or undefined when it isn't a sensible number.
+ */
+export function marginFromLostBy(text) {
+  const t = String(text ?? '').trim().replace(',', '.');
+  if (!t) return null;
+  if (!/^\d{1,4}(\.\d{1,2})?$/.test(t)) return undefined;
+  const n = Number(t);
+  return n > 0 ? -n : undefined;
 }
 
 /**

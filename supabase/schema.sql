@@ -134,6 +134,12 @@ alter table public.legs add column if not exists bet jsonb
 -- weekly recap uses it to pick a face (a close miss gets off lighter than a blowout).
 alter table public.legs add column if not exists margin numeric
   check (margin is null or abs(margin) < 100000);
+-- How bad a lost leg was when the app can't measure it from the score (a typed
+-- leg, or one graded without a final score): 'close' or 'blowout', picked by
+-- the commish. Empty means a regular miss. For typed legs, margin can hold how
+-- much it lost by, as the commish entered it (shown in the recap).
+alter table public.legs add column if not exists miss text
+  check (miss is null or miss in ('close', 'blowout'));
 
 -- Several screenshots per slip (a long parlay rarely fits in one). slip_path is
 -- the first one, kept for older copies of the app.
@@ -245,13 +251,17 @@ begin
   if new.result is null then
     new.margin := null; -- un-graded: how far it missed no longer applies
   end if;
+  if new.result is distinct from 'L' then
+    new.miss := null; -- only a lost leg can be a close call or a blowout
+  end if;
 
   if not public.is_admin(w_league) then
     if tg_op = 'INSERT' then
       new.result := null;
       new.margin := null;
+      new.miss := null;
     else
-      if new.result is distinct from old.result or new.margin is distinct from old.margin then
+      if new.result is distinct from old.result or new.margin is distinct from old.margin or new.miss is distinct from old.miss then
         raise exception 'Only the commish can grade legs';
       end if;
       if new.player_id <> old.player_id or new.week_id <> old.week_id then

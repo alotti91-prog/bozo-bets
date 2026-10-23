@@ -214,6 +214,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         <LegSheet key={openLeg.id} leg={openLeg} st={statusOf(openLeg)} data={data} me={me} isAdmin={isAdmin} locked={locked} pname={pname}
           userId={userId} nameOfUser={nameOfUser} reload={reload}
           onGrade={(r) => grade(openLeg, r)}
+          onMiss={(patch) => act(supabase.from('legs').update(patch).eq('id', openLeg.id))}
           onEdit={() => { setOpenId(null); setForm(openLeg); }}
           onRemove={() => { setOpenId(null); remove(openLeg); }}
           onClose={() => setOpenId(null)} />
