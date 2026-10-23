@@ -1,21 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase, friendly } from '../lib/supabase.js';
-import { weekInfo, amerFmt, fmtOdds, money, dollars, parseOdds } from '../lib/odds.js';
-import { toast, shareText, fmtDate, listNames, store } from '../lib/ui.js';
-import { lockState } from '../lib/deadline.js';
-import { IconShare, Belt } from '../components/common.jsx';
-import { LegTalk } from '../components/Comments.jsx';
-import PlacedSheet from './PlacedSheet.jsx';
+import { weekInfo, amerFmt, fmtOdds, money, dollars } from '../lib/odds.js';
+import { toast, shareText, fmtDate, listNames } from '../lib/ui.js';
+import { lockState, updatedAgo } from '../lib/deadline.js';
+import { IconShare } from '../components/common.jsx';
 import { slipPaths } from '../lib/slip.js';
-import { SPORTS as LIVE_SPORTS } from '../lib/espn.js';
-import { liveStatus, aliveCount, gameKey, pickText, betProblem, emptyPick, pickFromBet, betFromPick, legState, suggestedGrade, gradeHidden } from '../lib/bets.js';
-import { updatedAgo } from '../lib/deadline.js';
+import { liveStatus, aliveCount, gameKey, legState } from '../lib/bets.js';
 import { useLiveGames } from '../lib/useLiveGames.js';
-import BetPicker from '../components/BetPicker.jsx';
+import PlacedSheet from './PlacedSheet.jsx';
+import LegRow from './week/LegRow.jsx';
+import LegForm from './week/LegForm.jsx';
+import PayoutForm from './week/PayoutForm.jsx';
 
-const SPORTS = ['NFL', 'NCAAF', 'NBA', 'NHL', 'MLB', 'Soccer', 'Other'];
-const HINT = 'American odds, as the book shows them. Tap the sign to switch between minus and plus.';
-
+// The This week tab: header, the parlay slip, actions, who's missing, and the add-a-leg form.
+// Each leg on the slip is ./week/LegRow.jsx; the forms are in ./week/ too.
 export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, nameOfUser, openSettings, openWheel }) {
   const week = data.weeks[data.weeks.length - 1];
   const [confirmRm, setConfirmRm] = useState(null);
@@ -145,59 +143,14 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         {stamp && <div className={`stamp stamp-${info.status}`}>{stamp}</div>}
         <ol className="legs">
           {legs.length === 0 && <li className="leg-empty">No legs yet. First one in sets the tone.</li>}
-          {legs.map((l) => {
-            const mine = me && l.player_id === me;
-            const canEdit = isAdmin || (mine && !l.result && !locked);
-            const st = statusOf(l);
-            const hideGrade = gradeHidden(l, st) && gradeFor !== l.id;
-            const suggest = isAdmin && !l.result ? suggestedGrade(st) : null;
-            const word = { W: 'Won', L: 'Lost', P: 'Push' };
-            const showPill = !isAdmin && (l.result || !l.bet?.game);
-            // Nothing to act on (a live picked leg): put the sport tag and ⋯ at the end of the reactions row.
-            const compact = !suggest && !(isAdmin && !hideGrade) && !showPill && l.result !== 'L' && confirmRm !== l.id && menuFor !== l.id;
-            const moreBtn = canEdit && <button type="button" className="more-btn" aria-label={`More for ${pname(l.player_id)}’s leg`} onClick={() => setMenuFor(l.id)}>{'⋯'}</button>;
-            return (
-              <li key={l.id} className={`leg${l.result ? ' is-' + l.result : ''}`}>
-                <span className="leg-who">{pname(l.player_id)}<Belt on={beltId === l.player_id} />{mine && <span className="you"> {'·'} you</span>}</span>
-                <span className="leg-odds">{fmtOdds(l.odds)}</span>
-                <span className="leg-pick">{l.pick}</span>
-                {l.bet?.game && <LiveLine bet={l.bet} s={st} />}
-                {!compact && <div className="leg-meta">
-                  <span className="tag">{l.sport}</span>
-                  {suggest && (
-                    <button type="button" className="mark-btn" onClick={() => grade(l, suggest)} aria-label={`Final. Mark ${pname(l.player_id)}’s leg ${word[suggest]}`}>
-                      Mark {suggest}
-                    </button>
-                  )}
-                  {isAdmin ? (!hideGrade && (
-                    <div className="grade" role="group" aria-label={`Result for ${pname(l.player_id)}`}>
-                      {['W', 'L', 'P'].map((r) => (
-                        <button key={r} type="button" className={`g-${r}`} aria-pressed={l.result === r} aria-label={word[r]} onClick={() => grade(l, r)}>{r}</button>
-                      ))}
-                    </div>
-                  )) : showPill && (
-                    <span className={`res res-${l.result || 'none'}`}>{word[l.result] || 'Pending'}</span>
-                  )}
-                  {canEdit && (confirmRm === l.id ? (
-                    <span className="confirm">Remove this leg?
-                      <button className="link danger" onClick={() => remove(l)}>Remove</button>
-                      <button className="link" onClick={() => setConfirmRm(null)}>Keep</button>
-                    </span>
-                  ) : menuFor === l.id ? (
-                    <span className="leg-menu">
-                      <button className="link" onClick={() => { setMenuFor(null); setEditing(l); }}>Edit</button>
-                      <button className="link" onClick={() => { setMenuFor(null); setConfirmRm(l.id); }}>Remove</button>
-                      {isAdmin && hideGrade && <button className="link" onClick={() => { setMenuFor(null); setGradeFor(l.id); }}>Grade now</button>}
-                      <button className="link" onClick={() => setMenuFor(null)} aria-label="Close menu">Done</button>
-                    </span>
-                  ) : moreBtn)}
-                  {l.result === 'L' && <span className="bozo-mark">Bozo</span>}
-                </div>}
-                <LegTalk leg={l} data={data} userId={userId} isAdmin={isAdmin} nameOfUser={nameOfUser} reload={reload} who={pname(l.player_id)}
-                  trailing={compact ? <><span className="tag">{l.sport}</span>{moreBtn}</> : null} />
-              </li>
-            );
-          })}
+          {legs.map((l) => (
+            <LegRow key={l.id} leg={l} st={statusOf(l)} me={me} isAdmin={isAdmin} locked={locked} beltId={beltId} pname={pname}
+              menuOpen={menuFor === l.id} onMenu={(open) => setMenuFor(open ? l.id : null)}
+              confirming={confirmRm === l.id} onConfirm={(open) => setConfirmRm(open ? l.id : null)}
+              gradeNow={gradeFor === l.id} onGradeNow={() => setGradeFor(l.id)}
+              onGrade={(r) => grade(l, r)} onRemove={() => remove(l)} onEdit={() => setEditing(l)}
+              data={data} userId={userId} nameOfUser={nameOfUser} reload={reload} />
+          ))}
         </ol>
         {legs.length > 0 && (
           <div className="t-foot">
@@ -254,178 +207,5 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         onCancel={() => setEditing(null)}
       />
     </>
-  );
-}
-
-function PayoutForm({ week, projected, act }) {
-  const [v, setV] = useState(week.actual_payout == null ? '' : Number(week.actual_payout).toFixed(2));
-  async function save(e) {
-    e.preventDefault();
-    const s = v.replace(/[$,\s]/g, '');
-    if (s === '') { act(supabase.from('weeks').update({ actual_payout: null }).eq('id', week.id), 'Using the calculated payout.'); return; }
-    const n = parseFloat(s);
-    if (!(n >= 0)) { toast('Enter the payout as a dollar amount, like 254.10.'); return; }
-    act(supabase.from('weeks').update({ actual_payout: Math.round(n * 100) / 100 }).eq('id', week.id), 'Payout saved.');
-  }
-  return (
-    <form className="card stack" onSubmit={save}>
-      <div className="field">
-        <label htmlFor="ov">Actual payout, if the book paid a different amount</label>
-        <div className="ov-row">
-          <input id="ov" inputMode="decimal" autoComplete="off" placeholder={projected.toFixed(2)} value={v} onChange={(e) => setV(e.target.value)} />
-          <button className="btn small" type="submit">Save payout</button>
-        </div>
-      </div>
-      <p className="hint">Leave blank to use the calculated payout. Odds sometimes move before the bet is placed.</p>
-    </form>
-  );
-}
-
-// Live state under a picked leg: "Covering · DET 24, GB 17 · Q3 6:12" (your team in bold), with a bar for overs.
-function LiveLine({ bet, s }) {
-  const when = bet.game.start ? new Date(bet.game.start).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
-  if (!s || s.tone === 'pre') return <span className="leg-live tone-pre"><span className="ll-row"><span>{bet.game.short}</span>{when && <span>{when}</span>}</span></span>;
-  const team = (t) => <span className={t.mine ? 'll-mine' : undefined}>{t.abbr} {t.score}</span>;
-  return (
-    <span className={`leg-live tone-${s.tone}`}>
-      <span className="ll-row">
-        <strong>{s.label}</strong>
-        <span>{team(s.away)}, {team(s.home)}</span>
-        <span>{s.clock}</span>
-      </span>
-      {s.progress != null && !s.done && <span className="leg-bar" aria-hidden="true"><span style={{ width: `${Math.round(s.progress * 100)}%` }} /></span>}
-    </span>
-  );
-}
-
-function LegForm({ week, editing, options, me, isAdmin, locked, pname, onDone, onCancel }) {
-  const draftKey = 'bz-draft-' + week.id;
-  const draft = editing ? null : store.get(draftKey, null);
-  const [player, setPlayer] = useState(editing ? editing.player_id : (draft && options.some((p) => p.id === draft.player) ? draft.player : options[0]?.id || ''));
-  const [pick, setPick] = useState(editing ? editing.pick : draft?.pick || '');
-  const [sign, setSign] = useState(editing ? (editing.odds > 0 ? '+' : '-') : draft?.sign || '-');
-  const [odds, setOdds] = useState(editing ? String(Math.abs(editing.odds)) : draft?.odds || '');
-  const [sport, setSport] = useState(editing ? editing.sport : draft?.sport || 'NFL');
-  // 'pick' = choose the game and bet (tracks live); 'type' = free text, for anything else.
-  const [mode, setMode] = useState(editing ? (editing.bet ? 'pick' : 'type') : draft?.mode || 'pick');
-  const [b, setB] = useState(editing?.bet ? pickFromBet(editing.bet) : draft?.b || emptyPick());
-  const [hint, setHint] = useState({ text: HINT, err: false });
-  const [busy, setBusy] = useState(false);
-  const formRef = useRef(null);
-  useEffect(() => {
-    if (editing && formRef.current) {
-      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      formRef.current.querySelector('#f-pick')?.focus({ preventScroll: true });
-    }
-  }, [editing]);
-
-  if (locked && !isAdmin) {
-    return options.length ? <p className="note">Picks are locked for this week. Ask the commish if you need a change.</p> : null;
-  }
-  if (!editing && !options.length) {
-    if (!isAdmin && !me) return <p className="note">Pick your name in Settings to add your own leg.</p>;
-    return null;
-  }
-
-  const saveDraft = (patch) => { if (!editing) store.set(draftKey, { player, pick, sign, odds, sport, mode, b, ...patch }); };
-  const toType = () => {
-    const bet = betFromPick(b);
-    if (!pick.trim() && !betProblem(bet)) setPick(pickText(bet));
-    if (LIVE_SPORTS[b.sport]) setSport(LIVE_SPORTS[b.sport].label);
-    setMode('type'); saveDraft({ mode: 'type' });
-  };
-
-  async function submit(e) {
-    e.preventDefault();
-    if (!player) { setHint({ text: 'Choose whose leg this is.', err: true }); return; }
-    let row;
-    if (mode === 'pick') {
-      const bet = betFromPick(b);
-      const problem = betProblem(bet);
-      if (problem) { setHint({ text: problem, err: true }); return; }
-      row = { pick: pickText(bet), sport: LIVE_SPORTS[b.sport].label, bet };
-    } else {
-      if (!pick.trim()) { setHint({ text: 'Type the pick, like “Bills -3.5”.', err: true }); return; }
-      row = { pick: pick.trim().slice(0, 80), sport };
-      if (editing?.bet) row.bet = null; // was picked from a game; now typed
-    }
-    const parsed = parseOdds(odds, sign);
-    if (parsed.error) { setHint({ text: parsed.error, err: true }); return; }
-    setBusy(true);
-    row.odds = parsed.odds;
-    const save = (r) => (editing
-      ? supabase.from('legs').update(r).eq('id', editing.id)
-      : supabase.from('legs').insert({ ...r, week_id: week.id, league_id: week.league_id, player_id: player }));
-    let { error } = await save(row);
-    let untracked = false;
-    if (error && 'bet' in row && /\bbet\b.*(column|schema cache)|column.*\bbet\b/i.test(error.message || '')) {
-      // The database hasn't been updated for picked legs yet: save it as a typed leg.
-      const { bet: _bet, ...plain } = row;
-      ({ error } = await save(plain));
-      untracked = !error;
-    }
-    setBusy(false);
-    if (error) { setHint({ text: friendly(error), err: true }); return; }
-    if (untracked) toast('Saved, but without live tracking until the commish runs the latest database update.');
-    store.remove(draftKey);
-    if (!untracked) toast(editing ? 'Leg updated.' : `Added ${pname(player)}’s leg.`);
-    onDone();
-  }
-
-  return (
-    <form ref={formRef} className="card stack" onSubmit={submit} noValidate>
-      <h3 className="sec-title-sm">{editing ? `Edit ${pname(editing.player_id)}’s leg` : player === me ? 'Add your leg' : 'Add a leg'}</h3>
-      {locked && <p className="hint">Picks are locked. As an admin you can still add or fix legs.</p>}
-      {!editing && options.length > 1 && (
-        <div className="field">
-          <label htmlFor="f-player">Whose leg</label>
-          <select id="f-player" value={player} onChange={(e) => { setPlayer(e.target.value); saveDraft({ player: e.target.value }); }}>
-            {options.map((p) => <option key={p.id} value={p.id}>{p.name}{p.id === me ? ' (you)' : ''}</option>)}
-          </select>
-        </div>
-      )}
-      {mode === 'pick' ? (
-        <BetPicker value={b} onTypeInstead={toType}
-          onChange={(nb) => { setB(nb); saveDraft({ b: nb }); setHint({ text: HINT, err: false }); }} />
-      ) : (
-        <div className="field">
-          <label htmlFor="f-pick">Pick</label>
-          <input id="f-pick" maxLength={80} autoComplete="off" placeholder="Bills -3.5, Lamar 250+ pass yds" value={pick}
-            onChange={(e) => { setPick(e.target.value); saveDraft({ pick: e.target.value }); setHint({ text: HINT, err: false }); }} />
-          <button type="button" className="link" style={{ alignSelf: 'flex-start' }} onClick={() => { setMode('pick'); saveDraft({ mode: 'pick' }); }}>
-            Pick from this week{'’'}s games instead (tracks it live)
-          </button>
-        </div>
-      )}
-      <div className="field-row">
-        <div className="field">
-          <label htmlFor="f-odds">Odds</label>
-          <div className="odds-in">
-            <button type="button" aria-label={sign === '+' ? 'Plus odds, tap for minus' : 'Minus odds, tap for plus'}
-              onClick={() => { const s = sign === '+' ? '-' : '+'; setSign(s); saveDraft({ sign: s }); }}>{sign === '+' ? '+' : '−'}</button>
-            <input id="f-odds" inputMode="numeric" autoComplete="off" placeholder="110" value={odds}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v.startsWith('+')) setSign('+');
-                else if (/^[-−]/.test(v)) setSign('-');
-                setOdds(v); saveDraft({ odds: v }); setHint({ text: HINT, err: false });
-              }} />
-          </div>
-        </div>
-        {mode === 'type' && (
-          <div className="field">
-            <label htmlFor="f-sport">Sport</label>
-            <select id="f-sport" value={sport} onChange={(e) => { setSport(e.target.value); saveDraft({ sport: e.target.value }); }}>
-              {SPORTS.map((s) => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-        )}
-      </div>
-      <p className={`hint${hint.err ? ' err' : ''}`} role={hint.err ? 'alert' : undefined}>{hint.text}</p>
-      <div className="btns">
-        <button className="btn primary" style={{ flex: 1 }} type="submit" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Add leg'}</button>
-        {editing && <button className="btn" type="button" onClick={onCancel}>Cancel</button>}
-      </div>
-    </form>
   );
 }

@@ -112,3 +112,6 @@ Mid-game, every leg showed W/L/P, Edit, Remove, and five emoji buttons, which bu
 **2026-10-22 · Swipe to change tabs**
 A quick, clearly sideways swipe (at least 70 px, twice as far sideways as up or down, under 0.6 s) changes tab; see `swipeDirection()` in `src/lib/swipe.js`. Swipes that start within 24 px of the screen edge are ignored, because Safari uses those for "back". Swipes that start in a text box or select, in an open sheet, or on anything marked `data-noswipe` are ignored too, and the tabs don't wrap around. Listeners are passive and never prevent scrolling. The new tab slides in from the direction you're heading (off with reduced motion). Mark any future horizontally swipeable element with `data-noswipe`.
 
+
+**2026-10-22 · Split the two biggest screens into smaller files**
+This week (430 lines) and Settings (395) had grown into several things each. Each leg on the slip is now `src/screens/week/LegRow.jsx`, with the leg form and payout form next to it, and every Settings form has its own file in `src/screens/settings/`. Nothing works differently: the same scripted click-through ran on the old and new versions with identical results and matching screenshots. The leg row's open menu, "Remove?" and "Grade now" state stays in WeekTab so only one can be open at a time, as before. Rule of thumb from here: keep files under about 300 lines.

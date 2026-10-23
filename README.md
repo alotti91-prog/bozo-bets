@@ -170,6 +170,12 @@ src/lib/stats.js           standings
 src/lib/wheel.js           wheel states and angle math
 src/lib/useLeague.js       loads a league and keeps it live
 src/lib/demo-supabase.js   sample data for `npm run demo`
+src/lib/bets.js, espn.js    live legs: bet text, live status, ESPN data
+api/                       Vercel functions: ESPN proxy, health check
 src/screens/               sign-in, onboarding, and the four tabs + settings
-src/components/            the wheel canvas, sheet, toasts, icons
+src/screens/week/          This week's pieces: one leg row, the leg form, payout
+src/screens/settings/      one file per Settings form (deadline, players, …)
+src/components/            the wheel canvas, bet picker, comments, sheet, toasts
 ```
+
+Keep files small enough to read in one sitting (roughly under 300 lines). When a screen grows past that, move a self-contained piece into its own file next to it.

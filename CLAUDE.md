@@ -25,6 +25,7 @@ Run all three checks before saying a change is done.
 - Pure logic lives in `src/lib/odds.js`, `stats.js`, `wheel.js`, `espn.js`, and `bets.js`, with tests. Put new math there, not in components.
 - `src/lib/demo-supabase.js` fakes the Supabase calls the app uses. If you add a new query or RPC, add it there too so `npm run demo` keeps working.
 - Swiping left or right changes tabs (`src/lib/swipe.js`, wired in `League.jsx`). Anything that needs its own sideways swipe or drag must carry `data-noswipe`.
+- Screens: `src/screens/WeekTab.jsx` is the This week tab, with its pieces in `src/screens/week/` (`LegRow`, `LegForm`, `PayoutForm`). `SettingsSheet.jsx` holds the layout, members, and weeks, and each form is a file in `src/screens/settings/`. Keep files under about 300 lines; when one grows past that, move a self-contained piece out next to it.
 - Styling is one file, `src/styles.css`, with color tokens on `:root` and a dark-mode override. Use the tokens rather than new hard-coded colors.
 
 ## Conventions
