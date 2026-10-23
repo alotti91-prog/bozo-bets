@@ -10,7 +10,8 @@ const SPORTS = ['NFL', 'NCAAF', 'NBA', 'NHL', 'MLB', 'Soccer', 'Other'];
 const HINT = 'American odds, like −110 or +150. Tap the sign to flip it.';
 
 // Add or edit a leg, inside the Add-a-leg sheet: pick it from this week's games (tracks live)
-// or type it. Keeps a draft until saved, so closing the sheet loses nothing.
+// or type it. A new leg always opens on this week's games; typing is the fallback.
+// Keeps a draft until saved, so closing the sheet loses nothing (typed text included).
 export default function LegForm({ week, editing, options, me, isAdmin, locked, pname, onDone, onCancel }) {
   const draftKey = 'bz-draft-' + week.id;
   const draft = editing ? null : store.get(draftKey, null);
@@ -19,8 +20,9 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
   const [sign, setSign] = useState(editing ? (editing.odds > 0 ? '+' : '-') : draft?.sign || '-');
   const [odds, setOdds] = useState(editing ? String(Math.abs(editing.odds)) : draft?.odds || '');
   const [sport, setSport] = useState(editing ? editing.sport : draft?.sport || 'NFL');
-  // 'pick' = choose the game and bet (tracks live); 'type' = free text, for anything else.
-  const [mode, setMode] = useState(editing ? (editing.bet ? 'pick' : 'type') : draft?.mode || 'pick');
+  // 'pick' = choose from this week's games (tracks live); 'type' = free text, for anything else.
+  // New legs always start on 'pick'. A typed leg reopens typed when you edit it.
+  const [mode, setMode] = useState(editing && !editing.bet ? 'type' : 'pick');
   const [b, setB] = useState(editing?.bet ? pickFromBet(editing.bet) : draft?.b || emptyPick());
   const [hint, setHint] = useState({ text: HINT, err: false });
   const [busy, setBusy] = useState(false);
@@ -33,12 +35,12 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
     return null;
   }
 
-  const saveDraft = (patch) => { if (!editing) store.set(draftKey, { player, pick, sign, odds, sport, mode, b, ...patch }); };
+  const saveDraft = (patch) => { if (!editing) store.set(draftKey, { player, pick, sign, odds, sport, b, ...patch }); };
   const toType = () => {
     const bet = betFromPick(b);
     if (!pick.trim() && !betProblem(bet)) setPick(pickText(bet));
     if (LIVE_SPORTS[b.sport]) setSport(LIVE_SPORTS[b.sport].label);
-    setMode('type'); saveDraft({ mode: 'type' });
+    setMode('type');
   };
 
   async function submit(e) {
@@ -106,7 +108,7 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
           <label htmlFor="f-pick">Pick</label>
           <input id="f-pick" maxLength={80} autoComplete="off" placeholder="Bills -3.5, Lamar 250+ pass yds" value={pick}
             onChange={(e) => { setPick(e.target.value); saveDraft({ pick: e.target.value }); setHint({ text: HINT, err: false }); }} />
-          <button type="button" className="link" style={{ alignSelf: 'flex-start' }} onClick={() => { setMode('pick'); saveDraft({ mode: 'pick' }); }}>
+          <button type="button" className="link" style={{ alignSelf: 'flex-start' }} onClick={() => setMode('pick')}>
             Pick from this week{'’'}s games instead (tracks it live)
           </button>
         </div>

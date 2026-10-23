@@ -5,6 +5,15 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-22-k',
+    date: '2026-10-22',
+    title: 'Live picks first',
+    idea: 'Lotti',
+    items: [
+      'Add your leg always opens on this week’s games and DraftKings’ lines, even if you typed a leg last time. Typing is still there under “Type it instead,” and anything you typed is kept.',
+    ],
+  },
+  {
     id: '2026-10-22-j',
     date: '2026-10-22',
     title: 'Pick from DraftKings’ lines',
