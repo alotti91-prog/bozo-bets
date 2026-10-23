@@ -13,7 +13,7 @@ import WeekNumberForm from './settings/WeekNumberForm.jsx';
 
 // The Settings sheet: you, invite, members, and weeks live here.
 // Each form is its own file in ./settings/.
-export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, reload, onClose, onChangePlayer, leagues, onSwitchLeague, onAddLeague, onSignOut, onNotesSeen }) {
+export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, reload, onClose, onChangePlayer, leagues, onSwitchLeague, onAddLeague, onSignOut, onNotesSeen, canPreview, previewing, onPreview }) {
   const [confirm, setConfirm] = useState(null);
   const league = data.league;
   const pname = (id) => data.players.find((p) => p.id === id)?.name || 'Unknown';
@@ -45,6 +45,18 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
           <button className="btn small" onClick={onSignOut}>Sign out</button>
         </div>
       </section>
+
+      {canPreview && (
+        <section>
+          <span className="lbl">Member view</span>
+          <p className="sub">{previewing
+            ? 'You’re seeing the app the way members do.'
+            : 'Check what members see: no grading, no wheel controls, no admin settings.'} It only hides buttons. Anything you do still counts, with your admin powers.</p>
+          <div className="btns">
+            <button className="btn small" onClick={() => onPreview(!previewing)}>{previewing ? 'Back to admin view' : 'View as a member'}</button>
+          </div>
+        </section>
+      )}
 
       {isAdmin && <WhatsNew onSeen={onNotesSeen} />}
 

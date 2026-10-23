@@ -76,6 +76,9 @@ create table if not exists public.spins (
   spun_by    uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now()
 );
+-- Elimination wheel: the names knocked out, in order. The last name left is
+-- landed_id, the bozo. Null on spins from before elimination (one spin, landed_id = bozo).
+alter table public.spins add column if not exists eliminated uuid[];
 
 create index if not exists players_league_idx on public.players (league_id);
 create index if not exists weeks_league_idx   on public.weeks (league_id, n);
@@ -514,15 +517,21 @@ begin
   return code;
 end $$;
 
--- Spin the Bozo Wheel. The database picks the winner (not the spinner's
--- phone), logs the spin, and sets next week's payer. Spinning the previous
--- week again counts as a logged re-spin.
+-- Spin the Bozo Wheel. The database decides the result (not the spinner's
+-- phone): it knocks names out one at a time, each picked at random from the
+-- names left, until one remains. That last name is the bozo. Every name still
+-- has the same 1-in-N chance; elimination only adds suspense. It logs the spin
+-- (with the knock-out order, so every phone plays the same sequence) and sets
+-- next week's payer. Spinning the previous week again counts as a logged re-spin.
 create or replace function public.spin_wheel(p_week uuid, p_pool uuid[])
 returns public.spins language plpgsql security definer set search_path = public as $$
 declare
   w public.weeks;
   latest int;
   pool uuid[];
+  remaining uuid[];
+  knocked uuid[] := '{}';
+  bozo uuid;
   cnt int;
   b bytea;
   k int;
@@ -560,22 +569,30 @@ begin
   ) q
   where exists (select 1 from public.players p where p.id = q.x and p.league_id = w.league_id);
 
-  cnt := coalesce(array_length(pool, 1), 0);
-  if cnt = 0 then raise exception 'Put at least one name in the wheel'; end if;
+  if coalesce(array_length(pool, 1), 0) = 0 then raise exception 'Put at least one name in the wheel'; end if;
 
-  b := decode(replace(gen_random_uuid()::text, '-', ''), 'hex');
-  k := ((get_byte(b, 0) * 16777216::bigint + get_byte(b, 1) * 65536 + get_byte(b, 2) * 256 + get_byte(b, 3)) % cnt)::int + 1;
+  -- Knock out a random name (secure random bytes from gen_random_uuid) until one is left.
+  remaining := pool;
+  loop
+    cnt := array_length(remaining, 1);
+    exit when cnt = 1;
+    b := decode(replace(gen_random_uuid()::text, '-', ''), 'hex');
+    k := ((get_byte(b, 0) * 16777216::bigint + get_byte(b, 1) * 65536 + get_byte(b, 2) * 256 + get_byte(b, 3)) % cnt)::int + 1;
+    knocked := knocked || remaining[k];
+    remaining := remaining[1:k - 1] || remaining[k + 1:cnt];
+  end loop;
+  bozo := remaining[1];
 
-  insert into public.spins (week_id, league_id, pool, landed_id, spun_by)
-  values (w.id, w.league_id, pool, pool[k], auth.uid())
+  insert into public.spins (week_id, league_id, pool, landed_id, eliminated, spun_by)
+  values (w.id, w.league_id, pool, bozo, knocked, auth.uid())
   returning * into s;
 
   select id into next_id from public.weeks where league_id = w.league_id and n > w.n order by n limit 1;
   if next_id is null then
     insert into public.weeks (league_id, n, stake, payer_id)
-    select w.league_id, w.n + 1, l.stake, pool[k] from public.leagues l where l.id = w.league_id;
+    select w.league_id, w.n + 1, l.stake, bozo from public.leagues l where l.id = w.league_id;
   else
-    update public.weeks set payer_id = pool[k] where id = next_id;
+    update public.weeks set payer_id = bozo where id = next_id;
   end if;
   return s;
 end $$;

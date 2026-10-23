@@ -5,6 +5,18 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-22-h',
+    date: '2026-10-22',
+    title: 'The elimination wheel',
+    idea: 'Lotti',
+    items: [
+      'The wheel now knocks names out one at a time. Each spin lands on someone who’s safe, their slice drops off, and it spins again. The last name left is the bozo.',
+      'Everyone has the same chance as before. It just takes longer to find out. “Skip to the bozo” jumps to the end.',
+      'Spins from before the change replay the way they happened.',
+      'Member view: in Settings, admins can see the app the way everyone else does. It only hides buttons, so anything you do still counts.',
+    ],
+  },
+  {
     id: '2026-10-22-g',
     date: '2026-10-22',
     title: 'Swipe between tabs',

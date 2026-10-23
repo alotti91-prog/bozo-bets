@@ -72,6 +72,40 @@ export function hideSpin(data, spin) {
   };
 }
 
+/**
+ * Spin timing in ms. Knock-out rounds spin quicker; the last round (two names
+ * left) and old-style spins get the full spin. pause = time on "X is safe".
+ */
+export const SPIN_MS = { full: [6000, 7000], quick: [3200, 3900], pause: 1400 };
+
+/** True for spins made by the elimination wheel (at least one name knocked out). */
+export function isElimination(spin) {
+  return Array.isArray(spin?.eliminated) && spin.eliminated.length > 0;
+}
+
+/**
+ * The spins to animate for one wheel spin, in order. Each round has the names
+ * still on the wheel and the name it lands on (at).
+ *   Elimination: one round per knocked-out name (bozo: false, that name is safe);
+ *   the last name left is the bozo (landed_id) and doesn't need a spin.
+ *   Old spins, or a wheel with one name: one round that lands on the bozo.
+ * quick: a shorter spin for every knock-out round but the last.
+ */
+export function spinRounds(spin) {
+  if (!isElimination(spin)) return [{ names: spin.pool, at: spin.landed_id, bozo: true, quick: false }];
+  let names = spin.pool;
+  return spin.eliminated.map((id, i) => {
+    const round = { names, at: id, bozo: false, quick: i < spin.eliminated.length - 1 };
+    names = names.filter((x) => x !== id);
+    return round;
+  });
+}
+
+/** About how long a spin takes to play, at most (ms). Holds refreshes so the payer isn't spoiled. */
+export function spinMs(spin) {
+  return spinRounds(spin).reduce((t, r) => t + (r.quick ? SPIN_MS.quick[1] : SPIN_MS.full[1]) + (r.bozo ? 0 : SPIN_MS.pause), 500);
+}
+
 /** Which segment sits under the pointer (top) at rotation r. */
 export function indexAt(r, n) {
   const a = (((-r) % TAU) + TAU) % TAU;

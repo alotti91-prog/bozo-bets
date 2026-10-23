@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { dec, amerFmt, fmtOdds, parseOdds, weekInfo, money, signed } from './odds.js';
 import { standings, hitPct, bozoBelt } from './stats.js';
-import { indexAt, targetRotation, restRotation, wheelContext, unwatchedSpin, hideSpin, TAU } from './wheel.js';
+import { indexAt, targetRotation, restRotation, wheelContext, unwatchedSpin, hideSpin, TAU, spinRounds, spinMs, isElimination, SPIN_MS } from './wheel.js';
 import { nflWeek, nflWeekDate, seasonOf } from './nfl.js';
 import { countdown, lockState, toLocalInput, ago, updatedAgo } from './deadline.js';
 import { isPrivateAddress } from './site.js';
@@ -513,6 +513,27 @@ describe('wheel', () => {
     expect(masked.spins[0].hidden).toBe(true); // the replaced spin too, no working it out by elimination
     const s = standings({ players: [{ id: 'a' }, { id: 'b' }], weeks: masked.weeks, legs: [], spins: masked.spins });
     expect(s.rows.b.landed).toBe(0);
+  });
+  it('plays an elimination spin as one round per knocked-out name', () => {
+    const spin = { pool: ['a', 'b', 'c', 'd'], eliminated: ['c', 'a', 'd'], landed_id: 'b' };
+    const rounds = spinRounds(spin);
+    expect(rounds.map((r) => r.names)).toEqual([['a', 'b', 'c', 'd'], ['a', 'b', 'd'], ['b', 'd']]);
+    expect(rounds.map((r) => r.at)).toEqual(['c', 'a', 'd']);
+    expect(rounds.every((r) => !r.bozo)).toBe(true); // every round lands on someone who's safe
+    expect(rounds.map((r) => r.quick)).toEqual([true, true, false]); // the last one gets the full spin
+    expect(isElimination(spin)).toBe(true);
+  });
+  it('plays old spins and one-name wheels as a single spin onto the bozo', () => {
+    const old = { pool: ['a', 'b'], landed_id: 'b' };
+    expect(spinRounds(old)).toEqual([{ names: ['a', 'b'], at: 'b', bozo: true, quick: false }]);
+    expect(isElimination(old)).toBe(false);
+    const solo = { pool: ['a'], eliminated: [], landed_id: 'a' };
+    expect(spinRounds(solo)).toEqual([{ names: ['a'], at: 'a', bozo: true, quick: false }]);
+  });
+  it('estimates how long a spin plays, so refreshes wait for it', () => {
+    expect(spinMs({ pool: ['a', 'b'], landed_id: 'b' })).toBe(SPIN_MS.full[1] + 500);
+    const six = { pool: ['a', 'b', 'c', 'd', 'e', 'f'], eliminated: ['a', 'b', 'c', 'd', 'e'], landed_id: 'f' };
+    expect(spinMs(six)).toBe(4 * SPIN_MS.quick[1] + SPIN_MS.full[1] + 5 * SPIN_MS.pause + 500);
   });
   it('spins last week when it settled but was never spun', () => {
     const weeks = [W('w6', 6), W('w7', 7)];

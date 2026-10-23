@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, friendly } from './supabase.js';
+import { spinMs } from './wheel.js';
 
 const TABLES = ['players', 'members', 'weeks', 'legs', 'spins', 'reactions', 'comments'];
 
@@ -53,7 +54,7 @@ export function useLeague(leagueId, onSpin) {
     TABLES.forEach((t) => {
       ch.on('postgres_changes', { event: '*', schema: 'public', table: t, filter: `league_id=eq.${leagueId}` }, (payload) => {
         if (t === 'spins' && payload.eventType === 'INSERT') {
-          holdUntil.current = Date.now() + 7500; // about as long as the spin animation
+          holdUntil.current = Date.now() + spinMs(payload.new); // as long as the spin takes to play
           if (onSpinRef.current) onSpinRef.current(payload.new);
         }
         reload();

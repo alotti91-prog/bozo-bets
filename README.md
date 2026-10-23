@@ -1,9 +1,9 @@
 # Bozo Bets
 
-A weekly group-parlay tracker. Everyone adds one leg. If the parlay hits, you split it. Anyone whose leg misses goes in the Bozo Wheel, and whoever it lands on puts in next week's stake.
+A weekly group-parlay tracker. Everyone adds one leg. If the parlay hits, you split it. Anyone whose leg misses goes in the Bozo Wheel. It knocks names out one spin at a time, and the last name left puts in next week's stake.
 
 - **This week:** the parlay as a bet slip, with combined odds and payout. Everyone adds their own leg from their phone.
-- **Wheel:** once a week's bets settle, the wheel loads everyone who missed and the commish spins whenever you're ready (say, mid-week). The server picks the result, so nobody can rig it. Every open phone watches the same spin live, and anyone can replay it after. Miss it, and who it landed on stays hidden everywhere in the app until you watch the replay. The result stays up until the next week settles.
+- **Wheel:** once a week's bets settle, the wheel loads everyone who missed and the commish spins whenever you're ready (say, mid-week). Each spin knocks out a name (they're safe) until one is left: the bozo. The server decides every spin, so nobody can rig it. Every open phone watches the same spins live, and anyone can replay it after. Miss it, and the bozo stays hidden everywhere in the app until you watch the replay. The result stays up until the next week settles.
 - **Standings:** records, hit %, money in and out, and superlatives.
 - **History:** every week, who sank it, and where the wheel landed. The commish can add weeks from before the league joined the app.
 - **Bozo Belt 🤡:** most misses this season wears the clown nose next to their name until someone passes him.
@@ -116,6 +116,7 @@ Admins also see a banner in the app when live scores stop loading. Side effect: 
 | Add, edit, or remove **their own** leg (current week, before it's graded and before the pick deadline) | ✓ | ✓ | ✓ |
 | Add or edit anyone's leg (even after the deadline), grade legs, set the payer, enter the actual payout | | ✓ | ✓ |
 | Spin and re-spin the wheel, delete replaced spins, add or bench players, open the next week, set the pick deadline, delete anyone's comment | | ✓ | ✓ |
+| See the app as a member (Settings → Member view; only hides buttons) | | ✓ | ✓ |
 | Make someone an admin, remove a login, new invite code, new season | | | ✓ |
 
 The database enforces these rules, not just the app's buttons. A regular member can't grade a leg or sneak a pick in after the deadline, even with a modified app.

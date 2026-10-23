@@ -108,6 +108,14 @@ const spin = (await as(A, `select * from public.spin_wheel($1, $2::uuid[])`, [we
 assert.ok(pool.includes(spin.landed_id));
 const w2 = (await as(A, `select id, payer_id from public.weeks where league_id = $1 and n = 2`, [lid])).rows[0];
 assert.equal(w2.payer_id, spin.landed_id); ok('spin picks from the pool and sets Week 2’s payer');
+// Elimination: every name but one is knocked out, once each; the one left is the bozo.
+const elimOk = (s, p) => {
+  assert.equal(s.eliminated.length, p.length - 1, 'knocks out all but one');
+  assert.ok(!s.eliminated.includes(s.landed_id), 'the bozo is never knocked out');
+  assert.deepEqual([...s.eliminated, s.landed_id].sort(), [...p].sort(), 'everyone in the wheel is accounted for once');
+};
+elimOk(spin, pool);
+ok('elimination: the last name left is the bozo, and the knock-out order is saved');
 
 // Friend can't add to the closed week, can add to Week 2
 await fails(B, `insert into public.legs (week_id, league_id, player_id, pick, odds) values ($1,$2,$3,'Late pick',-110)`, [week1, lid, players.Sully]);
@@ -139,15 +147,24 @@ await fails(B, `insert into public.spin_views (spin_id) values ($1)`, [newSpin.i
 await fails(C, `insert into public.spin_views (spin_id) values ($1)`, [newSpin.id]);
 ok('watched spins: you record and read only your own; strangers can’t');
 
-// Wheel fairness smoke test: 600 spins over 3 names, each lands a fair share
+// Wheel fairness smoke test: 600 spins over 3 names, each ends up the bozo a fair share
+// (and is knocked out first a fair share), with a valid knock-out order every time.
 const pool3 = [players.Lotti, players.Sully, players.Mikey];
 const counts = { [players.Lotti]: 0, [players.Sully]: 0, [players.Mikey]: 0 };
+const firstOut = { [players.Lotti]: 0, [players.Sully]: 0, [players.Mikey]: 0 };
 for (let i = 0; i < 600; i++) {
-  const r = (await as(A, `select landed_id from public.spin_wheel($1, $2::uuid[])`, [week1, pool3])).rows[0];
+  const r = (await as(A, `select landed_id, eliminated from public.spin_wheel($1, $2::uuid[])`, [week1, pool3])).rows[0];
+  elimOk(r, pool3);
   counts[r.landed_id]++;
+  firstOut[r.eliminated[0]]++;
 }
-Object.values(counts).forEach((c) => assert.ok(c > 140 && c < 260, 'uneven wheel: ' + JSON.stringify(counts)));
-ok('wheel lands evenly (600 test spins: ' + Object.values(counts).join(' / ') + ')');
+[...Object.values(counts), ...Object.values(firstOut)].forEach((c) => assert.ok(c > 140 && c < 260, 'uneven wheel: ' + JSON.stringify({ counts, firstOut })));
+ok('wheel is even (600 test spins, bozo: ' + Object.values(counts).join(' / ') + ')');
+// One name in the wheel: nothing to knock out, that name is the bozo.
+const solo = (await as(A, `select * from public.spin_wheel($1, $2::uuid[])`, [week1, [players.Sully]])).rows[0];
+assert.equal(solo.landed_id, players.Sully);
+assert.deepEqual(solo.eliminated, []);
+ok('a wheel with one name: that name is the bozo, nobody knocked out');
 
 // Roles: only owner changes roles; promoted admin can grade
 await fails(B, `select public.set_member_role($1, $2, 'admin')`, [lid, B], /owner/);

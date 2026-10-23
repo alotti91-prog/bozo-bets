@@ -46,6 +46,8 @@ button { font-family: inherit; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--win); box-shadow: 0 0 0 3px var(--win-soft); }
 .tabs { display: flex; gap: 2px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
+.preview-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 -16px; padding: 7px 16px; background: var(--gold-soft); border-top: 1px solid var(--gold); font-size: 13px; line-height: 1.35; }
+.preview-bar .link { padding: 0; color: var(--ink); font-weight: 700; white-space: nowrap; }
 .tab { appearance: none; border: 0; background: none; font: 600 14px/1 var(--body); color: var(--muted); padding: 10px 10px 12px; border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
 .tab:hover { color: var(--ink); }
 .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--nose); }
@@ -175,6 +177,9 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
 .result-name { font-family: var(--display); font-weight: 400; font-size: 42px; line-height: 1; color: var(--nose); letter-spacing: .01em; overflow-wrap: anywhere; }
 .result-sub { font-weight: 600; }
 .result.reveal { animation: reveal .55s cubic-bezier(.2, 1.4, .4, 1); }
+.result-name.is-safe { color: var(--win); font-size: 32px; }
+.chips.safe-list { justify-content: center; }
+.chip.safe { background: var(--win-soft); border-color: transparent; color: var(--win); }
 @keyframes reveal { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 .spin-btn { font-size: 17px; min-height: 54px; border-radius: 12px; font-family: var(--display); font-weight: 400; letter-spacing: .06em; text-transform: uppercase; }
 .confirm-box { display: flex; flex-direction: column; gap: 10px; background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 14px; }

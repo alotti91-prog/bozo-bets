@@ -114,10 +114,12 @@ const db = {
     leg('w4', 'p5', 'Rangers ML', 105, 'NHL', null, { bet: demoBet('ml', 'nhl', '930001', { side: 'away' }) }),
   ],
   spins: [
+    // s1, s2, s3a are from before elimination (no `eliminated`): one spin, landed_id is the bozo.
     { id: 's1', week_id: 'w1', league_id: L, pool: ['p3', 'p5'], landed_id: 'p5', spun_by: uid, created_at: daysAgo(27) + 'T23:00:00Z' },
     { id: 's2', week_id: 'w2', league_id: L, pool: P.map((p) => p.id), landed_id: 'p3', spun_by: uid, created_at: daysAgo(20) + 'T23:00:00Z' },
     { id: 's3a', week_id: 'w3', league_id: L, pool: ['p1', 'p4'], landed_id: 'p1', spun_by: uid, created_at: daysAgo(13) + 'T22:58:00Z' },
-    { id: 's3', week_id: 'w3', league_id: L, pool: ['p1', 'p4'], landed_id: 'p4', spun_by: 'u2', created_at: daysAgo(13) + 'T23:00:00Z' }, // Sully spun it; you haven't watched
+    // The re-spin that counts, with elimination: Lotti knocked out, Danny B left. Sully spun it; you haven't watched.
+    { id: 's3', week_id: 'w3', league_id: L, pool: ['p1', 'p4'], landed_id: 'p4', eliminated: ['p1'], spun_by: 'u2', created_at: daysAgo(13) + 'T23:00:00Z' },
   ],
   reactions: [],
   comments: [],
@@ -208,9 +210,17 @@ const rpcs = {
     const latest = Math.max(...db.weeks.map((x) => x.n));
     if (w.n === latest && db.legs.some((l) => l.week_id === w.id && !l.result)) throw new Error('Grade every leg before spinning');
     const pool = [...new Set(p_pool)];
-    const a = new Uint32Array(1); crypto.getRandomValues(a);
-    const landed = pool[a[0] % pool.length];
-    const s = { id: id(), week_id: w.id, league_id: L, pool, landed_id: landed, spun_by: uid, created_at: now() };
+    // Knock out a random name until one is left (same as spin_wheel in schema.sql).
+    let left = [...pool];
+    const eliminated = [];
+    while (left.length > 1) {
+      const a = new Uint32Array(1); crypto.getRandomValues(a);
+      const out = left[a[0] % left.length];
+      eliminated.push(out);
+      left = left.filter((x) => x !== out);
+    }
+    const landed = left[0];
+    const s = { id: id(), week_id: w.id, league_id: L, pool, landed_id: landed, eliminated, spun_by: uid, created_at: now() };
     db.spins.push(s);
     emit('spins', 'INSERT', s);
     const next = [...db.weeks].filter((x) => x.n > w.n).sort((a, b) => a.n - b.n)[0];

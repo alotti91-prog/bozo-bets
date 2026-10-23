@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
-import { TAU, indexAt, targetRotation, restRotation } from '../lib/wheel.js';
-import { secureRandom, tick, honk, audioInit } from '../lib/ui.js';
+import { TAU, SPIN_MS, indexAt, targetRotation, restRotation } from '../lib/wheel.js';
+import { secureRandom, tick, honk, ding, audioInit } from '../lib/ui.js';
 
 const SEG = [
   ['#E03A2D', '#FFFFFF'], ['#F2B705', '#1A1D29'], ['#2F5BD3', '#FFFFFF'], ['#14A08A', '#FFFFFF'],
@@ -13,14 +13,18 @@ const SEG = [
  *   restAt   index to centre under the pointer when idle, -1 to park the pointer
  *            between two names (gives nothing away), or null to leave it be
  *   restKey  changes when a new result should be shown
- * Ref: spinTo(names, landedIndex) -> Promise that resolves when it stops.
+ *   struck   index of a name to grey out and cross off (knocked out), or null
+ * Ref: spinTo(names, landedIndex, key, { quick, sound }) -> Promise that resolves when it stops.
+ *        quick: a shorter spin (knock-out rounds). sound: 'honk' (bozo) or 'ding' (safe).
+ *      stop() ends the current spin right away, silently (Skip).
  */
-const WheelCanvas = forwardRef(function WheelCanvas({ names, restAt, restKey }, ref) {
+const WheelCanvas = forwardRef(function WheelCanvas({ names, restAt, restKey, struck = null }, ref) {
   const canvasRef = useRef(null);
   const pointerRef = useRef(null);
   const rot = useRef(0);
   const animNames = useRef(null);
   const settledKey = useRef(null);
+  const stopped = useRef(false);
 
   const draw = useCallback(() => {
     const cv = canvasRef.current;
@@ -52,6 +56,8 @@ const WheelCanvas = forwardRef(function WheelCanvas({ names, restAt, restKey }, 
       list.forEach((name, i) => {
         let col = SEG[i % SEG.length];
         if (list.length > 1 && i === list.length - 1 && i % SEG.length === 0) col = SEG[2];
+        const out = !animNames.current && struck === i;
+        if (out) col = ['#3A4060', 'rgba(255,255,255,.6)'];
         const a0 = -Math.PI / 2 + i * seg;
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, rr, a0, a0 + seg); ctx.closePath();
         ctx.fillStyle = col[0]; ctx.fill();
@@ -69,6 +75,7 @@ const WheelCanvas = forwardRef(function WheelCanvas({ names, restAt, restKey }, 
           label += '…';
         }
         ctx.fillText(label, rr - 30, 0);
+        if (out) { const lw = ctx.measureText(label).width; ctx.fillRect(rr - 30 - lw, -1, lw, 2); }
         ctx.restore();
       });
     }
@@ -81,7 +88,7 @@ const WheelCanvas = forwardRef(function WheelCanvas({ names, restAt, restKey }, 
     g.addColorStop(0, '#FF9184'); g.addColorStop(0.4, '#E5392C'); g.addColorStop(1, '#9E1D14');
     ctx.beginPath(); ctx.arc(0, 0, hr, 0, TAU); ctx.fillStyle = g; ctx.fill();
     ctx.restore();
-  }, [names]);
+  }, [names, struck]);
 
   // Idle: centre the latest result under the pointer, unless we just animated to it.
   useEffect(() => {
@@ -103,20 +110,23 @@ const WheelCanvas = forwardRef(function WheelCanvas({ names, restAt, restKey }, 
   }, [draw]);
 
   useImperativeHandle(ref, () => ({
-    spinTo(list, k, key) {
+    spinTo(list, k, key, { quick = false, sound = 'honk' } = {}) {
       return new Promise((resolve) => {
         audioInit();
+        stopped.current = false;
         const n = list.length;
         if (!n) { resolve(); return; }
         const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const start = rot.current;
-        const end = targetRotation(start, n, k, 0.14 + secureRandom() * 0.72, reduce ? 1 : 6 + Math.floor(secureRandom() * 2));
-        const dur = reduce ? 1200 : 6000 + secureRandom() * 1000;
+        const [lo, hi] = quick ? SPIN_MS.quick : SPIN_MS.full;
+        const turns = reduce ? 1 : (quick ? 3 : 6) + Math.floor(secureRandom() * 2);
+        const end = targetRotation(start, n, k, 0.14 + secureRandom() * 0.72, turns);
+        const dur = reduce ? 1200 : lo + secureRandom() * (hi - lo);
         animNames.current = list;
         let last = indexAt(start, n);
         const t0 = performance.now();
         const frame = (t) => {
-          const p = Math.min(1, (t - t0) / dur);
+          const p = stopped.current ? 1 : Math.min(1, (t - t0) / dur);
           const e = 1 - Math.pow(1 - p, 4);
           rot.current = start + (end - start) * e;
           draw();
@@ -129,7 +139,7 @@ const WheelCanvas = forwardRef(function WheelCanvas({ names, restAt, restKey }, 
           }
           if (p < 1) requestAnimationFrame(frame);
           else {
-            honk();
+            if (!stopped.current) (sound === 'ding' ? ding : honk)();
             animNames.current = null;
             settledKey.current = key;
             resolve();
@@ -138,6 +148,7 @@ const WheelCanvas = forwardRef(function WheelCanvas({ names, restAt, restKey }, 
         requestAnimationFrame(frame);
       });
     },
+    stop() { stopped.current = true; },
   }), [draw]);
 
   return (

@@ -1,27 +1,39 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase, friendly } from '../lib/supabase.js';
-import { wheelContext } from '../lib/wheel.js';
+import { wheelContext, spinRounds, isElimination, SPIN_MS } from '../lib/wheel.js';
 import { dollars } from '../lib/odds.js';
-import { toast, listNames, fmtWhen, isMuted, setMuted } from '../lib/ui.js';
+import { toast, listNames, fmtWhen, isMuted, setMuted, honk } from '../lib/ui.js';
 import WheelCanvas from '../components/WheelCanvas.jsx';
+import WheelLog from './wheel/WheelLog.jsx';
 
 /**
- * The database picks the result (spin_wheel). This screen only animates to it.
- * When anyone spins, every phone with this tab open animates the same spin, once.
- * Any past spin can be replayed; it always lands on the same name.
+ * The database decides the result (spin_wheel): it knocks names out one at a
+ * time until one is left, the bozo. This screen only plays it back, one spin per
+ * knocked-out name. When anyone spins, every phone with this tab open plays the
+ * same sequence, once. Any past spin can be replayed; it always plays the same.
+ * Spins from before elimination replay as a single spin onto the bozo.
  */
 export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seenSpins, markWatched }) {
   const wheelRef = useRef(null);
   const cardRef = useRef(null);
   const animating = useRef(false);
-  const [active, setActive] = useState(null); // spin being animated: { ...spin, weekN, replay }
+  const alive = useRef(true); // false once this tab is closed, so a half-played spin doesn't count as watched
+  const skipping = useRef(false);
+  const wake = useRef(null); // ends the "X is safe" pause early on Skip
+  // spin being played: { ...spin, weekN, replay, round, rounds, names (on the wheel now), safe (just knocked out), gone (safe so far) }
+  const [active, setActive] = useState(null);
   const [revealed, setRevealed] = useState(null);
   const [focus, setFocus] = useState(null); // an older spin left on screen after replaying it
   const [poolSel, setPoolSel] = useState(null); // { week, ids }: a hand-picked pool for one week
   const [confirmFor, setConfirmFor] = useState(null); // week id awaiting re-spin confirmation
-  const [confirmDel, setConfirmDel] = useState(null); // spin id awaiting delete confirmation
   const [busy, setBusy] = useState(false);
   const [muted, setMutedState] = useState(isMuted());
+
+  useEffect(() => {
+    alive.current = true;
+    const wheel = wheelRef.current;
+    return () => { alive.current = false; wheel?.stop(); wake.current?.(); };
+  }, []);
 
   const ctx = wheelContext(data);
   const order = data.players.map((p) => p.id);
@@ -41,9 +53,21 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
   const confirmRespin = confirmFor != null && confirmFor === ctx.last?.week.id;
   const setConfirmRespin = (on) => setConfirmFor(on ? ctx.last?.week.id ?? null : null);
 
+  const pause = (ms) => new Promise((done) => {
+    const t = setTimeout(done, ms);
+    wake.current = () => { clearTimeout(t); done(); };
+  });
+
+  function skip() {
+    skipping.current = true;
+    wheelRef.current?.stop();
+    wake.current?.();
+  }
+
   async function play(spin, replay = false) {
     if (!wheelRef.current || animating.current) return;
     animating.current = true;
+    skipping.current = false;
     if (!replay) seenSpins?.add(spin.id);
     const isLatest = spin.id === ctx.last?.spin.id;
     // Phones and browsers pause animations on hidden pages, then jump to the end
@@ -52,11 +76,27 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
     const onVis = () => { if (document.visibilityState !== 'visible') missed = true; };
     document.addEventListener('visibilitychange', onVis);
     setFocus(null);
-    setActive({ ...spin, weekN: weekN(spin.week_id), replay });
     setRevealed(null);
-    await wheelRef.current.spinTo(spin.pool.map(pname), spin.pool.indexOf(spin.landed_id), spin.id);
+    const rounds = spinRounds(spin);
+    const base = { ...spin, weekN: weekN(spin.week_id), replay, rounds: rounds.length };
+    const gone = [];
+    for (let i = 0; i < rounds.length && alive.current && !skipping.current; i++) {
+      const r = rounds[i];
+      setActive({ ...base, round: i + 1, names: r.names, safe: null, gone: [...gone] });
+      // Old spins land on the bozo itself and rest there (key = spin id). Knock-out
+      // rounds get their own key so the wheel resets to the result afterwards.
+      await wheelRef.current?.spinTo(r.names.map(pname), r.names.indexOf(r.at), r.bozo ? spin.id : `${spin.id}:${i}`,
+        { quick: r.quick, sound: r.bozo ? 'honk' : 'ding' });
+      if (r.bozo || !alive.current || skipping.current) continue;
+      gone.push(r.at);
+      setActive({ ...base, round: i + 1, names: r.names, safe: r.at, gone: [...gone] });
+      await pause(SPIN_MS.pause);
+    }
     document.removeEventListener('visibilitychange', onVis);
     animating.current = false;
+    wake.current = null;
+    if (!alive.current) return; // left the Wheel tab partway: not watched, it stays hidden
+    if (isElimination(spin) && !skipping.current) honk(); // the last name left
     setActive(null);
     setRevealed(spin.id);
     if (!missed && (!replay || isLatest)) markWatched?.(spin.id);
@@ -78,7 +118,6 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
   }, [spinEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function removeSpin(s) {
-    setConfirmDel(null);
     const { error } = await supabase.rpc('delete_spin', { p_spin: s.id });
     if (error) { toast(friendly(error)); return; }
     if (focus?.id === s.id) setFocus(null);
@@ -96,38 +135,49 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
     if (!seenSpins?.has(s.id)) play(s);
   }
 
+  // At rest after a spin: an elimination spin leaves only the bozo on the wheel;
+  // an old spin points at the bozo among everyone who was in it.
+  const restOn = (s) => (isElimination(s)
+    ? { names: [pname(s.landed_id)], restAt: 0 }
+    : { names: s.pool.map(pname), restAt: s.pool.indexOf(s.landed_id) });
+  const resultLabel = (s) => `Week ${weekN(s.week_id) ?? '?'} ${isElimination(s) ? 'bozo' : 'wheel landed on'}`;
+  const outOf = (s) => `${isElimination(s) ? 'Last name left of' : 'Out of'} ${s.pool.length}`;
+  const namesLeft = (n) => (n === 1 ? 'One name left…' : `${n} names left`);
+  const safeOrder = (s) => isElimination(s) && <span className="fine">Safe, in order: {s.eliminated.map(pname).join(', ')}</span>;
+
   // What the wheel shows right now.
   let names = [];
   let restAt = null;
   let restKey = null;
+  let struck = null;
   if (active) {
-    names = active.pool.map(pname);
+    names = active.names.map(pname);
+    if (active.safe) struck = active.names.indexOf(active.safe);
   } else if (focus) {
-    names = focus.pool.map(pname);
-    restAt = focus.pool.indexOf(focus.landed_id);
+    ({ names, restAt } = restOn(focus));
     restKey = focus.id;
   } else if (ctx.mode === 'ready') {
     names = pool.map(pname);
   } else if (ctx.last) {
-    names = ctx.last.spin.pool.map(pname);
-    if (ctx.last.spin.hidden) { // don't leave the wheel pointing at a result they haven't watched
+    if (ctx.last.spin.hidden) { // don't leave the wheel showing a result they haven't watched
+      names = ctx.last.spin.pool.map(pname);
       restAt = -1;
       restKey = 'hidden-' + ctx.last.spin.id;
     } else {
-      restAt = ctx.last.spin.pool.indexOf(ctx.last.spin.landed_id);
+      ({ names, restAt } = restOn(ctx.last.spin));
       restKey = ctx.last.spin.id;
     }
   } else {
     names = sortIds(activeIds).map(pname);
   }
 
-  // Hide a live spin from the log while it animates so the log doesn't spoil it.
-  const allSpins = [...data.spins].reverse().filter((s) => !active || active.replay || s.id !== active.id);
+  // Hide a live spin from the log while it plays so the log doesn't spoil it.
+  const logSpins = [...data.spins].reverse().filter((s) => !active || active.replay || s.id !== active.id);
   const idle = !active && !focus;
 
   return (
     <>
-      <section className="card wheel-card" ref={cardRef}>
+      <section className="card wheel-card" ref={cardRef} data-noswipe={active ? '' : undefined}>
         {ctx.mode === 'ready' && idle ? (
           <>
             <h2 className="sec-title">Week {target.n} wheel</h2>
@@ -136,26 +186,42 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
                 ? `${[
                     ctx.losers.length ? `${listNames(sortIds(ctx.losers).map(pname))} missed` : '',
                     ctx.noShows.length ? `${listNames(sortIds(ctx.noShows).map(pname))} didn’t put in a leg` : '',
-                  ].filter(Boolean).join(', and ')}. Spin to see who puts in ${dollars(data.league.stake)} for Week ${ctx.nextN}.`
-                : `Nobody missed in Week ${target.n}, so everyone goes in the wheel for Week ${ctx.nextN}.`}
+                  ].filter(Boolean).join(', and ')}.`
+                : `Nobody missed in Week ${target.n}, so everyone goes in the wheel.`}
+              {pool.length > 1
+                ? ` Each spin knocks a name out. The last name left puts in ${dollars(data.league.stake)} for Week ${ctx.nextN}.`
+                : ` Spin to see who puts in ${dollars(data.league.stake)} for Week ${ctx.nextN}.`}
             </p>
           </>
         ) : <h2 className="sec-title">The Bozo Wheel</h2>}
 
-        <WheelCanvas ref={wheelRef} names={names} restAt={restAt} restKey={restKey} />
+        <WheelCanvas ref={wheelRef} names={names} restAt={restAt} restKey={restKey} struck={struck} />
 
         {active && (
           <div className="result" role="status">
-            <span className="label-sm">{active.weekN ? `Week ${active.weekN} wheel` : 'Wheel'} {active.replay ? 'replay' : 'is spinning'}</span>
-            <strong className="result-name">{'…'}</strong>
+            <span className="label-sm">
+              {active.weekN ? `Week ${active.weekN} wheel` : 'Wheel'} {active.replay ? 'replay' : 'is spinning'}
+              {active.rounds > 1 && ` · spin ${active.round} of ${active.rounds}`}
+            </span>
+            {active.safe
+              ? <strong className="result-name is-safe">{pname(active.safe)} is safe</strong>
+              : <strong className="result-name">{'…'}</strong>}
+            {isElimination(active) && <span className="result-sub">{namesLeft(active.names.length - (active.safe ? 1 : 0))}</span>}
+            {active.gone.length > 0 && (
+              <div className="chips safe-list" aria-label="Safe so far">
+                {active.gone.map((id) => <span key={id} className="chip safe">{pname(id)}</span>)}
+              </div>
+            )}
+            {isElimination(active) && <button type="button" className="link" onClick={skip}>Skip to the bozo</button>}
           </div>
         )}
 
         {!active && focus && (
           <div className={`result${revealed === focus.id ? ' reveal' : ''}`} role="status">
-            <span className="label-sm">Week {weekN(focus.week_id) ?? '?'} wheel landed on</span>
+            <span className="label-sm">{resultLabel(focus)}</span>
             <strong className={`result-name${replaced(focus) ? ' struck' : ''}`}>{pname(focus.landed_id)}</strong>
-            <span className="result-sub">{replaced(focus) ? 'Re-spun, so this one doesn’t count' : `Out of ${focus.pool.length} · ${fmtWhen(focus.created_at)}`}</span>
+            <span className="result-sub">{replaced(focus) ? 'Re-spun, so this one doesn’t count' : `${outOf(focus)} · ${fmtWhen(focus.created_at)}`}</span>
+            {safeOrder(focus)}
             <div className="btns">
               <button className="link" onClick={() => play(focus, true)}>Watch it again</button>
               <button className="link" onClick={() => setFocus(null)}>Back to the current wheel</button>
@@ -174,9 +240,10 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
 
         {idle && ctx.mode === 'waiting' && ctx.last && !ctx.last.spin.hidden && (
           <div className={`result${revealed === ctx.last.spin.id ? ' reveal' : ''}`} role="status">
-            <span className="label-sm">Week {ctx.last.week.n} wheel landed on</span>
+            <span className="label-sm">{resultLabel(ctx.last.spin)}</span>
             <strong className="result-name">{pname(ctx.last.spin.landed_id)}</strong>
-            <span className="result-sub">Puts in {dollars(ctx.week.stake)} for Week {ctx.week.n}</span>
+            <span className="result-sub">{isElimination(ctx.last.spin) && `${outOf(ctx.last.spin)} · `}Puts in {dollars(ctx.week.stake)} for Week {ctx.week.n}</span>
+            {safeOrder(ctx.last.spin)}
             <button className="link" onClick={() => play(ctx.last.spin, true)}>Watch it again</button>
           </div>
         )}
@@ -225,52 +292,13 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
         {ctx.mode === 'none' && <p className="sub">Start a week first. Anyone whose leg misses goes in the wheel.</p>}
 
         <div className="wheel-foot">
-          <span className="fine">The server picks the result with a secure random number, so the spinner can{'’'}t rig it.</span>
+          <span className="fine">The server decides every spin with a secure random number, so the spinner can{'’'}t rig it.</span>
           <button className="link" onClick={() => { setMuted(!muted); setMutedState(!muted); }}>Sound {muted ? 'off' : 'on'}</button>
         </div>
       </section>
 
-      {allSpins.length > 0 && (
-        <section className="card">
-          <h3 className="sec-title-sm">Wheel log</h3>
-          <ol className="log">
-            {allSpins.slice(0, 12).map((s) => {
-              const n = weekN(s.week_id);
-              const idx = data.spins.filter((x) => x.week_id === s.week_id).findIndex((x) => x.id === s.id);
-              const old = replaced(s);
-              return (
-                <li key={s.id} className={old ? 'is-replaced' : ''}>
-                  <span className="log-wk">Wk {n ?? '?'}</span>
-                  <span className="log-who">
-                    {s.hidden ? <span className="is-hidden">???</span> : old ? <s>{pname(s.landed_id)}</s> : pname(s.landed_id)}{' '}
-                    <small>{s.hidden ? 'tap ▶ to find out' : `out of ${s.pool.length}${old ? ' · replaced' : idx > 0 ? ' · re-spin' : ''}`}</small>
-                  </span>
-                  <time dateTime={s.created_at}>{fmtWhen(s.created_at)}</time>
-                  <span className="log-acts">
-                    {isAdmin && old && (
-                      <button type="button" className="log-btn" onClick={() => setConfirmDel(confirmDel === s.id ? null : s.id)}
-                        aria-label={`Delete the replaced Week ${n ?? ''} spin`} title="Delete">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
-                      </button>
-                    )}
-                    <button type="button" className="log-btn log-play" disabled={!!active} onClick={() => replay(s)}
-                      aria-label={`Watch the Week ${n ?? ''} spin again`} title="Watch again">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-                    </button>
-                  </span>
-                  {confirmDel === s.id && (
-                    <span className="log-confirm">Delete this replaced spin? It won{'’'}t change who{'’'}s on the hook.
-                      <button type="button" className="link danger" onClick={() => removeSpin(s)}>Delete</button>
-                      <button type="button" className="link" onClick={() => setConfirmDel(null)}>Keep</button>
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-          <p className="fine">Every spin is logged here. When a week is re-spun, only the latest counts; the replaced ones are crossed out{isAdmin ? ' and can be deleted' : ''}. Tap ▶ to watch one again.</p>
-        </section>
-      )}
+      <WheelLog spins={logSpins} allSpins={data.spins} isAdmin={isAdmin} pname={pname} weekN={weekN} replaced={replaced}
+        busy={!!active} onReplay={replay} onDelete={removeSpin} />
     </>
   );
 }

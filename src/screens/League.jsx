@@ -30,6 +30,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   const [watched, setWatched] = useState(() => new Set()); // spins watched since the last load
   const [notesSeen, setNotesSeen] = useState(() => !RELEASES.length || store.get('bz-seen-release') === RELEASES[0].id);
   const [scoresDown, setScoresDown] = useState(feedDown);
+  const [asMember, setAsMember] = useState(false); // an admin previewing the member view; resets on reload
   useEffect(() => {
     const on = () => setScoresDown(feedDown());
     window.addEventListener('bz-feed', on);
@@ -92,8 +93,11 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   if (!data) return <div className="center-msg">Loading{'…'}</div>;
 
   const member = data.members.find((m) => m.user_id === userId);
-  const isAdmin = member && (member.role === 'owner' || member.role === 'admin');
-  const isOwner = member && member.role === 'owner';
+  // Member view only hides admin controls. The database still knows you're an admin.
+  const realAdmin = !!member && (member.role === 'owner' || member.role === 'admin');
+  const previewing = realAdmin && asMember;
+  const isAdmin = realAdmin && !previewing;
+  const isOwner = !!member && member.role === 'owner' && !previewing;
   const me = member?.player_id || null;
   const pname = (id) => data.players.find((p) => p.id === id)?.name || 'Someone';
 
@@ -147,6 +151,12 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
               <button key={k} className="tab" role="tab" id={`tab-${k}`} aria-selected={tab === k} onClick={() => go(k)}>{label}</button>
             ))}
           </nav>
+          {previewing && (
+            <div className="preview-bar" role="status">
+              <span><strong>Member view.</strong> What members see. Anything you do still counts.</span>
+              <button type="button" className="link" onClick={() => setAsMember(false)}>Back to admin</button>
+            </div>
+          )}
         </div>
       </header>
       <main className="wrap" role="tabpanel" aria-labelledby={`tab-${tab}`}>
@@ -179,6 +189,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
       </main>
       {settings && (
         <SettingsSheet data={data} userId={userId} member={member} isAdmin={isAdmin} isOwner={isOwner} reload={reload} onNotesSeen={() => setNotesSeen(true)}
+          canPreview={realAdmin} previewing={previewing} onPreview={(on) => { setAsMember(on); setSettings(false); window.scrollTo(0, 0); }}
           onClose={() => { setSettings(false); if (store.get('bz-has-pw', false)) setPwNudgeHidden(true); }} onChangePlayer={changePlayer}
           leagues={leagues} onSwitchLeague={(id) => { setSettings(false); onSwitchLeague(id); }}
           onAddLeague={() => { setSettings(false); onAddLeague(); }} onSignOut={onSignOut} />

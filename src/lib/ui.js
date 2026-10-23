@@ -69,6 +69,16 @@ export function honk() {
   } catch { /* ignore */ }
 }
 
+// A bright two-note ding: someone's safe.
+export function ding() {
+  if (!actx || isMuted()) return;
+  try {
+    const t = actx.currentTime;
+    tone('sine', 880, t, 0.12, 0.06);
+    tone('sine', 1320, t + 0.1, 0.22, 0.06);
+  } catch { /* ignore */ }
+}
+
 export function secureRandom() {
   try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; } catch { return Math.random(); }
 }
