@@ -5,6 +5,17 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-a',
+    date: '2026-10-23',
+    title: 'The weekly recap',
+    idea: 'Lotti',
+    items: [
+      'After you watch the spin, live or later, the week’s recap slides up: who the wheel picked, and a clown face for everyone. Win and you’re clean, miss and the makeup goes on, and the wheel’s pick is full bozo.',
+      'Missed the spin? The first time you open the app after one, it offers to play it for you. “Watch spin” now starts the replay right away too.',
+      'Open any past week’s recap from History, or from the Wheel tab. Share it to the group chat from the recap.',
+    ],
+  },
+  {
     id: '2026-10-22-k',
     date: '2026-10-22',
     title: 'Live picks first',

@@ -18,7 +18,7 @@ import LinesSheet from './week/LinesSheet.jsx';
 // The This week tab: the week and its deadline, a summary row, the slip (legs,
 // who's still missing, the total), and the actions. Tapping a leg opens its
 // panel (week/LegSheet); adding or editing a leg opens a sheet with week/LegForm.
-export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, nameOfUser, openSettings, openWheel }) {
+export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, nameOfUser, openSettings, watchSpin }) {
   const week = data.weeks[data.weeks.length - 1];
   const [form, setForm] = useState(null); // null, 'new', or the leg being edited
   const [openId, setOpenId] = useState(null); // leg whose panel is open
@@ -92,7 +92,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
 
   // The summary row: who's on the hook, then two numbers that depend on how the week is going.
   const hook = week.payer_hidden ? (
-    <button type="button" className="text-btn nose hook-hidden" onClick={openWheel}>Watch spin</button>
+    <button type="button" className="text-btn nose hook-hidden" onClick={watchSpin}>Watch spin</button>
   ) : isAdmin ? (
     <select className="glance-select" aria-label="On the hook" value={week.payer_id || ''} onChange={(e) => setPayer(e.target.value)}>
       <option value="">Choose{'…'}</option>

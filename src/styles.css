@@ -421,6 +421,27 @@ span.gc-cell { background: transparent; border-color: var(--hair); }
 .r-P .hl-r { color: var(--muted); }
 .hist-legs .cmts { grid-column: 1 / -1; margin-top: 4px; padding-left: 10px; border-left: 2px solid var(--line); }
 .hist-legs .cmt { font-size: 13.5px; }
+.recap-strip { appearance: none; display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 12px; border: 0; border-radius: 12px; background: var(--sunk); color: var(--ink); font: 600 15px/1.2 var(--body); text-align: left; cursor: pointer; }
+.recap-strip-faces { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+.recap-strip > span:not(.recap-strip-faces) { white-space: nowrap; }
+.recap-more { font: 600 12px/1 var(--body); color: var(--muted); padding-left: 4px; }
+.recap-strip .chev { width: 16px; height: 16px; color: var(--muted); }
+
+/* the weekly recap (a sheet). The top card is paper, so it stays light in dark mode. */
+.recap-hero { background: var(--paper); color: var(--paper-ink); border-radius: 16px; box-shadow: inset 0 0 0 2px var(--p-loss); padding: 16px 16px 18px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.recap-hero.is-hit { box-shadow: inset 0 0 0 2px var(--p-win); }
+.recap-big { font-family: var(--display); font-size: 34px; line-height: 1.1; letter-spacing: .01em; margin-top: 4px; overflow-wrap: anywhere; }
+.recap-tag { font-weight: 700; }
+.recap-tag.is-loss { color: var(--p-loss); }
+.recap-tag.is-win { color: var(--p-win); }
+.recap-sub { font-size: 14px; color: var(--paper-muted); }
+.recap-faces { display: flex; flex-wrap: wrap; justify-content: center; }
+.sheet .glance { background: var(--sunk); padding: 12px 0; }
+.recap-list { list-style: none; margin: 0; padding: 0; }
+.recap-list .row { cursor: default; min-height: 60px; }
+.face-full { color: var(--nose); }
+.face-clean { color: var(--win); }
+.sheet-lede { font-size: 16px; color: var(--muted); }
 
 /* settings pages */
 .member { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }

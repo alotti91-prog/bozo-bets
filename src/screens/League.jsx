@@ -6,6 +6,7 @@ import { Brand, IconGear, IconTicket, IconWheel, IconBars, IconHistory } from '.
 import Claim from './Claim.jsx';
 import { bozoBelt } from '../lib/stats.js';
 import { unwatchedSpin, hideSpin } from '../lib/wheel.js';
+import { weekRecap } from '../lib/recap.js';
 import { RELEASES } from '../lib/releases.js';
 import { feedDown } from '../lib/scores.js';
 import { swipeDirection, swipeTarget } from '../lib/swipe.js';
@@ -14,7 +15,9 @@ import WheelTab from './WheelTab.jsx';
 import StandingsTab from './StandingsTab.jsx';
 import HistoryTab from './HistoryTab.jsx';
 import SettingsSheet from './SettingsSheet.jsx';
+import RecapSheet, { WatchPrompt } from './RecapSheet.jsx';
 
+const RECAP_DELAY = 1800; // ms between the spin's result and the recap sliding up
 const TABS = [['week', 'This week'], ['wheel', 'Wheel'], ['standings', 'Standings'], ['history', 'History']];
 const TAB_ICON = { week: IconTicket, wheel: IconWheel, standings: IconBars, history: IconHistory };
 
@@ -28,6 +31,10 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   const [skipClaim, setSkipClaim] = useState(() => store.get('bz-skip-claim-' + leagueId, false));
   const [seenSpins] = useState(() => new Set()); // live spins already played, so each plays once
   const [watched, setWatched] = useState(() => new Set()); // spins watched since the last load
+  const [liveSpins] = useState(() => new Set()); // spins that happened with the app open (the toast offers them)
+  const [recapOpen, setRecapOpen] = useState(null); // { spinId } after watching a spin, or { weekId } from History/Wheel
+  const [watchNow, setWatchNow] = useState(null); // spin id the Wheel tab should replay as soon as it opens
+  const [laterFor, setLaterFor] = useState(null); // spin id whose "wheel's been spun" prompt was answered
   const [notesSeen, setNotesSeen] = useState(() => !RELEASES.length || store.get('bz-seen-release') === RELEASES[0].id);
   const [scoresDown, setScoresDown] = useState(feedDown);
   const [asMember, setAsMember] = useState(false); // an admin previewing the member view; resets on reload
@@ -75,10 +82,11 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   // to watch without naming who it landed on.
   const onSpin = useCallback((spin) => {
     setSpinEvent(spin);
+    if (document.visibilityState === 'visible') liveSpins.add(spin.id); // came in while they were looking
     if (store.get('bz-tab', 'week') !== 'wheel') {
       toast('The wheel is spinning!', { label: 'Watch', onClick: () => { setTab('wheel'); store.set('bz-tab', 'wheel'); window.scrollTo(0, 0); } });
     }
-  }, []);
+  }, [liveSpins]);
 
   const { data, error, reload } = useLeague(leagueId, onSpin);
 
@@ -122,10 +130,23 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
     if (watched.has(spinId)) return;
     setWatched((prev) => new Set(prev).add(spinId));
     supabase.from('spin_views').insert({ spin_id: spinId }).then(() => {}); // a repeat is harmless
+    // The first time you see this result (live or replay), the recap follows.
+    if (!(data.views || []).includes(spinId)) setTimeout(() => setRecapOpen({ spinId }), RECAP_DELAY);
   }
   // Until you've watched the latest spin, hide who it landed on on every tab.
   const hidden = unwatchedSpin(data, userId, watched);
   const view = hidden ? hideSpin(data, hidden) : data;
+  const cur = data.weeks[data.weeks.length - 1];
+
+  // Opened the app to a spin you haven't seen (not one that came in while you
+  // were looking; the toast covers that): offer to watch it.
+  const prompt = hidden && tab !== 'wheel' && !settings && !watchNow && laterFor !== hidden.id && !liveSpins.has(hidden.id) ? hidden : null;
+  function watchSpin() {
+    if (hidden) { setLaterFor(hidden.id); setWatchNow(hidden.id); }
+    go('wheel');
+  }
+  const recapWeek = recapOpen && (recapOpen.weekId || view.spins.find((s) => s.id === recapOpen.spinId)?.week_id);
+  const recap = recapWeek ? weekRecap(view, recapWeek) : null; // null until the spin's row has loaded
 
   const belt = bozoBelt(data);
   const nameOfUser = (uid) => {
@@ -133,7 +154,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
     return (m && m.player_id && pname(m.player_id)) || 'Someone';
   };
   const props = { data: view, me, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, nameOfUser,
-    openSettings: () => setSettings(true), openWheel: () => go('wheel'), markWatched };
+    openSettings: () => setSettings(true), watchSpin, markWatched, openRecap: (weekId) => setRecapOpen({ weekId }) };
   return (
     <>
       <header className="top">
@@ -166,7 +187,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
         )}
         <div key={tab} className={`pane${slide ? ` pane-${slide}` : ''}`}>
         {tab === 'week' && <WeekTab {...props} />}
-        {tab === 'wheel' && <WheelTab {...props} spinEvent={spinEvent} seenSpins={seenSpins} />}
+        {tab === 'wheel' && <WheelTab {...props} spinEvent={spinEvent} seenSpins={seenSpins} autoplay={watchNow} onAutoplay={() => setWatchNow(null)} />}
         {tab === 'standings' && <StandingsTab {...props} />}
         {tab === 'history' && <HistoryTab {...props} />}
         </div>
@@ -188,6 +209,11 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
           leagues={leagues} onSwitchLeague={(id) => { setSettings(false); onSwitchLeague(id); }}
           onAddLeague={() => { setSettings(false); onAddLeague(); }} onSignOut={onSignOut} />
       )}
+      {prompt && (
+        <WatchPrompt weekN={data.weeks.find((w) => w.id === prompt.week_id)?.n} nextN={cur.n} stake={Number(cur.stake)}
+          onWatch={watchSpin} onLater={() => setLaterFor(prompt.id)} />
+      )}
+      {recap && <RecapSheet recap={recap} pname={pname} leagueName={data.league.name} onClose={() => setRecapOpen(null)} />}
     </>
   );
 }

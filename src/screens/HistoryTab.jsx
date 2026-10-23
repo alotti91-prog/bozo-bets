@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { weekInfo, amerFmt, fmtOdds, money } from '../lib/odds.js';
 import { fmtDate, listNames, toast } from '../lib/ui.js';
-import { IconChev, IconPlus, Belt } from '../components/common.jsx';
+import { IconChev, IconChevR, IconPlus, Belt } from '../components/common.jsx';
+import BozoFace from '../components/BozoFace.jsx';
+import { weekRecap } from '../lib/recap.js';
 import Reactions from '../components/Reactions.jsx';
 import Comments from '../components/Comments.jsx';
 import PastWeekSheet from './PastWeekSheet.jsx';
@@ -12,7 +14,7 @@ const PILL = { live: 'Live', hit: 'Hit', busted: 'Busted', empty: 'Open' };
 
 // History: one row per week (result, who sank it, who the wheel picked).
 // Tap a week for its picks and trash talk. Admins add or fix past weeks.
-export default function HistoryTab({ data, pname, isAdmin, reload, beltId, nameOfUser, userId }) {
+export default function HistoryTab({ data, pname, isAdmin, reload, beltId, nameOfUser, userId, openRecap }) {
   const [open, setOpen] = useState({});
   const [editing, setEditing] = useState(null); // null, 'new', or a week row
   if (!data.weeks.length) {
@@ -57,6 +59,7 @@ export default function HistoryTab({ data, pname, isAdmin, reload, beltId, nameO
             : info.status === 'busted' ? `Sunk by ${listNames(losers)}`
             : `${legs.length} leg${legs.length === 1 ? '' : 's'} · ${amerFmt(info.d)}`;
           const isOpen = !!open[w.id];
+          const recap = isOpen ? weekRecap(data, w.id) : null; // null while the spin is unwatched
           return (
             <li key={w.id}>
               <button type="button" className="hist-row" aria-expanded={isOpen} onClick={() => setOpen({ ...open, [w.id]: !isOpen })}>
@@ -73,6 +76,16 @@ export default function HistoryTab({ data, pname, isAdmin, reload, beltId, nameO
               </button>
               {isOpen && (
                 <div className="hist-open">
+                  {recap && openRecap && (
+                    <button type="button" className="recap-strip" onClick={() => openRecap(w.id)}>
+                      <span className="recap-strip-faces" aria-hidden="true">
+                        {recap.people.slice(0, 6).map((p) => <BozoFace key={p.id} face={p.face} size={26} />)}
+                        {recap.people.length > 6 && <span className="recap-more">+{recap.people.length - 6}</span>}
+                      </span>
+                      <span>See the recap</span>
+                      <IconChevR />
+                    </button>
+                  )}
                   {(w.payer_id || legs.length > 0) && (
                     <p className="hist-meta">
                       {w.payer_id ? `Put in by ${pname(w.payer_id)}${w.placed_at ? ' · placed ✓' : ''}` : ''}

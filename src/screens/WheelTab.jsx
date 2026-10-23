@@ -15,7 +15,7 @@ import { useSpinPlayer } from './wheel/useSpinPlayer.js';
  * same sequence, once. Any past spin can be replayed; it always plays the same.
  * Spins from before elimination replay as a single spin onto the bozo.
  */
-export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seenSpins, markWatched }) {
+export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seenSpins, markWatched, autoplay, onAutoplay, openRecap }) {
   const wheelRef = useRef(null);
   const cardRef = useRef(null);
   const [poolSel, setPoolSel] = useState(null); // { week, ids }: a hand-picked pool for one week
@@ -58,6 +58,16 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
     const t = setTimeout(() => play(spinEvent), 0);
     return () => clearTimeout(t);
   }, [spinEvent]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sent here by "Watch" or "Watch spin": replay the spin you haven't seen.
+  useEffect(() => {
+    if (!autoplay) return undefined;
+    const t = setTimeout(() => {
+      onAutoplay?.();
+      if (ctx.last?.spin.id === autoplay) play(ctx.last.spin, true);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [autoplay]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function removeSpin(s) {
     const { error } = await supabase.rpc('delete_spin', { p_spin: s.id });
@@ -196,7 +206,10 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
             <strong className="result-name">{pname(ctx.last.spin.landed_id)}</strong>
             <span className="result-sub">{isElimination(ctx.last.spin) && `${outOf(ctx.last.spin)} · `}Puts in {dollars(ctx.week.stake)} for Week {ctx.week.n}</span>
             {safeOrder(ctx.last.spin)}
-            <button type="button" className="text-btn" onClick={() => play(ctx.last.spin, true)}>Watch it again</button>
+            <div className="btns center">
+              <button type="button" className="text-btn" onClick={() => play(ctx.last.spin, true)}>Watch it again</button>
+              {openRecap && <button type="button" className="text-btn" onClick={() => openRecap(ctx.last.week.id)}>See the recap</button>}
+            </div>
           </div>
         )}
 

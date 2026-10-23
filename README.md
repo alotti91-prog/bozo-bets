@@ -3,7 +3,8 @@
 A weekly group-parlay tracker. Everyone adds one leg. If the parlay hits, you split it. Anyone whose leg misses goes in the Bozo Wheel. It knocks names out one spin at a time, and the last name left puts in next week's stake.
 
 - **This week:** the parlay as a bet slip, with combined odds and payout. Everyone adds their own leg from their phone.
-- **Wheel:** once a week's bets settle, the wheel loads everyone who missed and the commish spins whenever you're ready (say, mid-week). Each spin knocks out a name (they're safe) until one is left: the bozo. The server decides every spin, so nobody can rig it. Every open phone watches the same spins live, and anyone can replay it after. Miss it, and the bozo stays hidden everywhere in the app until you watch the replay. The result stays up until the next week settles.
+- **Wheel:** once a week's bets settle, the wheel loads everyone who missed and the commish spins whenever you're ready (say, mid-week). Each spin knocks out a name (they're safe) until one is left: the bozo. The server decides every spin, so nobody can rig it. Every open phone watches the same spins live, and anyone can replay it after. Miss it, and the bozo stays hidden everywhere in the app until you watch the replay (the app offers it the first time you open it after a spin). The result stays up until the next week settles.
+- **Weekly recap:** a beat after you watch the spin, the week's recap slides up: who the wheel picked, and a clown face for everyone (won: clean, missed: makeup, the wheel's pick: full bozo). Share it to the group chat, or open any week's recap again from History.
 - **Standings:** records, hit %, money in and out, and superlatives.
 - **History:** every week, who sank it, and where the wheel landed. The commish can add weeks from before the league joined the app.
 - **Bozo Belt 🤡:** most misses this season wears the clown nose next to their name until someone passes him.
@@ -148,7 +149,7 @@ Or skip the keys and run `npm run demo`.
 **Checks before you push:**
 
 ```bash
-npm test          # odds, payout, standings, and wheel math
+npm test          # odds, payout, standings, wheel, and recap math
 npm run test:sql  # runs the database setup in a throwaway Postgres and checks the permission rules
 npm run build     # makes sure the site builds
 ```
@@ -169,6 +170,7 @@ scripts/sql-dryrun.mjs     tests schema.sql in an in-memory Postgres
 src/lib/odds.js            odds and payout math
 src/lib/stats.js           standings
 src/lib/wheel.js           wheel states and angle math
+src/lib/recap.js           the weekly recap: faces, bozo, share text
 src/lib/useLeague.js       loads a league and keeps it live
 src/lib/demo-supabase.js   sample data for `npm run demo`
 src/lib/bets.js, espn.js    live legs: bet text, live status, ESPN data
