@@ -612,3 +612,6 @@ main.wrap.gate { min-height: 100dvh; display: flex; flex-direction: column; just
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--nose); }
 .watching-joined { font-size: 14px; color: var(--muted); }
 .watching-joined b { color: var(--ink); }
+.recap-actual { font-weight: 700; }
+.recap-actual.is-win { color: var(--win); }
+.recap-actual.is-loss { color: var(--nose); }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weekRecap, personLine, recapText, FACES, lossTier, cutoffs, needsMissPick, marginFromLostBy, faceCounts, cutoffRows, FACE_ORDER } from './recap.js';
+import { weekRecap, personLine, legActual, recapText, FACES, lossTier, cutoffs, needsMissPick, marginFromLostBy, faceCounts, cutoffRows, FACE_ORDER } from './recap.js';
 import { liveStatus, gradeMargin, finishedGrades } from './bets.js';
 import { weekAwards, streak, missText } from './awards.js';
 import { recapCard } from './recapCard.js';
@@ -148,7 +148,8 @@ describe('how bad a loss was', () => {
     ];
     const r = weekRecap({ weeks, legs, spins: [spin], players }, 'w7');
     expect(r.people.map((p) => [p.id, p.face])).toEqual([['p3', 'full'], ['p2', 'wig'], ['p4', 'makeup'], ['p1', 'paint'], ['p5', 'clean']]);
-    expect(personLine(r.people.find((p) => p.id === 'p1'))).toBe('Bills −6.5 · missed by 0.5');
+    expect(personLine(r.people.find((p) => p.id === 'p1'))).toBe('Bills −6.5 · won by 6, needed 7');
+    expect(personLine(r.people.find((p) => p.id === 'p2'))).toBe('Saquon 75+ rush yds · missed by 44.5'); // no stat saved: can't say how many
     expect(personLine(r.people.find((p) => p.id === 'p3'))).toBe('Steelers ML · lost by 21');
     expect(personLine(r.people.find((p) => p.id === 'p4'))).toBe('NYJ/NE under 41.5 · lost');
   });
@@ -306,7 +307,7 @@ describe('the recap image’s content', () => {
     expect(c.hero).toEqual({ kind: 'bozo', faces: ['full'], big: 'Mikey', tone: 'loss', tag: 'Full bozo · picked by the wheel', sub: 'Puts in Week 8’s $10' });
     expect(c.stats).toMatch(/^2 of 5 legs hit · Would’ve paid \$/);
     expect(c.awards).toEqual([{ icon: '💰', title: 'Biggest hit', name: 'Danny B', note: 'Jets ML · +210' }]);
-    expect(c.people[0]).toEqual({ face: 'full', name: 'Mikey', label: 'Full bozo', line: 'Steelers ML · lost', odds: '+135' });
+    expect(c.people[0]).toEqual({ face: 'full', name: 'Mikey', label: 'Full bozo', line: 'Steelers ML · lost', detail: ['Steelers ML', 'lost'], tone: 'loss', odds: '+135' });
     expect(c.people.find((p) => p.name === 'Sully')).toMatchObject({ face: 'clean', label: '' });
   });
   it('a week that hit: everyone’s faces and the payout', () => {
@@ -318,5 +319,38 @@ describe('the recap image’s content', () => {
     expect(c.hero.tag).toMatch(/^\$10 paid \$.+ each$/);
     expect(c.stats).toBe('');
     expect(c.awards).toEqual([]);
+  });
+});
+
+describe('what actually happened on a leg', () => {
+  const game = { home: { short: 'Saints' }, away: { short: 'Steelers' } };
+  const L = (bet, result, margin) => ({ bet: { sport: 'nfl', ...bet }, result, margin });
+  it('props: how many they had, and how far off', () => {
+    expect(legActual(L({ type: 'prop', stat: 'passYds', side: 'over', line: 239.5 }, 'L', -27.5))).toBe('had 212 pass yds, 27.5 short');
+    expect(legActual(L({ type: 'prop', stat: 'passYds', side: 'over', line: 239.5 }, 'W', 20.5))).toBe('had 260 pass yds');
+    expect(legActual(L({ type: 'prop', stat: 'rec', side: 'under', line: 4.5 }, 'L', -1.5))).toBe('had 6 receptions, 1.5 over');
+    expect(legActual(L({ type: 'prop', stat: 'passTd', side: 'over', line: 1.5 }, 'L', -0.5))).toBe('had 1 pass TD, 0.5 short');
+    expect(legActual(L({ type: 'prop', stat: 'td' }, 'W', null))).toBe('scored');
+    expect(legActual(L({ type: 'prop', stat: 'td' }, 'L', null))).toBe('no TD');
+  });
+  it('totals, spreads, and moneylines', () => {
+    expect(legActual(L({ type: 'total', side: 'over', line: 47.5 }, 'L', -3.5))).toBe('game went 44, 3.5 short');
+    expect(legActual(L({ type: 'total', side: 'under', line: 41.5 }, 'W', 4.5))).toBe('game went 37');
+    expect(legActual(L({ type: 'spread', side: 'away', line: -6.5, game }, 'L', -3.5))).toBe('Steelers won by 3, needed 7');
+    expect(legActual(L({ type: 'spread', side: 'away', line: -7, game }, 'L', -2))).toBe('Steelers won by 5, needed 8');
+    expect(legActual(L({ type: 'spread', side: 'home', line: 3.5, game }, 'L', -1.5))).toBe('Saints lost by 5, 1.5 short');
+    expect(legActual(L({ type: 'spread', side: 'home', line: 3.5, game }, 'W', 1.5))).toBe('Saints lost by 2');
+    expect(legActual(L({ type: 'ml', side: 'away', game }, 'L', -7))).toBe('Steelers lost by 7');
+    expect(legActual(L({ type: 'ml', side: 'away' }, 'W', 10))).toBe('won by 10');
+    expect(legActual(L({ type: 'spread', side: 'away', line: -3, game }, 'P', 0))).toBe('Steelers won by 3');
+  });
+  it('says nothing when it can’t tell', () => {
+    expect(legActual({ bet: null, result: 'L', margin: -7 })).toBe(null); // typed
+    expect(legActual(L({ type: 'spread', side: 'away', line: -6.5 }, 'L', null))).toBe(null); // graded before the final
+    expect(legActual(L({ type: 'spread', side: 'away', line: -6.5 }, null, -3))).toBe(null); // not graded
+  });
+  it('shows up in the recap line', () => {
+    const p = { legs: [{ pick: 'Shough 240+ pass yds', result: 'L', margin: -28, bet: { sport: 'nfl', type: 'prop', stat: 'passYds', side: 'over', line: 240 } }] };
+    expect(personLine(p)).toBe('Shough 240+ pass yds · had 212 pass yds, 28 short');
   });
 });

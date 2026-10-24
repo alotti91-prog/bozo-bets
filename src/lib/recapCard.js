@@ -8,6 +8,9 @@ import { money, dollars, fmtOdds } from './odds.js';
  * r: weekRecap() output plus r.awards. Returns
  *   { brand, title, hero: { kind: 'bozo' | 'hit' | 'busted', faces, big, tag, tone, sub }, stats, awards, people }
  * hero.faces: one face (the bozo) or up to six (a hit). tone: 'loss' | 'win'.
+ * Each person's detail is [pick, what happened] for one leg ("Shough 240+ pass yds",
+ * "had 212 pass yds, 28 short"), or [their whole line] otherwise; tone colors the
+ * second line: 'win' | 'loss' | ''.
  */
 export function recapCard(r, pname, leagueName = 'Bozo Bets') {
   const hit = r.info.status === 'hit';
@@ -29,12 +32,18 @@ export function recapCard(r, pname, leagueName = 'Bozo Bets') {
     hero,
     stats: hit ? '' : `${r.hits} of ${r.total} legs hit · Would’ve paid ${money(r.info.projected)}`,
     awards: (r.awards || []).map((a) => ({ icon: a.icon, title: a.title, name: pname(a.who), note: a.note })),
-    people: r.people.map((p) => ({
-      face: p.face,
-      name: pname(p.id),
-      label: p.face === 'clean' ? '' : FACES[p.face],
-      line: personLine(p),
-      odds: p.legs.length === 1 ? fmtOdds(Number(p.legs[0].odds)) : '',
-    })),
+    people: r.people.map((p) => {
+      const line = personLine(p);
+      const one = p.legs.length === 1 ? p.legs[0] : null;
+      return {
+        face: p.face,
+        name: pname(p.id),
+        label: p.face === 'clean' ? '' : FACES[p.face],
+        line,
+        detail: one ? [one.pick, line.slice(one.pick.length + 3)] : [line],
+        tone: one ? ({ W: 'win', L: 'loss' }[one.result] || '') : '',
+        odds: one ? fmtOdds(Number(one.odds)) : '',
+      };
+    }),
   };
 }

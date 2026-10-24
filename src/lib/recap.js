@@ -1,6 +1,7 @@
 // The weekly recap: how a settled week went, with a clown face for each person.
 // Pure functions, covered by recap.test.js.
 import { weekInfo, money, dollars } from './odds.js';
+import { STATS } from './bets.js';
 
 /** What each face is called, best to worst. */
 export const FACES = { clean: 'Clean', paint: 'Face paint', makeup: 'Makeup’s on', wig: 'Wig’s on', full: 'Full bozo' };
@@ -145,11 +146,47 @@ export function weekRecap({ weeks, legs, spins, players }, weekId) {
 }
 
 const num = (n) => String(Math.round(Math.abs(n) * 10) / 10);
+const SINGULAR = { 'pass TDs': 'pass TD', INTs: 'INT', carries: 'carry', receptions: 'reception', completions: 'completion' };
 
-/** One line about a person's week: "Bills −6.5 · missed by 0.5", "Steelers ML · lost", or "Didn’t pick". */
+/**
+ * What actually happened on a graded leg, worked out from the saved margin and
+ * the bet: "had 212 pass yds, 27.5 short", "game went 44, 3.5 short", "Bills won
+ * by 3, needed 7", "Steelers lost by 7", "scored" / "no TD". null when it can't
+ * tell (typed legs, or graded before the final score so no margin was saved).
+ */
+export function legActual(leg) {
+  const b = leg.bet;
+  if (!b || !leg.result) return null;
+  const st = STATS[b.stat];
+  if (b.type === 'prop' && st?.yesNo) return leg.result === 'W' ? 'scored' : leg.result === 'L' ? 'no TD' : null;
+  const m = leg.margin == null || leg.margin === '' ? NaN : Number(leg.margin);
+  if (!Number.isFinite(m)) return null;
+  const missed = leg.result === 'L' && m < 0;
+  if (b.type === 'prop' || b.type === 'total') {
+    if (typeof b.line !== 'number' || (b.side !== 'over' && b.side !== 'under') || (b.type === 'prop' && !st)) return null;
+    const v = Math.round((b.side === 'over' ? b.line + m : b.line - m) * 10) / 10;
+    const tail = missed ? `, ${num(m)} ${b.side === 'over' ? 'short' : 'over'}` : '';
+    if (b.type === 'total') return `game went ${v}${tail}`;
+    return `had ${v} ${v === 1 ? SINGULAR[st.label] || st.label : st.label}${tail}`;
+  }
+  if (b.type === 'spread' || b.type === 'ml') {
+    const diff = Math.round((b.type === 'spread' ? m - (Number(b.line) || 0) : m) * 10) / 10;
+    const team = b.game?.[b.side]?.short;
+    const what = diff > 0 ? `won by ${num(diff)}` : diff < 0 ? `lost by ${num(diff)}` : 'tied';
+    // A favorite that won but didn't cover: say what it needed ("won by 6, needed 7")
+    const tail = b.type !== 'spread' || !missed ? ''
+      : diff > 0 && Number(b.line) < 0 ? `, needed ${Math.floor(-Number(b.line)) + 1}` : `, ${num(m)} short`;
+    return `${team ? `${team} ` : ''}${what}${tail}`;
+  }
+  return null;
+}
+
+/** One line about a person's week: "Shough 240+ pass yds · had 212 pass yds, 28 short", "Steelers ML · lost", or "Didn’t pick". */
 export function personLine(p) {
   if (!p.legs.length) return 'Didn’t pick';
   return p.legs.map((l) => {
+    const actual = legActual(l);
+    if (actual) return `${l.pick} · ${actual}`;
     if (l.result === 'L' && l.margin != null && Number(l.margin) < 0) {
       return `${l.pick} · ${l.bet?.type === 'ml' ? 'lost' : 'missed'} by ${num(l.margin)}`;
     }

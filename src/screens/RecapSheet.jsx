@@ -100,7 +100,7 @@ export default function RecapSheet({ recap: r, pname, leagueName, onClose }) {
               <BozoFace face={p.face} size={40} />
               <span className="row-label">
                 <span><b>{pname(p.id)}</b>{p.face !== 'clean' && <> · <b className={`face-${p.face}`}>{FACES[p.face]}</b></>}</span>
-                <span className="row-note">{personLine(p)}</span>
+                <PersonNote p={p} />
               </span>
               {p.legs.length === 1 && <span className="row-value">{fmtOdds(p.legs[0].odds)}</span>}
             </li>
@@ -134,5 +134,18 @@ export function WatchPrompt({ weekN, nextN, stake, onWatch, onLater }) {
         <button type="button" className="btn nose" onClick={onWatch}>Watch</button>
       </div>
     </Sheet>
+  );
+}
+
+/** Under a name: the pick, then what actually happened in green or red ("had 212 pass yds, 28 short"). Several legs: one line. */
+function PersonNote({ p }) {
+  const line = personLine(p);
+  const one = p.legs.length === 1 ? p.legs[0] : null;
+  if (!one) return <span className="row-note">{line}</span>;
+  return (
+    <>
+      <span className="row-note">{one.pick}</span>
+      <span className={`row-note recap-actual${one.result === 'W' ? ' is-win' : one.result === 'L' ? ' is-loss' : ''}`}>{line.slice(one.pick.length + 3)}</span>
+    </>
   );
 }

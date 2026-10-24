@@ -71,11 +71,12 @@ export async function drawRecapImage(card) {
   await Promise.all([...wanted].map(async (f) => { faces[f] = await faceImage(f); }));
 
   const ROW = 128;
+  const LINE2 = 40; // a second detail line (what actually happened)
   const AWARD = 104;
   const heroH = card.hero.kind === 'hit' ? 450 : 550;
   const h = PAD + 150 + heroH + (card.stats ? 90 : 20)
     + (card.awards.length ? 80 + card.awards.length * AWARD : 0)
-    + 80 + card.people.length * ROW + 60 + PAD;
+    + 80 + card.people.reduce((s, p) => s + ROW + (p.detail.length - 1) * LINE2, 0) + 60 + PAD;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = h;
@@ -209,14 +210,19 @@ export async function drawRecapImage(card) {
     }
     ctx.font = `500 30px ${BODY}`;
     ctx.fillStyle = C.muted;
-    ctx.fillText(fit(ctx, p.line, R - x - oddsW - 20), x, y + 82);
+    ctx.fillText(fit(ctx, p.detail[0], R - x - oddsW - 20), x, y + 82);
+    if (p.detail[1]) { // what actually happened, green or red
+      ctx.font = `700 30px ${BODY}`;
+      ctx.fillStyle = p.tone === 'win' ? C.win : p.tone === 'loss' ? C.loss : C.muted;
+      ctx.fillText(fit(ctx, p.detail[1], R - x - 20), x, y + 82 + LINE2);
+    }
     if (p.odds) {
       ctx.textAlign = 'right';
       ctx.font = `700 34px ${BODY}`;
       ctx.fillStyle = C.ink;
       ctx.fillText(p.odds, R, y + 58);
     }
-    y += ROW;
+    y += ROW + (p.detail.length - 1) * LINE2;
   });
 
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));

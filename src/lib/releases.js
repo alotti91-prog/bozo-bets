@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-24-h',
+    date: '2026-10-24',
+    title: 'The recap shows what happened',
+    idea: 'Lotti',
+    items: [
+      'Under each pick in the recap: how it actually went. “Shough 240+ pass yds · had 212 pass yds, 28 short,” “Bills won by 3, needed 7,” “game went 44.”',
+      'It’s on the recap picture and the shared text too. Legs typed in by hand, or graded before the final score, still just say won or lost.',
+    ],
+  },
+  {
     id: '2026-10-24-g',
     date: '2026-10-24',
     title: 'See who’s here',
