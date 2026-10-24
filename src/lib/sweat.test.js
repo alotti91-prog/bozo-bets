@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { legOutcome, carrier, slipOutcome, sweatEvents, sweatMessage } from './sweat.js';
+import { currentBozo } from './stats.js';
 
 const leg = (id, player, pick, result = null) => ({ id, player_id: player, pick, result });
 const names = (id) => ({ p1: 'Lotti', p2: 'Danny B', p3: 'Mikey' }[id] || id);
@@ -70,5 +71,18 @@ describe('Sunday sweat mode', () => {
     expect(sweatMessage([{ leg: a, outcome: 'won' }, { leg: b, outcome: 'lost' }], null, names)).toBe('🤡 2 legs just settled: 1 hit, 1 busted');
     expect(sweatMessage([{ leg: a, outcome: 'won' }], 'won', names)).toBe('🎉 The slip hit!');
     expect(sweatMessage([], null, names)).toBe('');
+  });
+  it('the bozo wears it for the week after the spin, never before you’ve watched', () => {
+    const weeks = [{ id: 'w5', n: 5 }, { id: 'w7', n: 7 }, { id: 'w8', n: 8 }]; // weeks can skip numbers
+    const spin = (id, week_id, landed_id, created_at, extra = {}) => ({ id, week_id, landed_id, created_at, ...extra });
+    // Week 7 busted and got spun (then re-spun); week 8 is open now
+    const spins = [spin('a', 'w5', 'p1', '2026-10-05T23:00Z'), spin('b', 'w7', 'p2', '2026-10-19T23:00Z'), spin('c', 'w7', 'p3', '2026-10-19T23:05Z')];
+    expect(currentBozo({ weeks, spins })).toBe('p3'); // the re-spin counts
+    expect(currentBozo({ weeks: weeks.slice(0, 2), spins })).toBe('p3'); // spun but week 8 not open yet
+    expect(currentBozo({ weeks, spins: spins.map((s) => (s.id === 'c' ? { ...s, hidden: true } : s)) })).toBe(null); // not watched: no spoilers
+    expect(currentBozo({ weeks: [...weeks, { id: 'w9', n: 9 }], spins })).toBe(null); // two weeks later: the face comes off
+    expect(currentBozo({ weeks, spins: [...spins, spin('d', 'w8', 'p1', '2026-10-26T23:00Z')] })).toBe('p1'); // this week's spin takes over
+    expect(currentBozo({ weeks, spins: [] })).toBe(null);
+    expect(currentBozo({ weeks: [], spins })).toBe(null);
   });
 });

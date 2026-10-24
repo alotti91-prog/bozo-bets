@@ -4,7 +4,7 @@ import { useLeague } from '../lib/useLeague.js';
 import { store, toast } from '../lib/ui.js';
 import { Brand, IconGear, IconTicket, IconWheel, IconBars, IconHistory } from '../components/common.jsx';
 import Claim from './Claim.jsx';
-import { bozoBelt } from '../lib/stats.js';
+import { bozoBelt, currentBozo } from '../lib/stats.js';
 import { unwatchedSpin, hideSpin } from '../lib/wheel.js';
 import { weekRecap } from '../lib/recap.js';
 import { RELEASES } from '../lib/releases.js';
@@ -153,7 +153,9 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
     const m = data.members.find((x) => x.user_id === uid);
     return (m && m.player_id && pname(m.player_id)) || 'Someone';
   };
-  const props = { data: view, me, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, nameOfUser,
+  const bozoId = currentBozo(view); // from the masked view, so an unwatched spin doesn't give it away
+  const bozoUser = (uid) => !!bozoId && data.members.some((m) => m.user_id === uid && m.player_id === bozoId);
+  const props = { data: view, me, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, bozoId, bozoUser, nameOfUser,
     openSettings: () => setSettings(true), watchSpin, markWatched, openRecap: (weekId) => setRecapOpen({ weekId }) };
   return (
     <>

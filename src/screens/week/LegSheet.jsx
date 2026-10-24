@@ -15,7 +15,7 @@ const WORD = { W: 'Won', L: 'Lost', P: 'Push' };
  * reactions, trash talk, and, for whoever is allowed, grading (admins),
  * editing, and removing it. The database enforces who can do what.
  */
-export default function LegSheet({ leg, st, data, me, isAdmin, locked, pname, userId, nameOfUser, reload, onGrade, onMiss, onEdit, onRemove, onClose }) {
+export default function LegSheet({ leg, st, data, me, isAdmin, locked, pname, userId, nameOfUser, bozoUser, reload, onGrade, onMiss, onEdit, onRemove, onClose }) {
   const [gradeNow, setGradeNow] = useState(false); // an admin grading before the game is final
   const [confirmRm, setConfirmRm] = useState(false);
   const who = pname(leg.player_id);
@@ -41,7 +41,7 @@ export default function LegSheet({ leg, st, data, me, isAdmin, locked, pname, us
 
       <div className="group">
         <span className="group-label">Trash talk</span>
-        <Comments leg={leg} comments={comments} userId={userId} isAdmin={isAdmin} nameOfUser={nameOfUser} reload={reload}
+        <Comments leg={leg} comments={comments} userId={userId} isAdmin={isAdmin} nameOfUser={nameOfUser} bozoUser={bozoUser} reload={reload}
           mode="all" setMode={() => {}} who={who} />
       </div>
 

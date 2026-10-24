@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { standings, hitPct } from '../lib/stats.js';
 import { amerFmt, fmtOdds, dollars, signed } from '../lib/odds.js';
-import { Belt } from '../components/common.jsx';
+import { Belt, BozoTag } from '../components/common.jsx';
 
 // Standings: two headline numbers, a leaderboard (tap a name for more), awards
 // you can swipe through, and hit rate by sport.
-export default function StandingsTab({ data, me, belt }) {
+export default function StandingsTab({ data, me, belt, bozoId }) {
   const [openId, setOpenId] = useState(null);
   const s = standings(data);
   const all = Object.values(s.rows);
@@ -61,7 +61,7 @@ export default function StandingsTab({ data, me, belt }) {
                 <button type="button" className="board-row" aria-expanded={open} onClick={() => setOpenId(open ? null : r.p.id)}>
                   <span className="rank">{i + 1}</span>
                   <span className="board-name">
-                    {r.p.name}<Belt on={belt?.id === r.p.id} />
+                    {r.p.name}<Belt on={belt?.id === r.p.id} /><BozoTag on={bozoId === r.p.id} />
                     {r.p.id === me && <span className="muted"> · you</span>}
                     {!r.p.active && <span className="muted"> · benched</span>}
                   </span>

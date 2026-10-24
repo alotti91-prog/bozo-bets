@@ -15,6 +15,12 @@ export function Brand({ name }) {
   );
 }
 
+// This week's bozo (the wheel's last pick, for the week after the spin): a red tag next to their name everywhere.
+export function BozoTag({ on }) {
+  if (!on) return null;
+  return <span className="bozo-tag" title="This week’s bozo" role="img" aria-label="(this week’s bozo)"><BozoFace face="full" size={14} />Bozo</span>;
+}
+
 // The Bozo Belt: the full-bozo face next to whoever has the most misses this season.
 export function Belt({ on, size = 18 }) {
   if (!on) return null;

@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-24-d',
+    date: '2026-10-24',
+    title: 'The bozo wears it',
+    idea: 'Lotti',
+    items: [
+      'For the week after the spin, the wheel’s bozo gets a red clown tag next to their name: on the slip, Standings, History, and their comments.',
+      'Nobody sees it until they’ve watched the spin, so no spoilers.',
+    ],
+  },
+  {
     id: '2026-10-24-c',
     date: '2026-10-24',
     title: 'Sunday sweat mode',

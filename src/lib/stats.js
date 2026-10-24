@@ -67,6 +67,23 @@ export function standings({ players, weeks, legs, spins }) {
  * missed most recently (latest week, then latest graded pick that week).
  * Returns { id, misses } or null if nobody has missed yet.
  */
+/**
+ * This week's bozo: whoever the wheel landed on last, for the week after the
+ * spin. The latest spin of the current week, or else of last week (the closest
+ * lower week); null when neither has one, or when that spin is hidden (you
+ * haven't watched it yet, so no spoilers). Pass the masked data (hideSpin).
+ */
+export function currentBozo({ weeks, spins }) {
+  if (!weeks?.length || !spins?.length) return null;
+  const byN = [...weeks].sort((a, b) => a.n - b.n);
+  for (const w of [byN[byN.length - 1], byN[byN.length - 2]]) {
+    if (!w) continue;
+    const s = spins.filter((x) => x.week_id === w.id).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
+    if (s) return s.hidden ? null : s.landed_id || null;
+  }
+  return null;
+}
+
 export function bozoBelt({ weeks, legs }) {
   const weekN = new Map(weeks.map((w) => [w.id, w.n]));
   const tally = new Map();

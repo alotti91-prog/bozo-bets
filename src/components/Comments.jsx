@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase, friendly } from '../lib/supabase.js';
 import { toast } from '../lib/ui.js';
 import { ago } from '../lib/deadline.js';
+import { BozoTag } from './common.jsx';
 
 const MAX = 280;
 const PREVIEW = 2; // comments shown before "See all" when the thread is closed
@@ -11,7 +12,7 @@ const PREVIEW = 2; // comments shown before "See all" when the thread is closed
  * add one (the leg panel); 'write' also focuses the box. readOnly lists every
  * comment with no box or delete (History).
  */
-export default function Comments({ leg, comments, userId, isAdmin, nameOfUser, reload, mode = 'all', setMode, who, readOnly = false }) {
+export default function Comments({ leg, comments, userId, isAdmin, nameOfUser, bozoUser, reload, mode = 'all', setMode, who, readOnly = false }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(null);
@@ -53,7 +54,7 @@ export default function Comments({ leg, comments, userId, isAdmin, nameOfUser, r
         <ul className="cmt-list" aria-label="Comments">
           {shown.map((c) => (
             <li key={c.id} className="cmt">
-              <b>{nameOfUser(c.user_id)}</b> <span className="cmt-body">{c.body}</span>{' '}
+              <b>{nameOfUser(c.user_id)}</b><BozoTag on={!!bozoUser?.(c.user_id)} /> <span className="cmt-body">{c.body}</span>{' '}
               <span className="cmt-meta">
                 <time dateTime={c.created_at}>{ago(c.created_at)}</time>
                 {!readOnly && open && (c.user_id === userId || isAdmin) && (confirmDel === c.id ? (

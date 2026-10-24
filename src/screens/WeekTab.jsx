@@ -23,7 +23,7 @@ const FINAL = { W: 'won', L: 'lost', P: 'pushed' };
 // The This week tab: the week and its deadline, a summary row, the slip (legs,
 // who's still missing, the total), and the actions. Tapping a leg opens its
 // panel (week/LegSheet); adding or editing a leg opens a sheet with week/LegForm.
-export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, nameOfUser, openSettings, watchSpin }) {
+export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, bozoId, bozoUser, nameOfUser, openSettings, watchSpin }) {
   const week = data.weeks[data.weeks.length - 1];
   const [form, setForm] = useState(null); // null, 'new', or the leg being edited
   const [openId, setOpenId] = useState(null); // leg whose panel is open
@@ -187,7 +187,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         {legs.length > 0 && (
           <ol className="legs">
             {legs.map((l) => (
-              <LegRow key={l.id} leg={l} st={statusOf(l)} inj={legInjury(l, statusOf(l), depth, now)} me={me} isAdmin={isAdmin} beltId={beltId} pname={pname}
+              <LegRow key={l.id} leg={l} st={statusOf(l)} inj={legInjury(l, statusOf(l), depth, now)} me={me} isAdmin={isAdmin} beltId={beltId} bozoId={bozoId} pname={pname}
                 fx={sweat.shaking.has(l.id) ? 'shake' : sweat.carry?.id === l.id ? 'carry' : null}
                 reactions={data.reactions || []} comments={data.comments || []}
                 onOpen={() => setOpenId(l.id)} onGrade={(r) => grade(l, r)} />
@@ -256,7 +256,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
 
       {openLeg && (
         <LegSheet key={openLeg.id} leg={openLeg} st={statusOf(openLeg)} data={data} me={me} isAdmin={isAdmin} locked={locked} pname={pname}
-          userId={userId} nameOfUser={nameOfUser} reload={reload}
+          userId={userId} nameOfUser={nameOfUser} bozoUser={bozoUser} reload={reload}
           onGrade={(r) => grade(openLeg, r)}
           onMiss={(patch) => act(supabase.from('legs').update(patch).eq('id', openLeg.id))}
           onEdit={() => { setOpenId(null); setForm(openLeg); }}

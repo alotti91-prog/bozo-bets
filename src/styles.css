@@ -578,3 +578,8 @@ main.wrap.gate { min-height: 100dvh; display: flex; flex-direction: column; just
   100% { transform: translate(var(--w, 0), 105vh) rotate(var(--r, 360deg)); opacity: .9; }
 }
 @media (prefers-reduced-motion: reduce) { .leg.is-shake { animation: none; } }
+
+/* This week's bozo (components/common.jsx BozoTag): a red tag after their name. */
+.bozo-tag { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 7px 1px 3px; border-radius: 999px; background: var(--nose-soft); color: var(--nose); font: 800 11px/1.4 var(--body); vertical-align: 1px; white-space: nowrap; }
+.bozo-tag svg { flex: none; }
+.leg .bozo-tag, .leg-card .bozo-tag { background: var(--p-loss-soft); color: var(--p-loss); } /* on the paper slip: light in dark mode too */

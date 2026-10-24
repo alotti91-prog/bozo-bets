@@ -1,6 +1,6 @@
 import { fmtOdds } from '../../lib/odds.js';
 import { legState, suggestedGrade } from '../../lib/bets.js';
-import { Belt, IconComment } from '../../components/common.jsx';
+import { Belt, BozoTag, IconComment } from '../../components/common.jsx';
 import { EMOJI } from '../../components/Reactions.jsx';
 import InjuryTag from '../../components/InjuryTag.jsx';
 import LiveLine from './LiveLine.jsx';
@@ -16,7 +16,7 @@ const TONE = { W: 'win', L: 'loss', P: 'pre' };
  *   inj  the player's injury status for an NFL prop before kickoff (legInjury()), or null
  *   fx   'shake' (it just busted) or 'carry' (last leg standing), from useSweat
  */
-export default function LegRow({ leg, st, inj, fx, me, isAdmin, beltId, pname, reactions, comments, onOpen, onGrade }) {
+export default function LegRow({ leg, st, inj, fx, me, isAdmin, beltId, bozoId, pname, reactions, comments, onOpen, onGrade }) {
   const who = pname(leg.player_id);
   const mine = me && leg.player_id === me;
   const state = legState(leg, st);
@@ -31,7 +31,7 @@ export default function LegRow({ leg, st, inj, fx, me, isAdmin, beltId, pname, r
       <button type="button" className="leg-main" onClick={onOpen} aria-haspopup="dialog">
         <span className="leg-dot" aria-hidden="true" />
         <span className="leg-body">
-          <span className="leg-who">{who}<Belt on={beltId === leg.player_id} />{mine && <span className="you"> · you</span>}</span>
+          <span className="leg-who">{who}<Belt on={beltId === leg.player_id} /><BozoTag on={bozoId === leg.player_id} />{mine && <span className="you"> · you</span>}</span>
           <span className="leg-pick">{leg.pick}{inj && <> <InjuryTag s={inj} /></>}</span>
           {showLive ? <LiveLine bet={leg.bet} s={st} /> : (
             <span className={`leg-live tone-${TONE[leg.result] || 'pre'}`}>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { weekInfo, amerFmt, fmtOdds, money } from '../lib/odds.js';
 import { fmtDate, listNames, toast } from '../lib/ui.js';
-import { IconChev, IconChevR, IconPlus, Belt } from '../components/common.jsx';
+import { IconChev, IconChevR, IconPlus, Belt, BozoTag } from '../components/common.jsx';
 import BozoFace from '../components/BozoFace.jsx';
 import { weekRecap } from '../lib/recap.js';
 import Reactions from '../components/Reactions.jsx';
@@ -14,7 +14,7 @@ const PILL = { live: 'Live', hit: 'Hit', busted: 'Busted', empty: 'Open' };
 
 // History: one row per week (result, who sank it, who the wheel picked).
 // Tap a week for its picks and trash talk. Admins add or fix past weeks.
-export default function HistoryTab({ data, pname, isAdmin, reload, beltId, nameOfUser, userId, openRecap }) {
+export default function HistoryTab({ data, pname, isAdmin, reload, beltId, bozoId, bozoUser, nameOfUser, userId, openRecap }) {
   const [open, setOpen] = useState({});
   const [editing, setEditing] = useState(null); // null, 'new', or a week row
   if (!data.weeks.length) {
@@ -95,11 +95,11 @@ export default function HistoryTab({ data, pname, isAdmin, reload, beltId, nameO
                   <ol className="hist-legs">
                     {legs.length ? legs.map((l) => (
                       <li key={l.id} className={l.result ? 'r-' + l.result : ''}>
-                        <span className="hl-who">{pname(l.player_id)}<Belt on={beltId === l.player_id} /> · {l.sport}</span>
+                        <span className="hl-who">{pname(l.player_id)}<Belt on={beltId === l.player_id} /><BozoTag on={bozoId === l.player_id} /> · {l.sport}</span>
                         <span className="hl-pick">{l.pick} <Reactions readOnly leg={l} reactions={data.reactions || []} userId={userId} nameOfUser={nameOfUser} reload={reload} /></span>
                         <span className="hl-odds">{fmtOdds(l.odds)}</span>
                         <span className="hl-r">{l.result || '–'}</span>
-                        <Comments readOnly leg={l} comments={(data.comments || []).filter((c) => c.leg_id === l.id)} nameOfUser={nameOfUser} />
+                        <Comments readOnly leg={l} comments={(data.comments || []).filter((c) => c.leg_id === l.id)} nameOfUser={nameOfUser} bozoUser={bozoUser} />
                       </li>
                     )) : <li><span className="hl-pick">No legs</span></li>}
                   </ol>
