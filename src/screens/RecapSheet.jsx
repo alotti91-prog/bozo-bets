@@ -8,8 +8,8 @@ import FaceLadder from './recap/FaceLadder.jsx';
 import FaceRules from './recap/FaceRules.jsx';
 
 /**
- * The weekly recap (r from weekRecap): who the wheel picked, then everyone's
- * face for the week. Opens a beat after you first watch a spin, live or as a
+ * The weekly recap (r from weekRecap, plus r.awards from weekAwards): who the
+ * wheel picked, the week's awards, then everyone's face for the week. Opens a beat after you first watch a spin, live or as a
  * replay. History and the Wheel tab open it again.
  */
 export default function RecapSheet({ recap: r, pname, leagueName, onClose }) {
@@ -53,6 +53,23 @@ export default function RecapSheet({ recap: r, pname, leagueName, onClose }) {
           <div className="glance-cell"><span className="glance-label">Legs that hit</span><span className="glance-value">{r.hits} of {r.total}</span></div>
           <div className="glance-cell"><span className="glance-label">Would{'’'}ve paid</span><span className="glance-value">{money(r.info.projected)}</span></div>
         </div>
+      )}
+
+      {r.awards?.length > 0 && (
+        <section aria-labelledby="recap-awards">
+          <h3 className="group-label" id="recap-awards">This week{'’'}s awards</h3>
+          <ul className="rows recap-awards">
+            {r.awards.map((a) => (
+              <li key={a.key} className="row">
+                <span className="award-icon" aria-hidden="true">{a.icon}</span>
+                <span className="row-label">
+                  <span><b>{a.title}</b> · {pname(a.who)}</span>
+                  <span className="row-note">{a.note}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <section aria-labelledby="recap-people">

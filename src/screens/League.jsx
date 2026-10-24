@@ -7,6 +7,7 @@ import Claim from './Claim.jsx';
 import { bozoBelt, currentBozo } from '../lib/stats.js';
 import { unwatchedSpin, hideSpin } from '../lib/wheel.js';
 import { weekRecap } from '../lib/recap.js';
+import { weekAwards } from '../lib/awards.js';
 import { RELEASES } from '../lib/releases.js';
 import { feedDown } from '../lib/scores.js';
 import { swipeDirection, swipeTarget } from '../lib/swipe.js';
@@ -146,7 +147,8 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
     go('wheel');
   }
   const recapWeek = recapOpen && (recapOpen.weekId || view.spins.find((s) => s.id === recapOpen.spinId)?.week_id);
-  const recap = recapWeek ? weekRecap(view, recapWeek) : null; // null until the spin's row has loaded
+  const base = recapWeek ? weekRecap(view, recapWeek) : null; // null until the spin's row has loaded
+  const recap = base && { ...base, awards: weekAwards(view, recapWeek) };
 
   const belt = bozoBelt(data);
   const nameOfUser = (uid) => {

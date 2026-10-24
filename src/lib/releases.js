@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-24-e',
+    date: '2026-10-24',
+    title: 'Awards in the recap',
+    idea: 'Lotti',
+    items: [
+      'The weekly recap now hands out awards: 😬 Closest miss, 💰 Biggest hit (plus-money only), 🧊 Ice cold (3+ straight losses), and 🔥 On fire (3+ straight wins).',
+      'They’re in the shared recap text too.',
+    ],
+  },
+  {
     id: '2026-10-24-d',
     date: '2026-10-24',
     title: 'The bozo wears it',

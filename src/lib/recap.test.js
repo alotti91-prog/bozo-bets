@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { weekRecap, personLine, recapText, FACES, lossTier, cutoffs, needsMissPick, marginFromLostBy, faceCounts, cutoffRows, FACE_ORDER } from './recap.js';
 import { liveStatus, gradeMargin, finishedGrades } from './bets.js';
+import { weekAwards, streak, missText } from './awards.js';
 
 const players = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris'].map((name, i) => ({ id: 'p' + (i + 1), name, active: true }));
 const pname = (id) => players.find((p) => p.id === id)?.name;
@@ -239,5 +240,58 @@ describe('grading finished games in one tap', () => {
       { id: 'typed', result: null, bet: null },
     ];
     expect(finishedGrades(legs, statusOf).map((g) => [g.leg.id, g.result, g.margin])).toEqual([['bills', 'L', -0.5], ['under', 'W', 4.5]]);
+  });
+});
+
+describe('weekly awards', () => {
+  const W = (n) => ({ id: 'w' + n, n, stake: 10 });
+  const wk = [W(4), W(5), W(7), W(8)]; // week 6 skipped (NFL weeks can have gaps)
+  const L = (p, week, result, extra = {}) => ({ id: `${p}-${week}-${extra.pick || ''}`, week_id: week, player_id: p, pick: extra.pick || `${p} pick`, odds: -110, result, ...extra });
+  const spread = (line) => ({ v: 1, sport: 'nfl', type: 'spread', side: 'home', line });
+  const legs = [
+    // Lotti: lost 4, 5, 7, 8 → ice cold, 4 straight
+    L('p1', 'w4', 'L'), L('p1', 'w5', 'L'), L('p1', 'w7', 'L'),
+    L('p1', 'w8', 'L', { pick: 'Bills −6.5', margin: -0.5, bet: spread(-6.5) }),
+    // Sully: won 5, 7, 8 (sat out 4) → on fire, 3 straight
+    L('p2', 'w5', 'W'), L('p2', 'w7', 'W'), L('p2', 'w8', 'W', { pick: 'Saquon anytime TD', odds: 140 }),
+    // Mikey: blowout loss, a bigger miss than Lotti's anyway
+    L('p3', 'w8', 'L', { pick: 'Steelers ML', margin: -21, bet: { v: 1, sport: 'nfl', type: 'ml', side: 'away' } }),
+    // Danny B: plus-money win, longest odds
+    L('p4', 'w8', 'W', { pick: 'Jets ML', odds: 210 }),
+    // Big Chris: typed leg the commish marked a close call, no number
+    L('p5', 'w8', 'L', { pick: 'Rangers ML', miss: 'close' }),
+  ];
+  it('picks the closest miss, the biggest hit, and the streaks', () => {
+    const a = weekAwards({ weeks: wk, legs, players }, 'w8');
+    expect(a.map((x) => [x.key, pname(x.who), x.note])).toEqual([
+      ['close', 'Lotti', 'Bills −6.5 · missed by 0.5'],
+      ['big', 'Danny B', 'Jets ML · +210'],
+      ['cold', 'Lotti', '4 straight losses'],
+      ['hot', 'Sully', '3 straight wins'],
+    ]);
+    expect(a.map((x) => x.title)).toEqual(['Closest miss', 'Biggest hit', 'Ice cold', 'On fire']);
+  });
+  it('skips awards that don’t apply', () => {
+    // Only a blowout loss and favorites winning: no closest miss, no biggest hit; streaks too short
+    const quiet = [L('p3', 'w8', 'L', { margin: -21, bet: spread(-3) }), L('p2', 'w8', 'W', { odds: -200 })];
+    expect(weekAwards({ weeks: wk, legs: quiet, players }, 'w8')).toEqual([]);
+    // An unmeasured loss (typed, no close-call pick) can't be the closest miss
+    expect(weekAwards({ weeks: wk, legs: [L('p1', 'w8', 'L')], players }, 'w8')).toEqual([]);
+    // The commish's "close call" counts, after any measured close call
+    expect(weekAwards({ weeks: wk, legs: [L('p5', 'w8', 'L', { pick: 'Rangers ML', miss: 'close' })], players }, 'w8')[0].note).toBe('Rangers ML · a close call');
+    expect(weekAwards({ weeks: wk, legs, players }, 'nope')).toEqual([]);
+  });
+  it('counts streaks through weeks someone sat out, and stops at a push', () => {
+    expect(streak('p2', wk, legs, 8)).toEqual({ kind: 'W', n: 3 });
+    expect(streak('p1', wk, legs, 7)).toEqual({ kind: 'L', n: 3 }); // as of week 7
+    const pushed = [...legs.filter((l) => !(l.player_id === 'p2' && l.week_id === 'w7')), L('p2', 'w7', 'P')];
+    expect(streak('p2', wk, pushed, 8)).toEqual({ kind: 'W', n: 1 });
+    expect(streak('p9', wk, legs, 8)).toEqual({ kind: null, n: 0 });
+    expect(missText({ margin: -3, bet: { type: 'ml' } })).toBe('lost by 3');
+    expect(missText({ margin: null, miss: 'close' })).toBe('a close call');
+  });
+  it('the share text lists the awards', () => {
+    const r = { ...weekRecap({ weeks, legs: busted, spins: [spin], players }, 'w7'), awards: [{ key: 'big', icon: '💰', title: 'Biggest hit', who: 'p4', note: 'Jets ML · +210' }] };
+    expect(recapText(r, pname)).toContain('💰 Biggest hit: Danny B (Jets ML · +210)');
   });
 });

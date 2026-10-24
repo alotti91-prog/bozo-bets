@@ -163,6 +163,10 @@ export function recapText(r, pname, leagueName = 'Bozo Bets') {
   if (r.info.status === 'hit') lines.push(`It hit! ${dollars(r.info.stake)} paid ${money(r.info.payout)} (${money(r.each)} each).`);
   else lines.push(`Busted. ${r.hits} of ${r.total} legs hit. Would’ve paid ${money(r.info.projected)}.`);
   if (r.bozo) lines.push(`${pname(r.bozo)} is the bozo. Puts in Week ${r.nextN}’s ${dollars(r.stake)}.`);
+  if (r.awards?.length) {
+    lines.push('');
+    r.awards.forEach((a) => lines.push(`${a.icon} ${a.title}: ${pname(a.who)} (${a.note})`));
+  }
   lines.push('');
   r.people.forEach((p) => lines.push(`${EMOJI[p.face]} ${pname(p.id)}: ${personLine(p)}`));
   return lines.join('\n');
