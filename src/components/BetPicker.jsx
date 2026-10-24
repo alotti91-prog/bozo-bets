@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SPORTS } from '../lib/espn.js';
-import { BET_TYPES, STATS, oddsLine, pickText, betProblem, emptyPick, betFromPick, boardOptions, pickFromBoard, isBoardPick } from '../lib/bets.js';
+import { BET_TYPES, STATS, oddsLine, pickText, betProblem, emptyPick, betFromPick, boardOptions, pickFromBoard, isBoardPick, boardPrice } from '../lib/bets.js';
 import { getGames, getRoster } from '../lib/scores.js';
 import { gameWhen } from '../lib/ui.js';
 import GameCard from './GameCard.jsx';
@@ -12,7 +12,7 @@ const ORDER = { pre: 0, in: 1, post: 2 };
  * pick, line, and odds fill in. "Other bets" (or "Something else") builds it by
  * hand: the kind of bet, the side, the line, or a player prop.
  * value/onChange hold picker state (see emptyPick); onChange(state, price) passes
- * the board price when there is one. onTypeInstead switches the form to free text
+ * DraftKings' price when the bet is on the board (tapped, or built by hand to match). onTypeInstead switches the form to free text
  * ("Type it instead", right under the sports so nobody scrolls past the games for it).
  */
 export default function BetPicker({ value: b, onChange, onTypeInstead }) {
@@ -42,15 +42,16 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
   }, [rosterKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loading = games.sport !== b.sport;
-  const set = (patch) => onChange({ ...b, ...patch });
+  // The picked game's board, if it has one and hasn't started.
+  const listGame = b.game ? games.list.find((g) => g.id === b.game.id) : null;
+  const boardGame = listGame && listGame.state === 'pre' && boardOptions(listGame).length ? listGame : null;
+  // Building it by hand: when it lands exactly on DraftKings' main line, pass that price along too.
+  const set = (patch) => { const nb = { ...b, ...patch }; onChange(nb, boardPrice(nb, boardGame)); };
   // A saved leg's game has no odds; borrow them from this week's list when it's there.
   const odds = b.game?.odds || games.list.find((g) => g.id === b.game?.id)?.odds || null;
   const pickSport = (s) => { setFind(''); setCustom(false); onChange(emptyPick(s)); };
   const pickGame = (g) => { setCustom(!!g); onChange({ ...emptyPick(b.sport), game: g }); };
   const pickBoard = (g, opt) => { setCustom(false); const { b: nb, price } = pickFromBoard(b.sport, g, opt); onChange(nb, price); };
-  // The picked game's board, if it has one and hasn't started.
-  const listGame = b.game ? games.list.find((g) => g.id === b.game.id) : null;
-  const boardGame = listGame && listGame.state === 'pre' && boardOptions(listGame).length ? listGame : null;
   const onBoard = boardGame && b.type && boardOptions(boardGame).some((o) => isBoardPick(b, boardGame, o));
   const showCustom = !boardGame || custom || (b.type && !onBoard);
   const pickType = (t) => {

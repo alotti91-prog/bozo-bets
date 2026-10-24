@@ -241,6 +241,17 @@ export function isBoardPick(b, game, opt) {
   return opt.type === 'ml' || betFromPick(b).line === opt.line;
 }
 
+/**
+ * DraftKings' price for a bet built by hand ("Other bets"), when it's exactly a
+ * line on the game's board and the game hasn't started; null otherwise (alternate
+ * lines, props, started games).
+ */
+export function boardPrice(b, game) {
+  if (!game || game.state !== 'pre') return null;
+  const opt = boardOptions(game).find((o) => isBoardPick(b, game, o));
+  return opt && opt.price != null ? opt.price : null;
+}
+
 // ---- Leg form state (see components/BetPicker.jsx) ----
 
 /** Blank picker state. */

@@ -10,7 +10,7 @@ import { RELEASES, unseenReleases } from './releases.js';
 import { slipPaths } from './slip.js';
 import { swipeDirection, swipeTarget } from './swipe.js';
 import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster, oddsBoard } from './espn.js';
-import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden, boardOptions, pickFromBoard, isBoardPick, betFromPick } from './bets.js';
+import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden, boardOptions, pickFromBoard, isBoardPick, betFromPick, boardPrice, emptyPick } from './bets.js';
 import espnHandler from '../../api/espn.js';
 import { runChecks } from '../../api/health.js';
 
@@ -625,5 +625,16 @@ describe('the DraftKings board', () => {
     const { b } = pickFromBoard('nfl', PIT_NO_GAME, opts[0]);
     expect(isBoardPick({ ...b, lineText: '3' }, PIT_NO_GAME, opts[0])).toBe(false);
     expect(boardOptions({ odds: { details: 'X -1' } })).toEqual([]);
+  });
+  it('fills DraftKings’ price for a bet built by hand when it matches the main line', () => {
+    const built = (patch) => ({ ...emptyPick('nfl'), game: PIT_NO_GAME, ...patch });
+    expect(boardPrice(built({ type: 'spread', side: 'away', lineText: '3.5', lineSign: '-' }), PIT_NO_GAME)).toBe(-102);
+    expect(boardPrice(built({ type: 'ml', side: 'home' }), PIT_NO_GAME)).toBe(145);
+    expect(boardPrice(built({ type: 'total', side: 'over', lineText: '44.5' }), PIT_NO_GAME)).toBe(-110);
+    expect(boardPrice(built({ type: 'spread', side: 'away', lineText: '7.5', lineSign: '-' }), PIT_NO_GAME)).toBe(null); // alternate line
+    expect(boardPrice(built({ type: 'spread', side: 'away' }), PIT_NO_GAME)).toBe(null); // no line yet
+    expect(boardPrice(built({ type: 'prop', side: 'over', lineText: '74.5', stat: 'rushYds' }), PIT_NO_GAME)).toBe(null);
+    expect(boardPrice(built({ type: 'ml', side: 'home' }), { ...PIT_NO_GAME, state: 'in' })).toBe(null); // started: no stale prices
+    expect(boardPrice(built({ type: 'ml', side: 'home' }), null)).toBe(null);
   });
 });

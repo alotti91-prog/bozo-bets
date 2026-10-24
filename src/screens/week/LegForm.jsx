@@ -19,6 +19,7 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
   const [pick, setPick] = useState(editing ? editing.pick : draft?.pick || '');
   const [sign, setSign] = useState(editing ? (editing.odds > 0 ? '+' : '-') : draft?.sign || '-');
   const [odds, setOdds] = useState(editing ? String(Math.abs(editing.odds)) : draft?.odds || '');
+  const [oddsAuto, setOddsAuto] = useState(!editing && !!draft?.oddsAuto); // odds came from DraftKings, not typed
   const [sport, setSport] = useState(editing ? editing.sport : draft?.sport || 'NFL');
   // 'pick' = choose from this week's games (tracks live); 'type' = free text, for anything else.
   // New legs always start on 'pick'. A typed leg reopens typed when you edit it.
@@ -35,7 +36,7 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
     return null;
   }
 
-  const saveDraft = (patch) => { if (!editing) store.set(draftKey, { player, pick, sign, odds, sport, b, ...patch }); };
+  const saveDraft = (patch) => { if (!editing) store.set(draftKey, { player, pick, sign, odds, oddsAuto, sport, b, ...patch }); };
   const toType = () => {
     const bet = betFromPick(b);
     if (!pick.trim() && !betProblem(bet)) setPick(pickText(bet));
@@ -94,13 +95,16 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
       {mode === 'pick' ? (
         <BetPicker value={b} onTypeInstead={toType}
           onChange={(nb, price) => {
-            // A price from DraftKings' board fills the odds too.
+            // A price from DraftKings' board fills the odds too. If the bet then moves
+            // off the board (another line, another game), that price no longer applies.
             const patch = { b: nb };
             if (price != null) {
-              patch.sign = price > 0 ? '+' : '-';
-              patch.odds = String(Math.abs(price));
-              setSign(patch.sign); setOdds(patch.odds);
+              Object.assign(patch, { sign: price > 0 ? '+' : '-', odds: String(Math.abs(price)), oddsAuto: true });
+            } else if (oddsAuto) {
+              Object.assign(patch, { odds: '', oddsAuto: false });
             }
+            if ('odds' in patch) { setOdds(patch.odds); setOddsAuto(patch.oddsAuto); }
+            if (patch.sign) setSign(patch.sign);
             setB(nb); saveDraft(patch); setHint({ text: price != null ? 'DraftKings’ price right now. Change it if yours is different.' : HINT, err: false });
           }} />
       ) : (
@@ -118,13 +122,13 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
           <label htmlFor="f-odds">Odds</label>
           <div className="odds-in">
             <button type="button" aria-label={sign === '+' ? 'Plus odds, tap for minus' : 'Minus odds, tap for plus'}
-              onClick={() => { const s = sign === '+' ? '-' : '+'; setSign(s); saveDraft({ sign: s }); }}>{sign === '+' ? '+' : '−'}</button>
+              onClick={() => { const s = sign === '+' ? '-' : '+'; setSign(s); setOddsAuto(false); saveDraft({ sign: s, oddsAuto: false }); }}>{sign === '+' ? '+' : '−'}</button>
             <input id="f-odds" inputMode="numeric" autoComplete="off" placeholder="110" value={odds}
               onChange={(e) => {
                 const v = e.target.value;
                 if (v.startsWith('+')) setSign('+');
                 else if (/^[-−]/.test(v)) setSign('-');
-                setOdds(v); saveDraft({ odds: v }); setHint({ text: HINT, err: false });
+                setOdds(v); setOddsAuto(false); saveDraft({ odds: v, oddsAuto: false }); setHint({ text: HINT, err: false });
               }} />
           </div>
         </div>

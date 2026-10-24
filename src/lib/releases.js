@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-h',
+    date: '2026-10-23',
+    title: 'DraftKings’ odds for bets you build',
+    idea: 'Lotti',
+    items: [
+      'Building a spread, total, or moneyline with “Other bets” now fills in DraftKings’ odds too, as long as it’s their main line.',
+      'Pick an alternate line and the odds clear, so you type the real ones. Player props still need their odds typed in.',
+    ],
+  },
+  {
     id: '2026-10-23-g',
     date: '2026-10-23',
     title: '“Type it instead” up top',
