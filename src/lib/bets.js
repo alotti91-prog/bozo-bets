@@ -1,3 +1,5 @@
+import { depthOf } from './depth.js';
+
 // Structured legs: the pick text they save as, and where they stand while the
 // game is on. Pure, covered by logic.test.js.
 //
@@ -48,22 +50,25 @@ export function propCatOf(stat) {
  * The players who fit a prop stat, one group per team (in the order given):
  * positions in the stat's order (QBs for passing; WRs, TEs, then RBs for
  * receiving), then depth chart order, then the roster's order. q filters by name.
- * With depth charts ({ espnId: { o, s } }, see depth.js), only starters show up
- * front and the rest go in `more` (behind "Show all players"); each player gets
- * `inj`, their injury status. Without them (college, or Sleeper down), everyone shows.
+ * With depth charts (see depth.js), backups and players off the depth chart go
+ * in `more` (behind "Show all players"); starters and anyone Sleeper couldn't
+ * match stay up front, so a starter is never hidden by a missed match. Each player gets `inj`, their injury status. Without
+ * depth charts (college, or Sleeper down), everyone shows.
  * roster: [{ id, name, pos, team }]. Returns [{ team, players, more, all }] (all = everyone, in order).
  */
 export function propPlayers(roster, stat, teams, q = '', depth = null) {
   const pos = STAT_POS[stat] || [];
   const needle = q.trim().toLowerCase();
-  const rank = (p) => p.depth ?? 99;
+  const rank = (p) => (p.depth == null ? 50 : p.depth);
   return teams.map((team) => {
     const all = roster
       .filter((p) => p.team === team && pos.includes(p.pos) && (!needle || p.name.toLowerCase().includes(needle)))
-      .map((p) => (depth?.[p.id] ? { ...p, depth: depth[p.id].o, inj: depth[p.id].s } : p))
+      .map((p) => { const d = depthOf(depth, p); return d ? { ...p, depth: d.o, inj: d.s, known: true } : p; })
       .sort((a, b) => pos.indexOf(a.pos) - pos.indexOf(b.pos) || rank(a) - rank(b));
-    const starters = needle ? [] : all.filter((p) => p.depth === 1);
-    return starters.length ? { team, players: starters, more: all.filter((p) => p.depth !== 1), all } : { team, players: all, more: [], all };
+    // Hidden: players Sleeper has below the starter, or off the depth chart (practice squad, IR)
+    const backup = (p) => p.known && p.depth !== 1;
+    if (needle || !all.some((p) => p.depth === 1)) return { team, players: all, more: [], all };
+    return { team, players: all.filter((p) => !backup(p)), more: all.filter(backup), all };
   });
 }
 

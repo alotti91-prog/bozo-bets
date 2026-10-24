@@ -13,7 +13,7 @@ import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard,
 import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden, boardOptions, pickFromBoard, isBoardPick, betFromPick, boardPrice, emptyPick, PROP_CATS, STAT_POS, propCatOf, propPlayers, STATS } from './bets.js';
 import espnHandler from '../../api/espn.js';
 import { runChecks } from '../../api/health.js';
-import { normalizeDepth, injuryTag } from './depth.js';
+import { normalizeDepth, injuryTag, nameKey, depthOf } from './depth.js';
 import depthHandler from '../../api/depth.js';
 
 describe('odds', () => {
@@ -680,11 +680,27 @@ describe('depth charts from Sleeper', () => {
     6: { position: 'WR', team: 'MIA', espn_id: '', depth_chart_order: 1 }, // no ESPN id to match
     7: { fantasy_positions: ['TE'], team: 'MIA', espn_id: 333, depth_chart_order: null, injury_status: 'IR' },
   };
-  it('keeps skill players on a team, keyed by ESPN id, with depth order and injury', () => {
-    expect(normalizeDepth(sleeper)).toEqual({
-      3918298: { o: 1, s: null }, 3046779: { o: 2, s: null }, 4379399: { o: 1, s: 'Questionable' }, 333: { o: null, s: 'IR' },
-    });
+  it('keeps skill players on a team, keyed by ESPN id (when Sleeper has it) and by name', () => {
+    const named = { ...sleeper, 6: { ...sleeper[6], full_name: 'Tyreek Hill' }, 4984: { ...sleeper[4984], full_name: 'Josh Allen' } };
+    const d = normalizeDepth(named);
+    expect(d['3918298']).toEqual({ o: 1, s: null });
+    expect(d['4379399']).toEqual({ o: 1, s: 'Questionable' });
+    expect(d['333']).toEqual({ o: null, s: 'IR' });
+    expect(d['n:tyreek hill']).toEqual({ o: 1, s: null }); // no ESPN id: matched by name instead
+    expect(d['n:josh allen']).toEqual({ o: 1, s: null });
+    expect(d['111']).toBe(undefined); // free agent
+    expect(d['222']).toBe(undefined); // linebacker
     expect(normalizeDepth(null)).toEqual({});
+  });
+  it('matches names across ESPN and Sleeper, and skips names two players share', () => {
+    expect([nameKey('A.J. Brown'), nameKey('Marvin Harrison Jr.'), nameKey('D’Andre Swift'), nameKey('Amon-Ra St. Brown'), nameKey('Kenneth Walker III')])
+      .toEqual(['aj brown', 'marvin harrison', 'dandre swift', 'amonra st brown', 'kenneth walker']);
+    const twins = normalizeDepth({ 1: { position: 'WR', team: 'LAC', full_name: 'Mike Williams', depth_chart_order: 1 }, 2: { position: 'WR', team: 'NYJ', full_name: 'Mike Williams', depth_chart_order: 3 }, 3: { position: 'WR', team: 'NYJ', full_name: 'Mike Williams', depth_chart_order: 2 } });
+    expect(twins['n:mike williams']).toBe(undefined);
+    const d = { 9: { o: 2, s: null }, 'n:amonra st brown': { o: 1, s: null } };
+    expect(depthOf(d, { id: '9', name: 'Anyone' })).toEqual({ o: 2, s: null });
+    expect(depthOf(d, { id: '7', name: 'Amon-Ra St. Brown' })).toEqual({ o: 1, s: null });
+    expect(depthOf(d, { id: '8', name: 'Nobody' })).toBe(null);
   });
   it('shortens injuries like DraftKings', () => {
     expect([injuryTag('Questionable'), injuryTag('Doubtful'), injuryTag('Out'), injuryTag('IR'), injuryTag(null), injuryTag('NA')]).toEqual(['Q', 'D', 'Out', 'IR', '', '']);
@@ -720,5 +736,11 @@ describe('depth charts from Sleeper', () => {
     // No depth data (college, or Sleeper down): everyone, as before
     expect(propPlayers(roster, 'recYds', ['BUF'])[0].more).toEqual([]);
     expect(propPlayers(roster, 'recYds', ['BUF'], '', {})[0].players.length).toBe(6);
+    // A player the depth chart doesn't know is never hidden (could be a starter Sleeper couldn't match)
+    const partial = { 11: { o: 1, s: null }, 10: { o: 2, s: null }, 'n:ray davis': { o: null, s: 'IR' } }; // Davis: matched by name, off the chart
+    const [pg] = propPlayers(roster, 'recYds', ['BUF'], '', partial);
+    expect(pg.players.map((p) => p.name)).toEqual(['Keon Coleman', 'Khalil Shakir', 'Dalton Kincaid', 'James Cook']);
+    expect(pg.more.map((p) => p.name)).toEqual(['Curtis Samuel', 'Ray Davis']);
+    expect(pg.more[1].inj).toBe('IR');
   });
 });

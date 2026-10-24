@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PROP_CATS, STAT_POS, STATS, propCatOf, propPlayers } from '../lib/bets.js';
 import { getDepth } from '../lib/scores.js';
-import { injuryTag } from '../lib/depth.js';
+import { injuryTag, depthOf } from '../lib/depth.js';
 
 // Short names for the stat buttons inside a category ("Yards" under Passing).
 const CHIP = {
@@ -43,7 +43,7 @@ export default function PropPicker({ b, set, teams, roster, onTypeInstead }) {
   const hidden = groups.reduce((n, g) => n + g.more.length, 0);
   const shown = groups.map((g) => ({ ...g, players: showAll ? g.all : g.players }));
   const total = shown.reduce((n, g) => n + g.players.length, 0);
-  const injOf = (id) => depth?.[id]?.s || null;
+  const injOf = (player) => depthOf(depth, { id: player.id, name: player.name })?.s || null;
   const teamName = (abbr) => teams.find(([, t]) => t.abbr === abbr)?.[1].short || abbr;
   const picked = b.player && roster && !roster.err && fits(b.player, b.stat);
 
@@ -68,7 +68,7 @@ export default function PropPicker({ b, set, teams, roster, onTypeInstead }) {
 
       {cat && picked && (
         <div className="bp-game is-picked">
-          <span className="bp-game-name"><strong>{b.player.name}</strong><span className="sub">{posOf(b.player.id)} · {teamName(b.player.team)}{injOf(b.player.id) ? ` · ${injOf(b.player.id)}` : ''}</span></span>
+          <span className="bp-game-name"><strong>{b.player.name}</strong><span className="sub">{posOf(b.player.id)} · {teamName(b.player.team)}{injOf(b.player) ? ` · ${injOf(b.player)}` : ''}</span></span>
           <button type="button" className="text-btn nose" onClick={() => set({ player: null })}>Change</button>
         </div>
       )}

@@ -10,22 +10,45 @@ export const SLEEPER_STATE = 'https://api.sleeper.app/v1/state/nfl'; // tiny: us
 const SKILL = ['QB', 'RB', 'WR', 'TE', 'FB'];
 
 /**
- * Sleeper's player map → { [espnId]: { o, s } } for skill players on a team:
+ * A name made comparable across ESPN and Sleeper: "A.J. Brown", "Marvin Harrison
+ * Jr." and "D'Andre Swift" → "aj brown", "marvin harrison", "dandre swift".
+ */
+export function nameKey(name) {
+  return String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[.'’`-]/g, '').replace(/[^a-z ]/g, ' ')
+    .split(/\s+/).filter((w) => w && !['jr', 'sr', 'ii', 'iii', 'iv', 'v'].includes(w)).join(' ');
+}
+
+/**
+ * Sleeper's player map → { [key]: { o, s } } for skill players on a team:
  * o = depth chart order (1 = starter, null if unknown), s = injury status
- * ("Questionable", "Out", ...) or null. Keyed by ESPN id so it lines up with the
- * ESPN rosters and live stats the app already uses.
+ * ("Questionable", "Out", ...) or null. Each player is keyed by ESPN id (when
+ * Sleeper has it) and by "n:" + nameKey, since Sleeper only has ESPN ids for
+ * some players. A name two players share is left out rather than guessed.
  */
 export function normalizeDepth(json) {
   const out = {};
   if (!json || typeof json !== 'object') return out;
+  const shared = new Set();
   for (const p of Object.values(json)) {
     const pos = p?.position || p?.fantasy_positions?.[0];
-    const espn = p?.espn_id == null ? '' : String(p.espn_id).trim();
-    if (!espn || !p.team || !SKILL.includes(pos)) continue;
+    if (!p?.team || !SKILL.includes(pos)) continue;
     const o = Number(p.depth_chart_order);
-    out[espn] = { o: Number.isInteger(o) && o > 0 ? o : null, s: p.injury_status || null };
+    const info = { o: Number.isInteger(o) && o > 0 ? o : null, s: p.injury_status || null };
+    const espn = p.espn_id == null ? '' : String(p.espn_id).trim();
+    if (espn) out[espn] = info;
+    const n = nameKey(p.full_name || `${p.first_name || ''} ${p.last_name || ''}`);
+    if (!n || shared.has(n)) continue;
+    if (out[`n:${n}`]) { delete out[`n:${n}`]; shared.add(n); continue; }
+    out[`n:${n}`] = info;
   }
   return out;
+}
+
+/** Depth info for an ESPN roster player ({ id, name }): by ESPN id, else by name. */
+export function depthOf(depth, p) {
+  if (!depth || !p) return null;
+  return depth[p.id] || depth[`n:${nameKey(p.name)}`] || null;
 }
 
 const TAGS = { Questionable: 'Q', Doubtful: 'D', Out: 'Out', IR: 'IR', PUP: 'PUP', Sus: 'Susp' };
