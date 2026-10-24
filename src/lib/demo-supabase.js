@@ -63,9 +63,11 @@ const DEMO_GAMES = [
   mkGame('930001', 'nhl', 'NYR', 'BOSH', inHours(-1), 'in', '12:05 - 2nd', 2, 1, { details: 'BOS -130', total: 6 }),
   mkGame('940001', 'mlb', 'LAD', 'NYY', inHours(28), 'pre', 'Fri 8:08 PM', null, null, { details: 'LAD -125', total: 8.5, board: bd(-1.5, 135, -160, -125, 105, 8.5, -105, -115) }),
 ];
+// [name, position, ESPN id (optional), depth chart order (default 1 = starter), injury]
 const ROSTER = {
-  CHI: [['Caleb Williams', 'QB'], ["D'Andre Swift", 'RB'], ['DJ Moore', 'WR'], ['Rome Odunze', 'WR'], ['Cole Kmet', 'TE']],
-  NE: [['Drake Maye', 'QB'], ['Rhamondre Stevenson', 'RB'], ['Stefon Diggs', 'WR'], ['Hunter Henry', 'TE']],
+  CHI: [['Caleb Williams', 'QB'], ["D'Andre Swift", 'RB', null, 1, 'Questionable'], ['DJ Moore', 'WR'], ['Rome Odunze', 'WR'], ['Cole Kmet', 'TE'],
+    ['Tyson Bagent', 'QB', null, 2], ['Roschon Johnson', 'RB', null, 2], ['Olamide Zaccheaus', 'WR', null, 2]],
+  NE: [['Drake Maye', 'QB'], ['Rhamondre Stevenson', 'RB'], ['Stefon Diggs', 'WR'], ['Hunter Henry', 'TE'], ['Antonio Gibson', 'RB', null, 2], ['DeMario Douglas', 'WR', null, 2, 'Out']],
   BUF: [['Josh Allen', 'QB', '3918298'], ['James Cook', 'RB', '4379399'], ['Khalil Shakir', 'WR'], ['Dalton Kincaid', 'TE']],
   MIA: [['Tua Tagovailoa', 'QB'], ["De'Von Achane", 'RB'], ['Tyreek Hill', 'WR'], ['Jaylen Waddle', 'WR']],
   PHI: [['Jalen Hurts', 'QB', '4040715'], ['Saquon Barkley', 'RB', '3929630'], ['A.J. Brown', 'WR'], ['DeVonta Smith', 'WR'], ['Dallas Goedert', 'TE']],
@@ -87,6 +89,14 @@ function demoBet(type, sport, gameId, extra) {
   const g = DEMO_GAMES.find((x) => x.id === gameId);
   const team = (t) => ({ id: t.id, abbr: t.abbr, short: t.short, name: t.name });
   return { v: 1, sport, type, ...extra, game: { id: g.id, start: g.start, short: g.short, home: team(g.home), away: team(g.away) } };
+}
+// Fake depth charts for demo mode (stands in for /api/depth), keyed like the demo rosters' ids.
+export function demoDepth() {
+  const players = {};
+  for (const g of DEMO_GAMES.filter((x) => x.sport === 'nfl')) {
+    for (const t of [g.away, g.home]) (ROSTER[t.abbr] || []).forEach(([, , pid, o = 1, s = null], i) => { players[pid || `${t.id}${i}`] = { o, s }; });
+  }
+  return { players };
 }
 export async function demoScores({ kind, sport, event, team }) {
   await new Promise((r) => setTimeout(r, 120));

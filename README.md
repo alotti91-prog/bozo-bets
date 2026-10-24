@@ -98,7 +98,7 @@ The first few emails from a new Gmail sender can land in spam, so tell the group
 
 ## Get an alert if something breaks
 
-`/api/health` on your site checks Supabase (the database) and ESPN's live-scores feed, and answers 200 when both work or 503 with what's broken. Point a free uptime monitor at it:
+`/api/health` on your site checks Supabase (the database), ESPN's live-scores feed, and Sleeper (NFL depth charts for player props), and answers 200 when all three work or 503 with what's broken. Point a free uptime monitor at it:
 
 1. Sign up at **uptimerobot.com** (free).
 2. **New monitor** → type **HTTP(s)** → URL `https://<your-site>/api/health` → check every **5 minutes**.
@@ -174,7 +174,8 @@ src/lib/recap.js           the weekly recap: faces, bozo, share text
 src/lib/useLeague.js       loads a league and keeps it live
 src/lib/demo-supabase.js   sample data for `npm run demo`
 src/lib/bets.js, espn.js    live legs: bet text, live status, ESPN data
-api/                       Vercel functions: ESPN proxy, health check
+src/lib/depth.js           NFL depth charts and injuries from Sleeper (player props)
+api/                       Vercel functions: ESPN proxy, Sleeper depth charts, health check
 src/screens/               sign-in, onboarding, and the four tabs + settings
 src/screens/week/          This week's pieces: leg row, leg panel, leg form, payout
 src/screens/settings/      one file per Settings page (deadline, players, people, …)

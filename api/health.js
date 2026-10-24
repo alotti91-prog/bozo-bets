@@ -3,6 +3,7 @@
 // monitor (UptimeRobot) opens this every few minutes and emails the commish
 // when it stops returning 200. Read-only: it never writes anything.
 import { espnUrl, normalizeScoreboard } from '../src/lib/espn.js';
+import { SLEEPER_STATE } from '../src/lib/depth.js';
 
 const env = (...names) => names.map((n) => process.env[n]).find(Boolean) || '';
 
@@ -31,7 +32,15 @@ export async function runChecks(now = new Date()) {
     if (json.events.length && !normalizeScoreboard(json, 'nfl').length) throw new Error('Couldn’t read teams from ESPN’s scoreboard');
     return 'ok';
   });
-  const checks = { supabase: await supabase, espn: await espn };
+  // Sleeper (depth charts for player props). Its tiny "state" call, never the 5MB player list.
+  const sleeper = check(async () => {
+    const r = await fetch(SLEEPER_STATE, { headers: { accept: 'application/json' }, signal: timeout() });
+    if (!r.ok) throw new Error(`Sleeper answered ${r.status}`);
+    const json = await r.json();
+    if (!json?.season) throw new Error('Sleeper’s state changed shape');
+    return 'ok';
+  });
+  const checks = { supabase: await supabase, espn: await espn, sleeper: await sleeper };
   return { ok: Object.values(checks).every((v) => v === 'ok'), checks, at: now.toISOString() };
 }
 

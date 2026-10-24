@@ -47,18 +47,24 @@ export function propCatOf(stat) {
 /**
  * The players who fit a prop stat, one group per team (in the order given):
  * positions in the stat's order (QBs for passing; WRs, TEs, then RBs for
- * receiving), keeping the roster's order within a position. q filters by name.
- * roster: [{ id, name, pos, team }]. Returns [{ team, players }].
+ * receiving), then depth chart order, then the roster's order. q filters by name.
+ * With depth charts ({ espnId: { o, s } }, see depth.js), only starters show up
+ * front and the rest go in `more` (behind "Show all players"); each player gets
+ * `inj`, their injury status. Without them (college, or Sleeper down), everyone shows.
+ * roster: [{ id, name, pos, team }]. Returns [{ team, players, more, all }] (all = everyone, in order).
  */
-export function propPlayers(roster, stat, teams, q = '') {
+export function propPlayers(roster, stat, teams, q = '', depth = null) {
   const pos = STAT_POS[stat] || [];
   const needle = q.trim().toLowerCase();
-  return teams.map((team) => ({
-    team,
-    players: roster
+  const rank = (p) => p.depth ?? 99;
+  return teams.map((team) => {
+    const all = roster
       .filter((p) => p.team === team && pos.includes(p.pos) && (!needle || p.name.toLowerCase().includes(needle)))
-      .sort((a, b) => pos.indexOf(a.pos) - pos.indexOf(b.pos)),
-  }));
+      .map((p) => (depth?.[p.id] ? { ...p, depth: depth[p.id].o, inj: depth[p.id].s } : p))
+      .sort((a, b) => pos.indexOf(a.pos) - pos.indexOf(b.pos) || rank(a) - rank(b));
+    const starters = needle ? [] : all.filter((p) => p.depth === 1);
+    return starters.length ? { team, players: starters, more: all.filter((p) => p.depth !== 1), all } : { team, players: all, more: [], all };
+  });
 }
 
 export const gameKey = (bet) => `${bet.sport}:${bet.game.id}`;

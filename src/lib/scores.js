@@ -2,7 +2,7 @@
 // Vercel), or fake games in demo mode. In `npm run dev` there's no /api, so it
 // asks ESPN directly.
 import { espnUrls, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
-import { demoScores } from './demo-supabase.js';
+import { demoScores, demoDepth } from './demo-supabase.js';
 
 async function direct(params) {
   const urls = espnUrls(params);
@@ -57,4 +57,21 @@ export function getRoster(sport, team) {
   const k = `${sport}:${team}`;
   if (!rosters.has(k)) rosters.set(k, get({ kind: 'roster', sport, team }).then((b) => b.players).catch((e) => { rosters.delete(k); throw e; }));
   return rosters.get(k);
+}
+
+let depth = null;
+/**
+ * NFL depth charts and injuries ({ espnId: { o, s } }, from Sleeper via /api/depth),
+ * fetched once per session. Resolves to null for other sports, in `npm run dev`
+ * (no /api), or if Sleeper's down: the prop picker then lists everyone, A–Z.
+ */
+export function getDepth(sport) {
+  if (sport !== 'nfl') return Promise.resolve(null);
+  if (!depth) {
+    depth = (demoDepth ? Promise.resolve(demoDepth()) : fetch('/api/depth').then((r) => (r.ok && (r.headers.get('content-type') || '').includes('json') ? r.json() : null)))
+      .then((b) => b?.players || null)
+      .catch(() => null)
+      .then((d) => { if (!d) depth = null; return d; }); // try again next time if it failed
+  }
+  return depth;
 }

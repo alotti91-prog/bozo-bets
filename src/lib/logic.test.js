@@ -13,6 +13,8 @@ import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard,
 import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden, boardOptions, pickFromBoard, isBoardPick, betFromPick, boardPrice, emptyPick, PROP_CATS, STAT_POS, propCatOf, propPlayers, STATS } from './bets.js';
 import espnHandler from '../../api/espn.js';
 import { runChecks } from '../../api/health.js';
+import { normalizeDepth, injuryTag } from './depth.js';
+import depthHandler from '../../api/depth.js';
 
 describe('odds', () => {
   it('converts American odds to decimal', () => {
@@ -303,9 +305,11 @@ describe('health check', () => {
   };
   it('passes when Supabase and ESPN both answer', () => withEnv(async () => {
     const asked = [];
-    globalThis.fetch = async (u) => { asked.push(String(u)); return String(u).includes('supabase') ? ok([]) : ok(SB); };
+    globalThis.fetch = async (u) => { asked.push(String(u)); return String(u).includes('supabase') ? ok([]) : String(u).includes('sleeper') ? ok({ season: '2026', week: 8 }) : ok(SB); };
     const r = await runChecks(new Date(2026, 9, 25));
-    expect(r).toMatchObject({ ok: true, checks: { supabase: 'ok', espn: 'ok' } });
+    expect(r).toMatchObject({ ok: true, checks: { supabase: 'ok', espn: 'ok', sleeper: 'ok' } });
+    expect(asked.some((u) => u.endsWith('/v1/state/nfl'))).toBe(true);
+    expect(asked.some((u) => u.includes('/v1/players/'))).toBe(false); // never the 5MB list
     expect(asked.some((u) => u.includes('/rest/v1/leagues'))).toBe(true);
     expect(asked.some((u) => u.includes('dates=20261025'))).toBe(true);
   }));
@@ -315,6 +319,7 @@ describe('health check', () => {
     expect(r.ok).toBe(false);
     expect(r.checks.supabase).toMatch(/540.*paused/);
     expect(r.checks.espn).toMatch(/changed shape/);
+    expect(r.checks.sleeper).toMatch(/Sleeper’s state changed shape/);
   }));
 });
 
@@ -662,5 +667,58 @@ describe('player props, DraftKings style', () => {
   });
   it('finds a player by name', () => {
     expect(names(propPlayers(roster, 'td', ['BUF', 'MIA'], ' hill'))).toEqual([['BUF', []], ['MIA', ['Tyreek Hill']]]);
+  });
+});
+
+describe('depth charts from Sleeper', () => {
+  const sleeper = {
+    4984: { position: 'QB', team: 'BUF', espn_id: 3918298, depth_chart_order: 1, injury_status: null },
+    2: { position: 'QB', team: 'BUF', espn_id: '3046779', depth_chart_order: 2, injury_status: null },
+    3: { position: 'RB', team: 'BUF', espn_id: 4379399, depth_chart_order: 1, injury_status: 'Questionable' },
+    4: { position: 'WR', team: null, espn_id: 111, depth_chart_order: 1 }, // free agent
+    5: { position: 'LB', team: 'BUF', espn_id: 222, depth_chart_order: 1 }, // not a skill player
+    6: { position: 'WR', team: 'MIA', espn_id: '', depth_chart_order: 1 }, // no ESPN id to match
+    7: { fantasy_positions: ['TE'], team: 'MIA', espn_id: 333, depth_chart_order: null, injury_status: 'IR' },
+  };
+  it('keeps skill players on a team, keyed by ESPN id, with depth order and injury', () => {
+    expect(normalizeDepth(sleeper)).toEqual({
+      3918298: { o: 1, s: null }, 3046779: { o: 2, s: null }, 4379399: { o: 1, s: 'Questionable' }, 333: { o: null, s: 'IR' },
+    });
+    expect(normalizeDepth(null)).toEqual({});
+  });
+  it('shortens injuries like DraftKings', () => {
+    expect([injuryTag('Questionable'), injuryTag('Doubtful'), injuryTag('Out'), injuryTag('IR'), injuryTag(null), injuryTag('NA')]).toEqual(['Q', 'D', 'Out', 'IR', '', '']);
+  });
+  it('the /api/depth function trims Sleeper’s list and caches it for a day', async () => {
+    const saved = globalThis.fetch;
+    const res = () => { const r = { headers: {}, setHeader(k, v) { r.headers[k] = v; }, status(c) { r.code = c; return r; }, json(b) { r.body = b; return r; } }; return r; };
+    try {
+      globalThis.fetch = async () => ({ ok: true, json: async () => sleeper });
+      const r = await depthHandler({ query: {} }, res());
+      expect(r.code).toBe(200);
+      expect(r.body.players['3918298']).toEqual({ o: 1, s: null });
+      expect(r.headers['Cache-Control']).toMatch(/s-maxage=86400/);
+      globalThis.fetch = async () => { throw new Error('down'); };
+      const bad = await depthHandler({ query: {} }, res());
+      expect(bad.code).toBe(502);
+    } finally { globalThis.fetch = saved; }
+  });
+  it('puts starters first and tucks the rest behind “Show all”', () => {
+    const roster = [
+      { id: '10', name: 'Curtis Samuel', pos: 'WR', team: 'BUF' }, { id: '11', name: 'Keon Coleman', pos: 'WR', team: 'BUF' },
+      { id: '12', name: 'Khalil Shakir', pos: 'WR', team: 'BUF' }, { id: '13', name: 'Dalton Kincaid', pos: 'TE', team: 'BUF' },
+      { id: '14', name: 'James Cook', pos: 'RB', team: 'BUF' }, { id: '15', name: 'Ray Davis', pos: 'RB', team: 'BUF' },
+    ];
+    const depth = { 10: { o: 2, s: null }, 11: { o: 1, s: 'Questionable' }, 12: { o: 1, s: null }, 13: { o: 1, s: null }, 14: { o: 1, s: null }, 15: { o: 2, s: null } };
+    const [g] = propPlayers(roster, 'recYds', ['BUF'], '', depth);
+    expect(g.players.map((p) => p.name)).toEqual(['Keon Coleman', 'Khalil Shakir', 'Dalton Kincaid', 'James Cook']);
+    expect(g.players[0].inj).toBe('Questionable');
+    expect(g.more.map((p) => p.name)).toEqual(['Curtis Samuel', 'Ray Davis']);
+    expect(g.all.map((p) => p.name)).toEqual(['Keon Coleman', 'Khalil Shakir', 'Curtis Samuel', 'Dalton Kincaid', 'James Cook', 'Ray Davis']); // Show all: still by position
+    // Searching looks through everyone
+    expect(propPlayers(roster, 'recYds', ['BUF'], 'ray', depth)[0]).toMatchObject({ players: [{ name: 'Ray Davis' }], more: [] });
+    // No depth data (college, or Sleeper down): everyone, as before
+    expect(propPlayers(roster, 'recYds', ['BUF'])[0].more).toEqual([]);
+    expect(propPlayers(roster, 'recYds', ['BUF'], '', {})[0].players.length).toBe(6);
   });
 });

@@ -5,6 +5,17 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-j',
+    date: '2026-10-23',
+    title: 'Starters first, with injury tags',
+    idea: 'Lotti',
+    items: [
+      'NFL player props now list each team’s starters first, from Sleeper’s depth charts: QB1, RB1, the starting receivers. Backups are one tap away under “Show all players.”',
+      'Injured players get a tag like DraftKings: Q, D, Out, or IR.',
+      'College props still list everyone, with search.',
+    ],
+  },
+  {
     id: '2026-10-23-i',
     date: '2026-10-23',
     title: 'Player props, DraftKings style',

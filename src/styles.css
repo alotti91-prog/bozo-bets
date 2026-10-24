@@ -311,6 +311,8 @@ div.row { cursor: default; }
 .prop-players .row { min-height: 46px; }
 .pos-tag { font: 700 12px/1 var(--body); color: var(--muted); background: var(--surface); border-radius: 6px; padding: 4px 6px; min-width: 30px; text-align: center; }
 .segmented.stat-pick button { min-height: 32px; }
+.inj-tag { font: 700 11px/1 var(--body); color: var(--gold-ink); background: var(--gold-soft); border-radius: 6px; padding: 4px 6px; }
+.inj-tag.is-out { color: var(--nose); background: var(--nose-soft); }
 .bp-preview { font-size: 15px; color: var(--muted); text-align: center; }
 
 /* a game and its DraftKings board */
