@@ -2,3 +2,4 @@
 export const demoClient = null;
 export const demoScores = null;
 export const demoDepth = null;
+export const demoProps = null;

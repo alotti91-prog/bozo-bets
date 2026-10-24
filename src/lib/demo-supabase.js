@@ -98,6 +98,22 @@ export function demoDepth() {
   }
   return { players };
 }
+// Fake DraftKings prop lines for demo mode (stands in for /api/props), only for NE @ CHI.
+// Backups have none, like the real thing, so they fall back to typing the number.
+const DEMO_PROPS = {
+  'caleb williams': { passYds: { l: 224.5, o: -115, u: -105 }, passTd: { l: 1.5, o: 105, u: -135 }, passCmp: { l: 21.5, o: -110, u: -120 }, int: { l: 0.5, o: -130, u: 100 }, td: { y: 600 } },
+  'dandre swift': { rushYds: { l: 59.5, o: -110, u: -120 }, rushAtt: { l: 14.5, o: -105, u: -125 }, rushRecYds: { l: 79.5, o: -115, u: -115 }, rec: { l: 2.5, o: 105, u: -135 }, recYds: { l: 17.5, o: -115, u: -115 }, td: { y: 140 } },
+  'dj moore': { recYds: { l: 62.5, o: -115, u: -105 }, rec: { l: 4.5, o: -140, u: 110 }, td: { y: 165 } },
+  'rome odunze': { recYds: { l: 48.5, o: -110, u: -120 }, rec: { l: 3.5, o: -150, u: 120 }, td: { y: 210 } },
+  'cole kmet': { recYds: { l: 28.5, o: -115, u: -115 }, rec: { l: 2.5, o: -125, u: -105 }, td: { y: 380 } },
+  'drake maye': { passYds: { l: 218.5, o: -115, u: -115 }, passTd: { l: 1.5, o: 120, u: -150 }, passCmp: { l: 20.5, o: -115, u: -115 }, int: { l: 0.5, o: -145, u: 115 }, rushYds: { l: 24.5, o: -115, u: -115 }, td: { y: 330 } },
+  'rhamondre stevenson': { rushYds: { l: 54.5, o: -115, u: -115 }, rushAtt: { l: 13.5, o: -110, u: -120 }, rushRecYds: { l: 71.5, o: -115, u: -115 }, td: { y: 135 } },
+  'stefon diggs': { recYds: { l: 55.5, o: -115, u: -115 }, rec: { l: 5.5, o: 100, u: -130 }, td: { y: 200 } },
+  'hunter henry': { recYds: { l: 34.5, o: -115, u: -115 }, rec: { l: 3.5, o: -120, u: -110 }, td: { y: 300 } },
+};
+export function demoProps(game) {
+  return game?.id === '900001' ? { at: now(), via: 'team', lines: DEMO_PROPS } : { lines: {} };
+}
 export async function demoScores({ kind, sport, event, team }) {
   await new Promise((r) => setTimeout(r, 120));
   if (kind === 'scoreboard') return { games: DEMO_GAMES.filter((g) => g.sport === sport).map(({ players: _players, ...g }) => g) };

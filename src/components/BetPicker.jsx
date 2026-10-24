@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { SPORTS } from '../lib/espn.js';
 import { BET_TYPES, STATS, oddsLine, pickText, betProblem, emptyPick, betFromPick, boardOptions, pickFromBoard, isBoardPick, boardPrice } from '../lib/bets.js';
-import { getGames, getRoster } from '../lib/scores.js';
+import { getGames, getRoster, getProps } from '../lib/scores.js';
+import { propPrice, lineFor } from '../lib/props.js';
+import { fmtOdds } from '../lib/odds.js';
 import { gameWhen } from '../lib/ui.js';
 import GameCard from './GameCard.jsx';
 import PropPicker from './PropPicker.jsx';
@@ -11,7 +13,8 @@ const ORDER = { pre: 0, in: 1, post: 2 };
 /**
  * Pick the bet. Upcoming games show DraftKings' board: tap a price and the
  * pick, line, and odds fill in. "Other bets" (or "Something else") builds it by
- * hand: the kind of bet, the side, the line, or a player prop.
+ * hand: the kind of bet, the side, the line, or a player prop. NFL props get
+ * DraftKings' line and prices too, when SportsGameOdds has them (getProps).
  * value/onChange hold picker state (see emptyPick); onChange(state, price) passes
  * DraftKings' price when the bet is on the board (tapped, or built by hand to match). onTypeInstead switches the form to free text
  * ("Type it instead", right under the sports so nobody scrolls past the games for it).
@@ -21,6 +24,7 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
   const [find, setFind] = useState('');
   const [custom, setCustom] = useState(false); // building the bet by hand instead of from the board
   const [roster, setRoster] = useState({ key: '', list: [], err: '' });
+  const [lines, setLines] = useState({ key: '', map: null }); // DraftKings prop lines for the picked game
 
   useEffect(() => {
     let live = true;
@@ -41,13 +45,20 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
     );
     return () => { live = false; };
   }, [rosterKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!rosterKey) return undefined;
+    let live = true;
+    getProps(b.sport, b.game).then((map) => { if (live) setLines({ key: rosterKey, map }); });
+    return () => { live = false; };
+  }, [rosterKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const propLines = lines.key === rosterKey ? lines.map : null;
 
   const loading = games.sport !== b.sport;
   // The picked game's board, if it has one and hasn't started.
   const listGame = b.game ? games.list.find((g) => g.id === b.game.id) : null;
   const boardGame = listGame && listGame.state === 'pre' && boardOptions(listGame).length ? listGame : null;
-  // Building it by hand: when it lands exactly on DraftKings' main line, pass that price along too.
-  const set = (patch) => { const nb = { ...b, ...patch }; onChange(nb, boardPrice(nb, boardGame)); };
+  // Building it by hand: when it lands exactly on DraftKings' main line (or prop line), pass that price along too.
+  const set = (patch) => { const nb = { ...b, ...patch }; onChange(nb, boardPrice(nb, boardGame) ?? propPrice(nb, propLines)); };
   // A saved leg's game has no odds; borrow them from this week's list when it's there.
   const odds = b.game?.odds || games.list.find((g) => g.id === b.game?.id)?.odds || null;
   const pickSport = (s) => { setFind(''); setCustom(false); onChange(emptyPick(s)); };
@@ -76,6 +87,9 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
   const bet = betFromPick(b);
   const ready = !betProblem(bet);
   const teams = b.game ? [['away', b.game.away], ['home', b.game.home]] : [];
+  // DraftKings' over/under prices show on the buttons while the number matches its line.
+  const dk = b.type === 'prop' ? lineFor(propLines, b.player, b.stat) : null;
+  const dkPrice = (s) => (dk && b.lineText && Number(b.lineText) === dk.l ? dk[s === 'over' ? 'o' : 'u'] : null);
 
   return (
     <div className="stack bp">
@@ -145,13 +159,17 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
       )}
 
       {showCustom && b.type === 'prop' && (
-        <PropPicker b={b} set={set} teams={teams} onTypeInstead={onTypeInstead}
+        <PropPicker b={b} set={set} teams={teams} lines={propLines} onTypeInstead={onTypeInstead}
           roster={roster.key === rosterKey ? { list: roster.list, err: roster.err } : null} />
       )}
 
       {showCustom && (b.type === 'total' || (b.type === 'prop' && b.stat && !yesNo)) && (
         <div className="choices" role="group" aria-label="Over or under">
-          {['over', 'under'].map((s) => <button key={s} type="button" aria-pressed={b.side === s} onClick={() => set({ side: s })}>{s === 'over' ? 'Over' : 'Under'}</button>)}
+          {['over', 'under'].map((s) => (
+            <button key={s} type="button" aria-pressed={b.side === s} onClick={() => set({ side: s })}>
+              {s === 'over' ? 'Over' : 'Under'}{dkPrice(s) != null && <span>{fmtOdds(dkPrice(s))}</span>}
+            </button>
+          ))}
         </div>
       )}
 
@@ -172,7 +190,7 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
                 set(patch);
               }} />
           </div>
-          {b.lineAuto && <p className="hint">DraftKings{'’'} line from ESPN. Change it if yours is different.</p>}
+          {b.lineAuto && <p className="hint">DraftKings{'’'} line{b.type === 'prop' ? ' right now' : ' from ESPN'}. Change it if yours is different.</p>}
         </div>
       )}
 

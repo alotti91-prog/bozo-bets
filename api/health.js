@@ -1,7 +1,8 @@
 // Vercel serverless function: GET /api/health
 // Checks the app's outside connections and says which one is broken. An uptime
 // monitor (UptimeRobot) opens this every few minutes and emails the commish
-// when it stops returning 200. Read-only: it never writes anything.
+// when it stops returning 200. Read-only: it never writes anything. Prop lines
+// are reported but never fail it (see below).
 import { espnUrl, normalizeScoreboard } from '../src/lib/espn.js';
 import { SLEEPER_STATE } from '../src/lib/depth.js';
 
@@ -41,7 +42,11 @@ export async function runChecks(now = new Date()) {
     return 'ok';
   });
   const checks = { supabase: await supabase, espn: await espn, sleeper: await sleeper };
-  return { ok: Object.values(checks).every((v) => v === 'ok'), checks, at: now.toISOString() };
+  const ok = Object.values(checks).every((v) => v === 'ok');
+  // Prop lines (SportsGameOdds): only whether the key is set. Calling them would use up the
+  // free plan's monthly allowance every few minutes, and the app works without them anyway.
+  checks.props = process.env.SPORTSGAMEODDS_KEY ? 'ok' : 'not set up';
+  return { ok, checks, at: now.toISOString() };
 }
 
 export default async function handler(req, res) {

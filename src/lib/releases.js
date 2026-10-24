@@ -5,6 +5,17 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-24-a',
+    date: '2026-10-24',
+    title: 'DraftKings prop lines',
+    idea: 'Lotti',
+    items: [
+      'NFL player props now show DraftKings’ line next to each player, like “DJ Moore 62.5.”',
+      'Pick a player and the number fills in. The Over and Under buttons show DraftKings’ prices, and tapping one fills in the odds.',
+      'If DraftKings doesn’t have that prop, or the game has started, type the number like before.',
+    ],
+  },
+  {
     id: '2026-10-23-k',
     date: '2026-10-23',
     title: 'Injury tags on the slip',

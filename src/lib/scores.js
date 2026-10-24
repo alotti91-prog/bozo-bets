@@ -2,7 +2,8 @@
 // Vercel), or fake games in demo mode. In `npm run dev` there's no /api, so it
 // asks ESPN directly.
 import { espnUrls, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster } from './espn.js';
-import { demoScores, demoDepth } from './demo-supabase.js';
+import { demoScores, demoDepth, demoProps } from './demo-supabase.js';
+import { hourOf } from './props.js';
 
 async function direct(params) {
   const urls = espnUrls(params);
@@ -74,4 +75,25 @@ export function getDepth(sport) {
       .then((d) => { if (!d) depth = null; return d; }); // try again next time if it failed
   }
   return depth;
+}
+
+const props = new Map();
+/**
+ * DraftKings' player prop lines for one NFL game that hasn't started (from
+ * SportsGameOdds via /api/props; see props.js), or null: other sports, started
+ * games, `npm run dev` (no /api), the key not set up, or the service down. Kept for
+ * the session per game; a failure tries again next time.
+ */
+export function getProps(sport, game) {
+  if (sport !== 'nfl' || !game?.home?.abbr || !game?.away?.abbr || !game.start || Date.parse(game.start) <= Date.now()) return Promise.resolve(null);
+  const qs = new URLSearchParams({ home: game.home.abbr, away: game.away.abbr, start: hourOf(game.start) || '' });
+  const k = qs.toString();
+  if (!props.has(k)) {
+    const p = (demoProps ? Promise.resolve(demoProps(game)) : fetch(`/api/props?${k}`).then((r) => (r.ok && (r.headers.get('content-type') || '').includes('json') ? r.json() : null)))
+      .then((b) => (b?.lines && Object.keys(b.lines).length ? b.lines : null))
+      .catch(() => null)
+      .then((lines) => { if (!lines) props.delete(k); return lines; });
+    props.set(k, p);
+  }
+  return props.get(k);
 }

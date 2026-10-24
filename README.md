@@ -49,6 +49,8 @@ Open the address it prints. You'll see sample data, and nothing is saved.
 
    If you connected Supabase through Vercel's **Supabase integration**, you can skip this step. The integration already adds `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, and the app picks those up on its own.
 
+   Optional, for DraftKings player prop lines: sign up for the free plan at [sportsgameodds.com](https://sportsgameodds.com) and add `SPORTSGAMEODDS_KEY` with the key they email you. Never name it `VITE_...`: that would put the key in everyone's browser. Without it, props work as before (you type the number). The free plan allows 2,500 games' worth of odds a month; the app asks for one game at a time and caches each for 30 minutes, so a group of friends uses a small part of that.
+
 3. Click **Deploy**. When it finishes, copy your site address (like `https://bozo-bets.vercel.app`).
 
 ### 3. Set up sign-in emails (Supabase), required
@@ -98,7 +100,7 @@ The first few emails from a new Gmail sender can land in spam, so tell the group
 
 ## Get an alert if something breaks
 
-`/api/health` on your site checks Supabase (the database), ESPN's live-scores feed, and Sleeper (NFL depth charts for player props), and answers 200 when all three work or 503 with what's broken. Point a free uptime monitor at it:
+`/api/health` on your site checks Supabase (the database), ESPN's live-scores feed, and Sleeper (NFL depth charts for player props), and answers 200 when all three work or 503 with what's broken. It also says whether the prop-lines key is set (`props`), but that never makes it fail, and it never calls SportsGameOdds (that would use up the free plan). Point a free uptime monitor at it:
 
 1. Sign up at **uptimerobot.com** (free).
 2. **New monitor** → type **HTTP(s)** → URL `https://<your-site>/api/health` → check every **5 minutes**.
@@ -175,7 +177,8 @@ src/lib/useLeague.js       loads a league and keeps it live
 src/lib/demo-supabase.js   sample data for `npm run demo`
 src/lib/bets.js, espn.js    live legs: bet text, live status, ESPN data
 src/lib/depth.js           NFL depth charts and injuries from Sleeper (player props)
-api/                       Vercel functions: ESPN proxy, Sleeper depth charts, health check
+src/lib/props.js           DraftKings player prop lines from SportsGameOdds
+api/                       Vercel functions: ESPN proxy, Sleeper depth charts, prop lines, health check
 src/screens/               sign-in, onboarding, and the four tabs + settings
 src/screens/week/          This week's pieces: leg row, leg panel, leg form, payout
 src/screens/settings/      one file per Settings page (deadline, players, people, …)

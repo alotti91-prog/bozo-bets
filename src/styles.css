@@ -311,6 +311,7 @@ div.row { cursor: default; }
 .prop-players .row { min-height: 46px; }
 .pos-tag { font: 700 12px/1 var(--body); color: var(--muted); background: var(--surface); border-radius: 6px; padding: 4px 6px; min-width: 30px; text-align: center; }
 .segmented.stat-pick button { min-height: 32px; }
+.prop-line { font: 700 14px/1 var(--body); color: var(--ink); font-variant-numeric: tabular-nums; }
 .inj-tag { font: 700 11px/1 var(--body); color: var(--gold-ink); background: var(--gold-soft); border-radius: 6px; padding: 4px 6px; }
 .inj-tag.is-out { color: var(--nose); background: var(--nose-soft); }
 .leg-pick .inj-tag { display: inline-block; vertical-align: 2px; color: var(--p-warn); background: var(--p-warn-soft); } /* on the slip: paper colors, light in dark mode too */
