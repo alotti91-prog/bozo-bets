@@ -14,8 +14,9 @@ const TONE = { W: 'win', L: 'loss', P: 'pre' };
  * panel (LegSheet). Admins get a one-tap "Mark W" when a picked leg's game is final.
  *   st   live status from liveStatus() (null for typed legs or no feed)
  *   inj  the player's injury status for an NFL prop before kickoff (legInjury()), or null
+ *   fx   'shake' (it just busted) or 'carry' (last leg standing), from useSweat
  */
-export default function LegRow({ leg, st, inj, me, isAdmin, beltId, pname, reactions, comments, onOpen, onGrade }) {
+export default function LegRow({ leg, st, inj, fx, me, isAdmin, beltId, pname, reactions, comments, onOpen, onGrade }) {
   const who = pname(leg.player_id);
   const mine = me && leg.player_id === me;
   const state = legState(leg, st);
@@ -26,7 +27,7 @@ export default function LegRow({ leg, st, inj, me, isAdmin, beltId, pname, react
   const showLive = leg.bet?.game && !(leg.result && (!st || st.tone === 'pre'));
 
   return (
-    <li className={`leg is-${state}`}>
+    <li className={`leg is-${state}${fx ? ` is-${fx}` : ''}`}>
       <button type="button" className="leg-main" onClick={onOpen} aria-haspopup="dialog">
         <span className="leg-dot" aria-hidden="true" />
         <span className="leg-body">

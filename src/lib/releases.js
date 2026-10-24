@@ -5,6 +5,17 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-24-c',
+    date: '2026-10-24',
+    title: 'Sunday sweat mode',
+    idea: 'Lotti',
+    items: [
+      'Keep the slip open during games: a leg that busts gets the clown horn and a shake, one that cashes gets confetti, and the slip hitting gets the full shower.',
+      'When it comes down to one leg, the slip says who’s carrying it.',
+      'Sounds follow the sound switch on the Wheel tab, and start after your first tap.',
+    ],
+  },
+  {
     id: '2026-10-24-b',
     date: '2026-10-24',
     title: 'Player props, one tap',

@@ -559,3 +559,22 @@ main.wrap.gate { min-height: 100dvh; display: flex; flex-direction: column; just
 }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Sunday sweat mode (screens/week/useSweat.js): who's carrying the slip, a busted leg's shake, confetti. */
+.carry { display: flex; align-items: center; gap: 10px; margin: 0 18px 4px; padding: 10px 12px; border-radius: 12px; background: var(--p-warn-soft); color: var(--p-warn); font-size: 14px; line-height: 1.35; }
+.carry > span:last-child { display: flex; flex-direction: column; }
+.carry b { font-weight: 800; }
+.carry-icon { font-size: 20px; }
+.leg.is-carry { box-shadow: inset 4px 0 0 var(--gold); background: var(--p-warn-soft); }
+.leg.is-shake { animation: leg-shake .8s cubic-bezier(.36,.07,.19,.97) both; background: var(--p-loss-soft); }
+@keyframes leg-shake {
+  10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-8px); } 40%, 60% { transform: translateX(8px); }
+}
+.confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 100; }
+.confetti i { position: absolute; top: -16px; width: 8px; height: 14px; border-radius: 2px; animation: confetti-fall var(--d, 2s) cubic-bezier(.25,.6,.4,1) forwards; }
+@keyframes confetti-fall {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--w, 0), 105vh) rotate(var(--r, 360deg)); opacity: .9; }
+}
+@media (prefers-reduced-motion: reduce) { .leg.is-shake { animation: none; } }

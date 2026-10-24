@@ -12,6 +12,7 @@ import { getDepth } from '../lib/scores.js';
 import { legInjury } from '../lib/depth.js';
 import PlacedSheet from './PlacedSheet.jsx';
 import LegRow from './week/LegRow.jsx';
+import useSweat from './week/useSweat.js';
 import LegSheet from './week/LegSheet.jsx';
 import LegForm from './week/LegForm.jsx';
 import PayoutForm from './week/PayoutForm.jsx';
@@ -33,7 +34,10 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
     const t = setInterval(() => setNow(Date.now()), 30000); // keeps the countdown and "updated" label fresh
     return () => clearInterval(t);
   }, []);
-  const [games, updatedAt] = useLiveGames(week ? data.legs.filter((l) => l.week_id === week.id) : []);
+  const weekLegs = week ? data.legs.filter((l) => l.week_id === week.id) : [];
+  const [games, updatedAt] = useLiveGames(weekLegs);
+  const statusOf = (l) => (l.bet?.game ? liveStatus(l.bet, games[gameKey(l.bet)]) : null);
+  const sweat = useSweat(weekLegs, statusOf, pname); // horns, confetti, and who's carrying the slip
   // Injury tags for NFL player props on the slip (Sleeper, via getDepth); only fetched when there's one
   const [depth, setDepth] = useState(null);
   const hasProps = !!week && data.legs.some((l) => l.week_id === week.id && l.bet?.player && l.bet.sport === 'nfl');
@@ -54,11 +58,10 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
   }
 
   const order = Object.fromEntries(data.players.map((p, i) => [p.id, i]));
-  const legs = data.legs.filter((l) => l.week_id === week.id).sort((a, b) => (order[a.player_id] ?? 99) - (order[b.player_id] ?? 99));
+  const legs = [...weekLegs].sort((a, b) => (order[a.player_id] ?? 99) - (order[b.player_id] ?? 99));
   const info = weekInfo(week, legs);
   const active = data.players.filter((p) => p.active);
   const missing = active.filter((p) => !legs.some((l) => l.player_id === p.id));
-  const statusOf = (l) => (l.bet?.game ? liveStatus(l.bet, games[gameKey(l.bet)]) : null);
   const alive = aliveCount(legs, statusOf);
   const showAlive = info.status === 'live' && legs.some((l) => l.result || (statusOf(l) && statusOf(l).tone !== 'pre'));
   const anyLive = legs.some((l) => statusOf(l)?.tone && statusOf(l).tone !== 'pre' && !statusOf(l).done);
@@ -174,10 +177,18 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
           )}
         </div>
 
+        {sweat.carry && (
+          <p className="carry" role="status">
+            <span className="carry-icon" aria-hidden="true">🔥</span>
+            <span><b>It{'’'}s all on {pname(sweat.carry.player_id)}</b><span>Last leg standing: {sweat.carry.pick}</span></span>
+          </p>
+        )}
+
         {legs.length > 0 && (
           <ol className="legs">
             {legs.map((l) => (
               <LegRow key={l.id} leg={l} st={statusOf(l)} inj={legInjury(l, statusOf(l), depth, now)} me={me} isAdmin={isAdmin} beltId={beltId} pname={pname}
+                fx={sweat.shaking.has(l.id) ? 'shake' : sweat.carry?.id === l.id ? 'carry' : null}
                 reactions={data.reactions || []} comments={data.comments || []}
                 onOpen={() => setOpenId(l.id)} onGrade={(r) => grade(l, r)} />
             ))}
