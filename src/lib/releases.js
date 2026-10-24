@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-24-f',
+    date: '2026-10-24',
+    title: 'Share the recap as a picture',
+    idea: 'Lotti',
+    items: [
+      '“Share image” on the recap turns it into a picture (the bozo, the awards, everyone’s face) to post in the group chat.',
+      'On a computer it saves the picture instead. The text version is still there under “Share as text instead.”',
+    ],
+  },
+  {
     id: '2026-10-24-e',
     date: '2026-10-24',
     title: 'Awards in the recap',

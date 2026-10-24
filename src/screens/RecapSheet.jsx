@@ -1,20 +1,36 @@
-import { useState } from 'react';
-import { Sheet, IconShare, IconChevR } from '../components/common.jsx';
+import { useEffect, useState } from 'react';
+import { Sheet, IconShare, IconChevR, IconPhoto } from '../components/common.jsx';
 import BozoFace from '../components/BozoFace.jsx';
 import { FACES, personLine, recapText } from '../lib/recap.js';
 import { money, dollars, fmtOdds } from '../lib/odds.js';
-import { shareText } from '../lib/ui.js';
+import { shareText, toast } from '../lib/ui.js';
+import { recapCard } from '../lib/recapCard.js';
+import { drawRecapImage, shareImage } from './recap/recapImage.js';
 import FaceLadder from './recap/FaceLadder.jsx';
 import FaceRules from './recap/FaceRules.jsx';
 
 /**
  * The weekly recap (r from weekRecap, plus r.awards from weekAwards): who the
  * wheel picked, the week's awards, then everyone's face for the week. Opens a beat after you first watch a spin, live or as a
- * replay. History and the Wheel tab open it again.
+ * replay. History and the Wheel tab open it again. "Share image" posts it as a
+ * picture (drawn as soon as the sheet opens, because phones only open the share
+ * sheet right after a tap); the text version is a link below.
  */
 export default function RecapSheet({ recap: r, pname, leagueName, onClose }) {
   const hit = r.info.status === 'hit';
   const [rules, setRules] = useState(false); // showing "How the faces work"
+  const [img, setImg] = useState(null); // { blob } once the image is drawn, { err: true } if it couldn't be
+  useEffect(() => {
+    let live = true;
+    const t = setTimeout(() => { // after this render settles: drawing renders the faces with React
+      drawRecapImage(recapCard(r, pname, leagueName))
+        .then((blob) => { if (live) setImg(blob ? { blob } : { err: true }); }, () => { if (live) setImg({ err: true }); });
+    }, 60);
+    return () => { live = false; clearTimeout(t); };
+  }, [r.week.id, r.spin?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shareAsText = () => shareText(recapText(r, pname, leagueName), { title: `Week ${r.week.n} recap` });
+  const shareAsImage = () => shareImage(img.blob, `bozo-bets-week-${r.week.n}.png`, `Week ${r.week.n} recap`)
+    .then((how) => { if (how === 'downloaded') toast('Saved the picture. Post it in the group chat.'); });
   if (rules) {
     return (
       <Sheet title="How the faces work" onClose={onClose} onBack={() => setRules(false)} backLabel="The recap">
@@ -93,11 +109,14 @@ export default function RecapSheet({ recap: r, pname, leagueName, onClose }) {
       </section>
 
       <div className="btn-pair">
-        <button type="button" className="btn" onClick={() => shareText(recapText(r, pname, leagueName), { title: `Week ${r.week.n} recap` })}>
-          <IconShare />Share recap
-        </button>
+        {img?.err ? (
+          <button type="button" className="btn" onClick={shareAsText}><IconShare />Share recap</button>
+        ) : (
+          <button type="button" className="btn" disabled={!img} onClick={shareAsImage}><IconPhoto />{img ? 'Share image' : 'Making image…'}</button>
+        )}
         <button type="button" className="btn primary" onClick={onClose}>Done</button>
       </div>
+      {!img?.err && <button type="button" className="text-btn muted center" onClick={shareAsText}>Share as text instead</button>}
     </Sheet>
   );
 }

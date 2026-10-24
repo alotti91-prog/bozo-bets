@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { weekRecap, personLine, recapText, FACES, lossTier, cutoffs, needsMissPick, marginFromLostBy, faceCounts, cutoffRows, FACE_ORDER } from './recap.js';
 import { liveStatus, gradeMargin, finishedGrades } from './bets.js';
 import { weekAwards, streak, missText } from './awards.js';
+import { recapCard } from './recapCard.js';
 
 const players = ['Lotti', 'Sully', 'Mikey', 'Danny B', 'Big Chris'].map((name, i) => ({ id: 'p' + (i + 1), name, active: true }));
 const pname = (id) => players.find((p) => p.id === id)?.name;
@@ -293,5 +294,29 @@ describe('weekly awards', () => {
   it('the share text lists the awards', () => {
     const r = { ...weekRecap({ weeks, legs: busted, spins: [spin], players }, 'w7'), awards: [{ key: 'big', icon: '💰', title: 'Biggest hit', who: 'p4', note: 'Jets ML · +210' }] };
     expect(recapText(r, pname)).toContain('💰 Biggest hit: Danny B (Jets ML · +210)');
+  });
+});
+
+describe('the recap image’s content', () => {
+  it('a busted week: the bozo up top, the numbers, awards, then everyone', () => {
+    const r = { ...weekRecap({ weeks, legs: busted, spins: [spin], players }, 'w7'), awards: [{ key: 'big', icon: '💰', title: 'Biggest hit', who: 'p4', note: 'Jets ML · +210' }] };
+    const c = recapCard(r, pname, 'Bozo Bets');
+    expect(c.brand).toBe('Bozo Bets');
+    expect(c.title).toBe('Week 7 recap');
+    expect(c.hero).toEqual({ kind: 'bozo', faces: ['full'], big: 'Mikey', tone: 'loss', tag: 'Full bozo · picked by the wheel', sub: 'Puts in Week 8’s $10' });
+    expect(c.stats).toMatch(/^2 of 5 legs hit · Would’ve paid \$/);
+    expect(c.awards).toEqual([{ icon: '💰', title: 'Biggest hit', name: 'Danny B', note: 'Jets ML · +210' }]);
+    expect(c.people[0]).toEqual({ face: 'full', name: 'Mikey', label: 'Full bozo', line: 'Steelers ML · lost', odds: '+135' });
+    expect(c.people.find((p) => p.name === 'Sully')).toMatchObject({ face: 'clean', label: '' });
+  });
+  it('a week that hit: everyone’s faces and the payout', () => {
+    const won = busted.map((l) => ({ ...l, result: 'W' }));
+    const c = recapCard({ ...weekRecap({ weeks, legs: won, spins: [], players }, 'w7'), awards: [] }, pname);
+    expect(c.hero.kind).toBe('hit');
+    expect(c.hero.big).toBe('It hit.');
+    expect(c.hero.faces).toHaveLength(5);
+    expect(c.hero.tag).toMatch(/^\$10 paid \$.+ each$/);
+    expect(c.stats).toBe('');
+    expect(c.awards).toEqual([]);
   });
 });
