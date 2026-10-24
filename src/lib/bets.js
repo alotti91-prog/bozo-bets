@@ -10,15 +10,16 @@ import { depthOf } from './depth.js';
 //     game: { id, start, short, home: { id, abbr, short, name }, away: {...} } }
 
 export const STATS = {
-  passYds: { name: 'Passing yards', label: 'pass yds' },
+  // canDrop: yards can go back down on a negative play, so an over that's past the line isn't locked in until the final
+  passYds: { name: 'Passing yards', label: 'pass yds', canDrop: true },
   passTd: { name: 'Passing TDs', label: 'pass TDs' },
   passCmp: { name: 'Completions', label: 'completions' },
   int: { name: 'Interceptions thrown', label: 'INTs' },
-  rushYds: { name: 'Rushing yards', label: 'rush yds' },
+  rushYds: { name: 'Rushing yards', label: 'rush yds', canDrop: true },
   rushAtt: { name: 'Rushing attempts', label: 'carries' },
   rec: { name: 'Receptions', label: 'receptions' },
-  recYds: { name: 'Receiving yards', label: 'rec yds' },
-  rushRecYds: { name: 'Rush + rec yards', label: 'rush+rec yds' },
+  recYds: { name: 'Receiving yards', label: 'rec yds', canDrop: true },
+  rushRecYds: { name: 'Rush + rec yards', label: 'rush+rec yds', canDrop: true },
   td: { name: 'Anytime touchdown', label: 'anytime TD', yesNo: true },
 };
 
@@ -141,7 +142,10 @@ export function shortClock(detail, sport) {
  *   { tone: 'pre' | 'live' | 'win' | 'loss' | 'push', label, score, clock,
  *     away, home ({ abbr, score, mine: is it this bet's team }),
  *     progress (0..1 or null), done (final), locked (decided before the final),
- *     margin (how far from the line, in the bet's units: + ahead, − behind; null for yes/no props) }
+ *     margin (how far from the line, in the bet's units: + ahead, − behind; null for yes/no props),
+ *     found (props only: is the player in the box score) }
+ * locked: totals and counting stats (catches, TDs) only go up, so passing the
+ * line decides them early; yards can drop on a negative play, so they wait.
  */
 export function liveStatus(bet, game) {
   if (!bet || !game) return null;
@@ -156,7 +160,8 @@ export function liveStatus(bet, game) {
   const home = { abbr: game.home.abbr, score: H, mine: isMine('home', game.home.abbr) };
   const clock = done ? (game.detail || 'Final') : shortClock(game.detail, bet.sport);
   let margin = null;
-  const out = (tone, label, extra = {}) => ({ tone, label, score, clock, away, home, progress: null, done, locked: false, margin, ...extra });
+  let found = null; // props: whether the player shows up in the box score
+  const out = (tone, label, extra = {}) => ({ tone, label, score, clock, away, home, progress: null, done, locked: false, margin, ...(found == null ? {} : { found }), ...extra });
   const line = bet.line;
   const round = (x) => Math.round(x * 10) / 10;
 
@@ -178,10 +183,13 @@ export function liveStatus(bet, game) {
   // Totals and props: a running count against the line.
   let v;
   let unit = '';
+  let sure = true; // can't go back down
   if (bet.type === 'total') v = H + A;
   else {
     const st = STATS[bet.stat] || {};
     const p = (game.players || []).find((x) => x.id === bet.player?.id);
+    found = !!p;
+    sure = !st.canDrop;
     v = p ? p.stats[bet.stat] || 0 : 0;
     unit = st.label ? ` ${st.label}` : '';
     if (st.yesNo) {
@@ -192,11 +200,11 @@ export function liveStatus(bet, game) {
   const target = Number.isInteger(line) ? line : Math.ceil(line);
   margin = round(bet.side === 'over' ? v - line : line - v);
   if (bet.side === 'over') {
-    if (v > line) return out('win', bet.type === 'total' ? `Over hit (${v})` : `Hit: ${v}${unit}`, { locked: true, progress: 1 });
+    if (v > line) return out('win', bet.type === 'total' ? `Over hit (${v})` : (sure || done ? `Hit: ${v}${unit}` : `${v}${unit}, over so far`), { locked: sure, progress: 1 });
     if (done) return v === line ? out('push', `Push at ${v}`) : out('loss', `Fell short: ${v}${unit}`);
     return out('live', `${v} of ${target}${unit}`, { progress: line > 0 ? Math.min(1, v / line) : 0 });
   }
-  if (v > line) return out('loss', bet.type === 'total' ? `Went over (${v})` : `Went over: ${v}${unit}`, { locked: true, progress: 1 });
+  if (v > line) return out('loss', bet.type === 'total' ? `Went over (${v})` : (sure || done ? `Went over: ${v}${unit}` : `${v}${unit}, over the line`), { locked: sure, progress: 1 });
   if (done) return v === line ? out('push', `Push at ${v}`) : out('win', `Stayed under: ${v}${unit}`);
   return out('win', `${v}${unit}, under so far`, { progress: line > 0 ? Math.min(1, v / line) : 0 });
 }

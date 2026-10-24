@@ -40,22 +40,31 @@ export function slipOutcome(legs, outcomeOf) {
 }
 
 /**
- * What just happened since last time. seen: { [legId]: last decided outcome or
- * null } from the previous call, or null the first time (which only takes
- * stock, so opening the app never replays old news). A leg's outcome flickering
- * to "unknown" (the feed blinking) doesn't count as a change.
+ * What just happened since last time. seen: { [legId]: { o: last decided
+ * outcome or null, k: whether we've known where the leg stands } } from the
+ * previous call, or null the first time. Only a change in a leg we already knew
+ * about is news: the first look takes stock, and so does the moment a leg's live
+ * score first arrives (scores load a beat after the app opens), so opening the
+ * app never replays old news. A leg flickering to "unknown" (the feed blinking)
+ * doesn't count either.
+ *   knownOf(leg)  whether we know where it stands: graded, typed, or a live status (default: always)
+ * A grade from the commish is always news, even for a leg whose score never loaded.
  * Returns { seen, events: [{ leg, outcome }], slip: 'won' | null (the slip just hit) }.
  */
-export function sweatEvents(seen, legs, outcomeOf) {
+export function sweatEvents(seen, legs, outcomeOf, knownOf = () => true) {
   const next = {};
   const events = [];
   for (const l of legs) {
     const o = outcomeOf(l);
+    const k = !!knownOf(l);
     const before = seen ? seen[l.id] : undefined;
-    next[l.id] = o ?? before ?? null;
-    if (seen && l.id in seen && o && o !== before) events.push({ leg: l, outcome: o });
+    const r = l.result || null;
+    next[l.id] = { o: o ?? before?.o ?? null, k: k || !!before?.k, r };
+    // News: a leg we knew about changed, or the commish just graded it (always news, scores or not)
+    const graded = !!before && r && r !== before.r;
+    if (before && (before.k || graded) && o && o !== before.o) events.push({ leg: l, outcome: o });
   }
-  const wasWon = seen ? slipOutcome(legs.filter((l) => l.id in seen), (l) => seen[l.id]) === 'won' : true;
+  const wasWon = seen ? slipOutcome(legs.filter((l) => l.id in seen), (l) => seen[l.id].o) === 'won' : true;
   const slip = !wasWon && events.length && slipOutcome(legs, outcomeOf) === 'won' ? 'won' : null;
   return { seen: next, events, slip };
 }

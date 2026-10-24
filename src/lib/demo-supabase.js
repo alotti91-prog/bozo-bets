@@ -158,7 +158,7 @@ const db = {
     leg('w4', 'p1', 'Bills −6.5', -110, 'NFL', null, { bet: demoBet('spread', 'nfl', '900002', { side: 'away', line: -6.5 }) }),
     leg('w4', 'p2', 'Saquon Barkley 75+ rush yds', -125, 'NFL', null, { bet: demoBet('prop', 'nfl', '900004', { side: 'over', line: 74.5, stat: 'rushYds', player: { id: '3929630', name: 'Saquon Barkley', team: 'PHI' } }) }),
     leg('w4', 'p3', 'Steelers ML', 135, 'NFL', 'L'),
-    leg('w4', 'p4', 'NYJ/NE under 41.5', -105, 'NFL', 'W', { bet: demoBet('total', 'nfl', '900003', { side: 'under', line: 41.5 }) }),
+    leg('w4', 'p4', 'NYJ/NE under 41.5', -105, 'NFL', null, { bet: demoBet('total', 'nfl', '900003', { side: 'under', line: 41.5 }) }), /* final but ungraded: auto-grading grades it */
     leg('w4', 'p5', 'Rangers ML', 105, 'NHL', null, { bet: demoBet('ml', 'nhl', '930001', { side: 'away' }) }),
   ],
   spins: [

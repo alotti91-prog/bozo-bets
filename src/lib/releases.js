@@ -5,6 +5,18 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-24-i',
+    date: '2026-10-24',
+    title: 'Legs grade themselves',
+    idea: 'Lotti',
+    items: [
+      'Once a game is final, legs picked from it grade themselves (when the commish has the app open), with how far they finished from the line.',
+      'A few wait for the commish, with the reason on the slip: a player who isn’t in the box score (DraftKings voids props for players who sit), or a yards prop within a yard of the line. Typed-in legs are still graded by hand.',
+      'The commish can still change any grade, and a grade changed by hand stays put.',
+      'Fixed: sweat mode no longer celebrates a yards prop before the final (yards can drop on a negative play), and no longer replays results when the app opens.',
+    ],
+  },
+  {
     id: '2026-10-24-h',
     date: '2026-10-24',
     title: 'The recap shows what happened',

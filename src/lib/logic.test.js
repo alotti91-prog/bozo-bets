@@ -369,7 +369,17 @@ describe('structured legs', () => {
     const withGibbs = (yds, state) => live(14, 7, state, [{ id: '7', stats: { rushYds: yds, td: 0 } }]);
     expect(liveStatus(gibbs, withGibbs(52))).toMatchObject({ tone: 'live', label: '52 of 75 rush yds' });
     expect(liveStatus(gibbs, withGibbs(52)).progress).toBeCloseTo(52 / 74.5, 3);
-    expect(liveStatus(gibbs, withGibbs(80))).toMatchObject({ tone: 'win', locked: true });
+    // Yards can drop on a negative play: past the line isn't locked in until the final
+    expect(liveStatus(gibbs, withGibbs(80))).toMatchObject({ tone: 'win', locked: false, label: '80 rush yds, over so far', found: true });
+    expect(liveStatus(gibbs, withGibbs(80, 'post'))).toMatchObject({ tone: 'win', done: true, label: 'Hit: 80 rush yds' });
+    expect(liveStatus({ ...gibbs, side: 'under' }, withGibbs(80))).toMatchObject({ tone: 'loss', locked: false, label: '80 rush yds, over the line' });
+    // Catches only go up: past the line is locked
+    const catches = { ...gibbs, stat: 'rec', line: 4.5 };
+    expect(liveStatus(catches, live(14, 7, 'in', [{ id: '7', stats: { rec: 5 } }]))).toMatchObject({ tone: 'win', locked: true, label: 'Hit: 5 receptions' });
+    expect(liveStatus({ ...catches, side: 'under' }, live(14, 7, 'in', [{ id: '7', stats: { rec: 5 } }]))).toMatchObject({ tone: 'loss', locked: true });
+    // Not in the box score (didn't play, or no stats yet)
+    expect(liveStatus(gibbs, live(14, 7, 'post', [])).found).toBe(false);
+    expect(liveStatus({ type: 'total', side: 'over', line: 44.5, game }, live(28, 20)).found).toBe(undefined);
     expect(liveStatus(gibbs, withGibbs(60, 'post'))).toMatchObject({ tone: 'loss', done: true });
     expect(liveStatus({ ...gibbs, stat: 'td' }, withGibbs(0))).toMatchObject({ tone: 'live', label: 'No TD yet' });
     expect(liveStatus({ ...gibbs, stat: 'td' }, live(14, 7, 'in', [{ id: '7', stats: { td: 1 } }]))).toMatchObject({ tone: 'win', locked: true });

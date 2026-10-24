@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { legOutcome, carrier, slipOutcome, sweatEvents, sweatMessage } from './sweat.js';
 import { currentBozo } from './stats.js';
 import { herePeople, hereLine, arrivals, WHERE } from './presence.js';
+import { autoCheck, autoGrades } from './autograde.js';
 
 const leg = (id, player, pick, result = null) => ({ id, player_id: player, pick, result });
 const names = (id) => ({ p1: 'Lotti', p2: 'Danny B', p3: 'Mikey' }[id] || id);
@@ -38,7 +39,7 @@ describe('Sunday sweat mode', () => {
     const of = (l) => out[l.id];
     let r = sweatEvents(null, legs, of);
     expect(r.events).toEqual([]); // opening the app: no replay of the under that already hit
-    expect(r.seen).toEqual({ a: null, b: null, c: 'won' });
+    expect(Object.fromEntries(Object.entries(r.seen).map(([k, v]) => [k, v.o]))).toEqual({ a: null, b: null, c: 'won' });
     out = { a: 'won', b: null, c: 'won' };
     r = sweatEvents(r.seen, legs, of);
     expect(r.events.map((e) => [e.leg.id, e.outcome])).toEqual([['a', 'won']]);
@@ -46,7 +47,7 @@ describe('Sunday sweat mode', () => {
     out = { a: null, b: null, c: 'won' }; // the feed blinks
     r = sweatEvents(r.seen, legs, of);
     expect(r.events).toEqual([]);
-    expect(r.seen.a).toBe('won');
+    expect(r.seen.a.o).toBe('won');
     out = { a: 'won', b: null, c: 'won' }; // and comes back: not news again
     r = sweatEvents(r.seen, legs, of);
     expect(r.events).toEqual([]);
@@ -63,6 +64,26 @@ describe('Sunday sweat mode', () => {
     out.d = 'won';
     r = sweatEvents(r.seen, more, of);
     expect(r.events.map((e) => [e.leg.id, e.outcome])).toEqual([['d', 'won']]);
+  });
+  it('a leg’s live score arriving after the app opens isn’t news either', () => {
+    const legs = [leg('a', 'p1', 'NYJ/NE under 41.5'), leg('b', 'p2', 'Bills −6.5')];
+    let out = { a: null, b: null };
+    let known = { a: false, b: false }; // scores haven't loaded yet
+    const of = (l) => out[l.id];
+    const kn = (l) => known[l.id];
+    let r = sweatEvents(null, legs, of, kn);
+    out = { a: 'won', b: null }; known = { a: true, b: true }; // scores arrive: the under was already final
+    r = sweatEvents(r.seen, legs, of, kn);
+    expect(r.events).toEqual([]); // no replay
+    out = { a: 'won', b: 'lost' }; // then the Bills lose while you watch
+    r = sweatEvents(r.seen, legs, of, kn);
+    expect(r.events.map((e) => [e.leg.id, e.outcome])).toEqual([['b', 'lost']]);
+  });
+  it('a grade from the commish is news even if the score never loaded', () => {
+    const l = leg('a', 'p1', 'Rangers ML');
+    let r = sweatEvents(null, [l], () => null, () => false); // feed down: never known
+    r = sweatEvents(r.seen, [{ ...l, result: 'L' }], () => 'lost', () => true);
+    expect(r.events.map((e) => e.outcome)).toEqual(['lost']);
   });
   it('says what happened in one line', () => {
     const a = leg('a', 'p1', 'Bills −6.5'); const b = leg('b', 'p3', 'Steelers ML');
@@ -113,5 +134,32 @@ describe('Sunday sweat mode', () => {
     expect(arrivals(['p1'], here, 'wheel', 'p1')).toEqual(['p2']);
     expect(arrivals(['p1', 'p2'], here, 'wheel', 'p1')).toEqual([]);
     expect(arrivals([], here, 'wheel', 'p1')).toEqual(['p2']); // never you
+  });
+  it('auto-grades finals, leaves typed legs alone, and flags the ones a person should check', () => {
+    const fin = (tone, extra = {}) => ({ tone, done: true, clock: 'Final', margin: 3, ...extra });
+    const picked = (id, bet, extra = {}) => ({ id, player_id: 'p1', pick: id, result: null, bet: { game: { id: 'g' }, ...bet }, ...extra });
+    const spread = picked('spread', { type: 'spread', side: 'home', line: -3 });
+    expect(autoCheck(spread, fin('win', { margin: 4 }))).toEqual({ result: 'W', margin: 4 });
+    expect(autoCheck(spread, fin('loss', { margin: -2.5, clock: 'Final/OT' }))).toEqual({ result: 'L', margin: -2.5 });
+    expect(autoCheck(spread, fin('push', { margin: 0 }))).toEqual({ result: 'P', margin: null });
+    expect(autoCheck(spread, { tone: 'win', done: false, clock: 'Q4 2:00', margin: 4 })).toBe(null); // still going
+    expect(autoCheck(spread, fin('loss', { clock: 'Postponed' }))).toBe(null); // never grade a postponed game
+    expect(autoCheck(spread, fin('loss', { clock: 'Canceled' }))).toBe(null);
+    expect(autoCheck({ ...spread, result: 'W' }, fin('loss'))).toBe(null); // already graded
+    expect(autoCheck({ id: 't', pick: 'Steelers ML', result: null, bet: null }, fin('loss'))).toBe(null); // typed
+    const yards = picked('yards', { type: 'prop', stat: 'rushYds', side: 'over', line: 74.5 });
+    expect(autoCheck(yards, fin('loss', { margin: -12.5, found: true }))).toEqual({ result: 'L', margin: -12.5 });
+    expect(autoCheck(yards, fin('win', { margin: 0.5, found: true }))).toEqual({ why: 'close' }); // 75 on 74.5: official stats can differ
+    expect(autoCheck(yards, fin('loss', { margin: -74.5, found: false }))).toEqual({ why: 'absent' }); // didn't play: DraftKings voids it
+    const catches = picked('catches', { type: 'prop', stat: 'rec', side: 'over', line: 4.5 });
+    expect(autoCheck(catches, fin('win', { margin: 0.5, found: true }))).toEqual({ result: 'W', margin: 0.5 }); // counts aren't close calls
+    const td = picked('td', { type: 'prop', stat: 'td' });
+    expect(autoCheck(td, fin('loss', { margin: null, found: true }))).toEqual({ result: 'L', margin: null });
+    const status = { spread: fin('win', { margin: 4 }), yards: fin('win', { margin: 0.5, found: true }), catches: fin('win', { margin: 1.5, found: true }) };
+    const all = autoGrades([spread, yards, catches], (l) => status[l.id]);
+    expect(all.grade.map((g) => g.leg.id)).toEqual(['spread', 'catches']);
+    expect(all.check).toEqual([{ leg: yards, why: 'close' }]);
+    // The commish cleared a grade by hand: auto-grading leaves it alone
+    expect(autoGrades([spread, yards, catches], (l) => status[l.id], new Set(['spread', 'yards'])).grade.map((g) => g.leg.id)).toEqual(['catches']);
   });
 });

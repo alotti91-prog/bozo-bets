@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { fmtOdds } from '../../lib/odds.js';
 import { gradeHidden, suggestedGrade } from '../../lib/bets.js';
+import { autoCheck, WHY } from '../../lib/autograde.js';
 import { Sheet, IconChevR } from '../../components/common.jsx';
 import Reactions from '../../components/Reactions.jsx';
 import Comments from '../../components/Comments.jsx';
@@ -23,6 +24,7 @@ export default function LegSheet({ leg, st, data, me, isAdmin, locked, pname, us
   const canEdit = isAdmin || (mine && !leg.result && !locked);
   const hideGrade = gradeHidden(leg, st) && !gradeNow;
   const suggest = isAdmin && !leg.result ? suggestedGrade(st) : null;
+  const look = isAdmin ? autoCheck(leg, st)?.why : null; // final, but auto-grading left it for a person
   const comments = (data.comments || []).filter((c) => c.leg_id === leg.id);
 
   return (
@@ -48,6 +50,7 @@ export default function LegSheet({ leg, st, data, me, isAdmin, locked, pname, us
       {isAdmin && (
         <div className="group">
           <span className="group-label">Grade</span>
+          {look && <p className="hint">{look === 'absent' ? `${leg.bet.player?.name || 'The player'} ` : ''}{WHY[look][1]}</p>}
           {hideGrade ? (
             <div className="rows">
               <button type="button" className="row" onClick={() => setGradeNow(true)}>

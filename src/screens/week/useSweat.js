@@ -16,7 +16,7 @@ export default function useSweat(legs, statusOf, pname) {
   const [shaking, setShaking] = useState(() => new Set());
   const outcomeOf = (l) => legOutcome(l, statusOf(l));
   // A fingerprint of every leg's outcome, so the effect runs only when one changes.
-  const key = legs.map((l) => `${l.id}:${outcomeOf(l) || ''}`).join('|');
+  const key = legs.map((l) => `${l.id}:${outcomeOf(l) || ''}:${l.result || statusOf(l) ? 1 : 0}`).join('|');
 
   useEffect(() => {
     const unlock = () => audioInit();
@@ -25,7 +25,7 @@ export default function useSweat(legs, statusOf, pname) {
   }, []);
 
   useEffect(() => {
-    const { seen: next, events, slip } = sweatEvents(seen.current, legs, outcomeOf);
+    const { seen: next, events, slip } = sweatEvents(seen.current, legs, outcomeOf, (l) => !l.bet?.game || !!l.result || statusOf(l) != null);
     seen.current = next;
     if (!events.length) return;
     const lost = events.filter((e) => e.outcome === 'lost');
