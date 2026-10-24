@@ -22,6 +22,45 @@ export const STATS = {
 
 export const BET_TYPES = { spread: 'Spread', ml: 'Moneyline', total: 'Total', prop: 'Player prop' };
 
+/**
+ * Player props, laid out like DraftKings: a category, then the stat, then the
+ * players who'd have that line. pos lists who fits each stat, most likely first.
+ */
+export const PROP_CATS = {
+  pass: { label: 'Passing', stats: ['passYds', 'passTd', 'passCmp', 'int'] },
+  rush: { label: 'Rushing', stats: ['rushYds', 'rushAtt', 'rushRecYds'] },
+  rec: { label: 'Receiving', stats: ['recYds', 'rec'] },
+  td: { label: 'TDs', stats: ['td'] },
+};
+export const STAT_POS = {
+  passYds: ['QB'], passTd: ['QB'], passCmp: ['QB'], int: ['QB'],
+  rushYds: ['RB', 'QB', 'FB'], rushAtt: ['RB', 'QB', 'FB'], rushRecYds: ['RB', 'WR', 'TE', 'FB'],
+  recYds: ['WR', 'TE', 'RB'], rec: ['WR', 'TE', 'RB'],
+  td: ['RB', 'WR', 'TE', 'QB', 'FB'],
+};
+
+/** Which prop category a stat is in ('pass' | 'rush' | 'rec' | 'td'), or null. */
+export function propCatOf(stat) {
+  return Object.keys(PROP_CATS).find((k) => PROP_CATS[k].stats.includes(stat)) || null;
+}
+
+/**
+ * The players who fit a prop stat, one group per team (in the order given):
+ * positions in the stat's order (QBs for passing; WRs, TEs, then RBs for
+ * receiving), keeping the roster's order within a position. q filters by name.
+ * roster: [{ id, name, pos, team }]. Returns [{ team, players }].
+ */
+export function propPlayers(roster, stat, teams, q = '') {
+  const pos = STAT_POS[stat] || [];
+  const needle = q.trim().toLowerCase();
+  return teams.map((team) => ({
+    team,
+    players: roster
+      .filter((p) => p.team === team && pos.includes(p.pos) && (!needle || p.name.toLowerCase().includes(needle)))
+      .sort((a, b) => pos.indexOf(a.pos) - pos.indexOf(b.pos)),
+  }));
+}
+
 export const gameKey = (bet) => `${bet.sport}:${bet.game.id}`;
 
 const num = (n) => String(Math.abs(n)).replace(/\.0+$/, '');

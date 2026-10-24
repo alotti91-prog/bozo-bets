@@ -10,7 +10,7 @@ import { RELEASES, unseenReleases } from './releases.js';
 import { slipPaths } from './slip.js';
 import { swipeDirection, swipeTarget } from './swipe.js';
 import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard, normalizeSummary, normalizeRoster, oddsBoard } from './espn.js';
-import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden, boardOptions, pickFromBoard, isBoardPick, betFromPick, boardPrice, emptyPick } from './bets.js';
+import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden, boardOptions, pickFromBoard, isBoardPick, betFromPick, boardPrice, emptyPick, PROP_CATS, STAT_POS, propCatOf, propPlayers, STATS } from './bets.js';
 import espnHandler from '../../api/espn.js';
 import { runChecks } from '../../api/health.js';
 
@@ -636,5 +636,31 @@ describe('the DraftKings board', () => {
     expect(boardPrice(built({ type: 'prop', side: 'over', lineText: '74.5', stat: 'rushYds' }), PIT_NO_GAME)).toBe(null);
     expect(boardPrice(built({ type: 'ml', side: 'home' }), { ...PIT_NO_GAME, state: 'in' })).toBe(null); // started: no stale prices
     expect(boardPrice(built({ type: 'ml', side: 'home' }), null)).toBe(null);
+  });
+});
+
+describe('player props, DraftKings style', () => {
+  const roster = [
+    { id: '1', name: 'Josh Allen', pos: 'QB', team: 'BUF' }, { id: '2', name: 'Mitchell Trubisky', pos: 'QB', team: 'BUF' },
+    { id: '3', name: 'James Cook', pos: 'RB', team: 'BUF' }, { id: '4', name: 'Khalil Shakir', pos: 'WR', team: 'BUF' },
+    { id: '5', name: 'Dalton Kincaid', pos: 'TE', team: 'BUF' }, { id: '6', name: 'Tua Tagovailoa', pos: 'QB', team: 'MIA' },
+    { id: '7', name: 'De’Von Achane', pos: 'RB', team: 'MIA' }, { id: '8', name: 'Tyreek Hill', pos: 'WR', team: 'MIA' },
+  ];
+  const names = (groups) => groups.map((g) => [g.team, g.players.map((p) => p.name)]);
+  it('covers every stat, each in one category, with positions that fit it', () => {
+    const all = Object.values(PROP_CATS).flatMap((c) => c.stats);
+    expect(all.sort()).toEqual(Object.keys(STATS).sort());
+    all.forEach((st) => expect(STAT_POS[st].length).toBeGreaterThan(0));
+    expect(propCatOf('recYds')).toBe('rec');
+    expect(propCatOf('td')).toBe('td');
+    expect(propCatOf(null)).toBe(null);
+  });
+  it('shows only the players who’d have that line, grouped by team, most likely positions first', () => {
+    expect(names(propPlayers(roster, 'passYds', ['MIA', 'BUF']))).toEqual([['MIA', ['Tua Tagovailoa']], ['BUF', ['Josh Allen', 'Mitchell Trubisky']]]);
+    expect(names(propPlayers(roster, 'recYds', ['BUF']))).toEqual([['BUF', ['Khalil Shakir', 'Dalton Kincaid', 'James Cook']]]);
+    expect(names(propPlayers(roster, 'rushYds', ['BUF']))).toEqual([['BUF', ['James Cook', 'Josh Allen', 'Mitchell Trubisky']]]);
+  });
+  it('finds a player by name', () => {
+    expect(names(propPlayers(roster, 'td', ['BUF', 'MIA'], ' hill'))).toEqual([['BUF', []], ['MIA', ['Tyreek Hill']]]);
   });
 });

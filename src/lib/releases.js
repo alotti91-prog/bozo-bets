@@ -5,6 +5,17 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-i',
+    date: '2026-10-23',
+    title: 'Player props, DraftKings style',
+    idea: 'Lotti',
+    items: [
+      'Player props now go category first, like DraftKings: Passing, Rushing, Receiving, or TDs, then the stat (Yards, Catches, and so on).',
+      'You only see the players who’d have that line, grouped by team with their position: QBs for passing, WRs then TEs then RBs for receiving. There’s a search box when the list is long.',
+      'Tap a player and the list folds down to them, with Change to pick someone else.',
+    ],
+  },
+  {
     id: '2026-10-23-h',
     date: '2026-10-23',
     title: 'DraftKings’ odds for bets you build',

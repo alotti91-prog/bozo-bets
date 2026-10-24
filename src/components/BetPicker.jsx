@@ -4,6 +4,7 @@ import { BET_TYPES, STATS, oddsLine, pickText, betProblem, emptyPick, betFromPic
 import { getGames, getRoster } from '../lib/scores.js';
 import { gameWhen } from '../lib/ui.js';
 import GameCard from './GameCard.jsx';
+import PropPicker from './PropPicker.jsx';
 
 const ORDER = { pre: 0, in: 1, post: 2 };
 
@@ -144,33 +145,8 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
       )}
 
       {showCustom && b.type === 'prop' && (
-        <>
-          {roster.key !== rosterKey && <p className="sub">Loading players{'…'}</p>}
-          {roster.key === rosterKey && roster.err && <p className="hint err">{roster.err} <button type="button" className="link" onClick={onTypeInstead}>Type it instead</button></p>}
-          {roster.key === rosterKey && !roster.err && (
-            <div className="field">
-              <label htmlFor="bp-player">Player</label>
-              <select id="bp-player" value={b.player?.id || ''} onChange={(e) => {
-                const p = roster.list.find((x) => x.id === e.target.value);
-                set({ player: p ? { id: p.id, name: p.name, team: p.team } : null });
-              }}>
-                <option value="">Choose{'…'}</option>
-                {teams.map(([side, t]) => (
-                  <optgroup key={side} label={t.name || t.abbr}>
-                    {roster.list.filter((p) => p.team === t.abbr).map((p) => <option key={p.id} value={p.id}>{p.name} ({p.pos})</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-          )}
-          <div className="field">
-            <label htmlFor="bp-stat">Stat</label>
-            <select id="bp-stat" value={b.stat || ''} onChange={(e) => set({ stat: e.target.value || null })}>
-              <option value="">Choose{'…'}</option>
-              {Object.entries(STATS).map(([k, s]) => <option key={k} value={k}>{s.name}</option>)}
-            </select>
-          </div>
-        </>
+        <PropPicker b={b} set={set} teams={teams} onTypeInstead={onTypeInstead}
+          roster={roster.key === rosterKey ? { list: roster.list, err: roster.err } : null} />
       )}
 
       {showCustom && (b.type === 'total' || (b.type === 'prop' && b.stat && !yesNo)) && (

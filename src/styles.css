@@ -306,6 +306,11 @@ div.row { cursor: default; }
 .bp-game.is-picked { cursor: default; border: 1px solid var(--line); background: var(--surface); }
 .bp-game-name { display: flex; flex-direction: column; min-width: 0; }
 .bp-game .text-btn { padding-block: 10px; }
+.prop-players { display: flex; flex-direction: column; gap: 12px; }
+.prop-players .group { display: flex; flex-direction: column; gap: 6px; }
+.prop-players .row { min-height: 46px; }
+.pos-tag { font: 700 12px/1 var(--body); color: var(--muted); background: var(--surface); border-radius: 6px; padding: 4px 6px; min-width: 30px; text-align: center; }
+.segmented.stat-pick button { min-height: 32px; }
 .bp-preview { font-size: 15px; color: var(--muted); text-align: center; }
 
 /* a game and its DraftKings board */
