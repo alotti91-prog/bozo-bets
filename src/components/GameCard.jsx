@@ -9,10 +9,11 @@ const SPREAD = { nhl: 'Puck line', mlb: 'Run line' };
  * with prices. Tap a price to make it your leg (onPick); without onPick the
  * board is read-only. Games that have started, or have no lines yet, show as a
  * plain row (onOpen picks the game to build the bet by hand).
+ *   onProps        football: a "Player props" button next to the matchup
  *   selected(opt)  true for the choice currently picked
  *   head           false hides the matchup line (the picker shows its own)
  */
-export default function GameCard({ game, sport, onPick, onOpen, selected, head = true }) {
+export default function GameCard({ game, sport, onPick, onOpen, onProps, selected, head = true }) {
   const opts = game.state === 'pre' ? boardOptions(game) : [];
   if (!opts.length) {
     if (!onOpen) return null;
@@ -45,7 +46,7 @@ export default function GameCard({ game, sport, onPick, onOpen, selected, head =
       {head && (
         <div className="gc-head">
           <span className="gc-match"><b>{game.short}</b><span>{gameWhen(game)}</span></span>
-          {onOpen && <button type="button" className="text-btn muted" onClick={onOpen}>Other bets</button>}
+          {onProps && <button type="button" className="text-btn muted" onClick={onProps}>Player props</button>}
         </div>
       )}
       <div className="gc-board">

@@ -12,9 +12,12 @@ const ORDER = { pre: 0, in: 1, post: 2 };
 
 /**
  * Pick the bet. Upcoming games show DraftKings' board: tap a price and the
- * pick, line, and odds fill in. "Other bets" (or "Something else") builds it by
- * hand: the kind of bet, the side, the line, or a player prop. NFL props get
- * DraftKings' line and prices too, when SportsGameOdds has them (getProps).
+ * pick, line, and odds fill in. Football games add "Player props", which opens
+ * the prop picker straight away (NFL props get DraftKings' line and prices too,
+ * when SportsGameOdds has them; see getProps). Alternate lines aren't offered:
+ * nobody bets them, and "Type it instead" covers the odd one. Games without a
+ * board (no lines yet, or started) build the bet by hand: the kind of bet, the
+ * side, the line, or a player prop. Editing an older hand-built leg shows its builder.
  * value/onChange hold picker state (see emptyPick); onChange(state, price) passes
  * DraftKings' price when the bet is on the board (tapped, or built by hand to match). onTypeInstead switches the form to free text
  * ("Type it instead", right under the sports so nobody scrolls past the games for it).
@@ -63,6 +66,8 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
   const odds = b.game?.odds || games.list.find((g) => g.id === b.game?.id)?.odds || null;
   const pickSport = (s) => { setFind(''); setCustom(false); onChange(emptyPick(s)); };
   const pickGame = (g) => { setCustom(!!g); onChange({ ...emptyPick(b.sport), game: g }); };
+  const hasProps = !!SPORTS[b.sport]?.props;
+  const pickProps = (g) => { setCustom(true); onChange({ ...emptyPick(b.sport), game: g, type: 'prop' }); };
   const pickBoard = (g, opt) => { setCustom(false); const { b: nb, price } = pickFromBoard(b.sport, g, opt); onChange(nb, price); };
   const onBoard = boardGame && b.type && boardOptions(boardGame).some((o) => isBoardPick(b, boardGame, o));
   const showCustom = !boardGame || custom || (b.type && !onBoard);
@@ -113,7 +118,7 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
           {boardGame && !showCustom && (
             <>
               <GameCard game={boardGame} sport={b.sport} head={false} onPick={(o) => pickBoard(boardGame, o)} selected={(o) => isBoardPick(b, boardGame, o)} />
-              <button type="button" className="text-btn muted center" onClick={() => setCustom(true)}>Something else: a player prop or another line</button>
+              {hasProps && <button type="button" className="text-btn muted center" onClick={() => pickProps(b.game)}>Player props</button>}
             </>
           )}
           {boardGame && showCustom && (
@@ -134,13 +139,14 @@ export default function BetPicker({ value: b, onChange, onTypeInstead }) {
           )}
           <div className="bp-games">
             {shown.map((g) => (
-              <GameCard key={g.id} game={g} sport={b.sport} onPick={(o) => pickBoard(g, o)} onOpen={() => pickGame(g)} />
+              <GameCard key={g.id} game={g} sport={b.sport} onPick={(o) => pickBoard(g, o)} onOpen={() => pickGame(g)} onProps={hasProps ? () => pickProps(g) : undefined} />
             ))}
           </div>
         </div>
       )}
 
-      {b.game && showCustom && (
+      {/* The kind of bet: only for games without a board (or an older hand-built leg); board games go straight to props. */}
+      {b.game && showCustom && (!boardGame || (b.type && b.type !== 'prop')) && (
         <div className="segmented" role="group" aria-label="Kind of bet">
           {Object.entries(BET_TYPES).filter(([k]) => k !== 'prop' || SPORTS[b.sport]?.props).map(([k, label]) => (
             <button key={k} type="button" aria-pressed={b.type === k} onClick={() => pickType(k)}>{k === 'prop' ? 'Player' : label}</button>

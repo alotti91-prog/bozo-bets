@@ -292,7 +292,7 @@ export function isBoardPick(b, game, opt) {
 }
 
 /**
- * DraftKings' price for a bet built by hand ("Other bets"), when it's exactly a
+ * DraftKings' price for a bet built by hand (editing an older hand-built leg), when it's exactly a
  * line on the game's board and the game hasn't started; null otherwise (alternate
  * lines, props, started games).
  */

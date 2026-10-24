@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-24-b',
+    date: '2026-10-24',
+    title: 'Player props, one tap',
+    idea: 'Lotti',
+    items: [
+      'Football games now have a “Player props” button that opens straight to Passing, Rushing, Receiving, and TDs.',
+      'The hand-built spread, total, and moneyline are gone for games with DraftKings lines. Tap the price on the board, or use “Type it instead” for anything else.',
+    ],
+  },
+  {
     id: '2026-10-24-a',
     date: '2026-10-24',
     title: 'DraftKings prop lines',
