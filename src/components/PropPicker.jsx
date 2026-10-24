@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { PROP_CATS, STAT_POS, STATS, propCatOf, propPlayers } from '../lib/bets.js';
 import { getDepth } from '../lib/scores.js';
-import { injuryTag, depthOf } from '../lib/depth.js';
+import { depthOf } from '../lib/depth.js';
+import InjuryTag from './InjuryTag.jsx';
 
 // Short names for the stat buttons inside a category ("Yards" under Passing).
 const CHIP = {
@@ -85,7 +86,7 @@ export default function PropPicker({ b, set, teams, roster, onTypeInstead }) {
                 {g.players.map((p) => (
                   <button key={p.id} type="button" className="row" onClick={() => { setFind(''); set({ player: { id: p.id, name: p.name, team: p.team } }); }}>
                     <span className="row-label">{p.name}</span>
-                    {injuryTag(p.inj) && <span className={`inj-tag${p.inj === 'Questionable' ? '' : ' is-out'}`} title={p.inj}>{injuryTag(p.inj)}</span>}
+                    <InjuryTag s={p.inj} />
                     <span className="pos-tag">{p.pos}</span>
                   </button>
                 ))}

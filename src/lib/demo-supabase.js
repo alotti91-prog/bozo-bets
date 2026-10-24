@@ -70,7 +70,7 @@ const ROSTER = {
   NE: [['Drake Maye', 'QB'], ['Rhamondre Stevenson', 'RB'], ['Stefon Diggs', 'WR'], ['Hunter Henry', 'TE'], ['Antonio Gibson', 'RB', null, 2], ['DeMario Douglas', 'WR', null, 2, 'Out']],
   BUF: [['Josh Allen', 'QB', '3918298'], ['James Cook', 'RB', '4379399'], ['Khalil Shakir', 'WR'], ['Dalton Kincaid', 'TE']],
   MIA: [['Tua Tagovailoa', 'QB'], ["De'Von Achane", 'RB'], ['Tyreek Hill', 'WR'], ['Jaylen Waddle', 'WR']],
-  PHI: [['Jalen Hurts', 'QB', '4040715'], ['Saquon Barkley', 'RB', '3929630'], ['A.J. Brown', 'WR'], ['DeVonta Smith', 'WR'], ['Dallas Goedert', 'TE']],
+  PHI: [['Jalen Hurts', 'QB', '4040715'], ['Saquon Barkley', 'RB', '3929630', 1, 'Questionable'], ['A.J. Brown', 'WR'], ['DeVonta Smith', 'WR'], ['Dallas Goedert', 'TE']],
   NYG: [['Jaxson Dart', 'QB'], ['Cam Skattebo', 'RB'], ['Malik Nabers', 'WR']],
   DET: [['Jared Goff', 'QB'], ['Jahmyr Gibbs', 'RB'], ['David Montgomery', 'RB'], ['Amon-Ra St. Brown', 'WR'], ['Sam LaPorta', 'TE']],
   GB: [['Jordan Love', 'QB'], ['Josh Jacobs', 'RB'], ['Jayden Reed', 'WR'], ['Tucker Kraft', 'TE']],

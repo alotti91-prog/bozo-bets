@@ -51,6 +51,21 @@ export function depthOf(depth, p) {
   return depth[p.id] || depth[`n:${nameKey(p.name)}`] || null;
 }
 
+/**
+ * The injury status to show on a slip leg ("Questionable", "Out", ...), or null.
+ * Only NFL player props, only ungraded legs, only until the game kicks off
+ * (after that the injury report is old news), and only statuses with a tag.
+ *   st  the leg's live status from liveStatus(), or null when the feed has nothing
+ */
+export function legInjury(leg, st, depth, now = Date.now()) {
+  const b = leg?.bet;
+  if (!b?.player || b.sport !== 'nfl' || leg.result || !depth) return null;
+  const started = st ? st.tone !== 'pre' : !!b.game?.start && Date.parse(b.game.start) <= now;
+  if (started) return null;
+  const s = depthOf(depth, b.player)?.s;
+  return injuryTag(s) ? s : null;
+}
+
 const TAGS = { Questionable: 'Q', Doubtful: 'D', Out: 'Out', IR: 'IR', PUP: 'PUP', Sus: 'Susp' };
 
 /** A short tag for an injury status, like DraftKings shows: "Q", "D", "Out", "IR". '' when healthy. */

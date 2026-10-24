@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-23-k',
+    date: '2026-10-23',
+    title: 'Injury tags on the slip',
+    idea: 'Lotti',
+    items: [
+      'NFL player props on the slip now show the player’s injury tag (Q, D, Out, IR) until his game kicks off, so a late downgrade doesn’t sneak up on anyone.',
+      'Injury news comes from Sleeper and can be up to a day old. Check the news before kickoff.',
+    ],
+  },
+  {
     id: '2026-10-23-j',
     date: '2026-10-23',
     title: 'Starters first, with injury tags',

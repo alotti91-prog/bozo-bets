@@ -13,7 +13,7 @@ import { espnUrl, espnUrls, daysIn, mergeEvents, weekDates, normalizeScoreboard,
 import { pickText, parseLine, oddsLine, liveStatus, aliveCount, betProblem, fmtLine, shortClock, legState, suggestedGrade, gradeHidden, boardOptions, pickFromBoard, isBoardPick, betFromPick, boardPrice, emptyPick, PROP_CATS, STAT_POS, propCatOf, propPlayers, STATS } from './bets.js';
 import espnHandler from '../../api/espn.js';
 import { runChecks } from '../../api/health.js';
-import { normalizeDepth, injuryTag, nameKey, depthOf } from './depth.js';
+import { normalizeDepth, injuryTag, nameKey, depthOf, legInjury } from './depth.js';
 import depthHandler from '../../api/depth.js';
 
 describe('odds', () => {
@@ -718,6 +718,24 @@ describe('depth charts from Sleeper', () => {
       const bad = await depthHandler({ query: {} }, res());
       expect(bad.code).toBe(502);
     } finally { globalThis.fetch = saved; }
+  });
+  it('tags an NFL prop on the slip with the player’s injury, only until kickoff', () => {
+    const depth = { 3929630: { o: 1, s: 'Questionable' }, 'n:dandre swift': { o: 1, s: 'Out' }, 5: { o: 1, s: null } };
+    const now = Date.parse('2026-10-25T16:00:00Z');
+    const bet = (player, start = '2026-10-25T17:00:00Z') => ({ sport: 'nfl', type: 'prop', stat: 'rushYds', player, game: { start } });
+    const saquon = { bet: bet({ id: '3929630', name: 'Saquon Barkley', team: 'PHI' }), result: null };
+    const pre = { tone: 'pre' };
+    expect(legInjury(saquon, pre, depth, now)).toBe('Questionable');
+    expect(legInjury(saquon, null, depth, now)).toBe('Questionable'); // no feed, but kickoff is later
+    expect(legInjury({ ...saquon, bet: bet({ id: '9', name: 'D’Andre Swift', team: 'CHI' }) }, pre, depth, now)).toBe('Out'); // by name
+    expect(legInjury(saquon, { tone: 'live' }, depth, now)).toBe(null); // kicked off
+    expect(legInjury(saquon, null, depth, Date.parse('2026-10-25T18:00:00Z'))).toBe(null); // no feed, past kickoff
+    expect(legInjury({ ...saquon, result: 'W' }, pre, depth, now)).toBe(null); // graded
+    expect(legInjury({ ...saquon, bet: bet({ id: '5', name: 'Healthy Guy' }) }, pre, depth, now)).toBe(null);
+    expect(legInjury({ ...saquon, bet: { ...saquon.bet, sport: 'ncaaf' } }, pre, depth, now)).toBe(null);
+    expect(legInjury({ bet: { sport: 'nfl', type: 'spread', game: {} }, result: null }, pre, depth, now)).toBe(null); // not a prop
+    expect(legInjury({ pick: 'Saquon 75+ rush yds', result: null }, null, depth, now)).toBe(null); // typed leg
+    expect(legInjury(saquon, pre, null, now)).toBe(null); // Sleeper down
   });
   it('puts starters first and tucks the rest behind “Show all”', () => {
     const roster = [

@@ -2,6 +2,7 @@ import { fmtOdds } from '../../lib/odds.js';
 import { legState, suggestedGrade } from '../../lib/bets.js';
 import { Belt, IconComment } from '../../components/common.jsx';
 import { EMOJI } from '../../components/Reactions.jsx';
+import InjuryTag from '../../components/InjuryTag.jsx';
 import LiveLine from './LiveLine.jsx';
 
 const WORD = { W: 'Won', L: 'Lost', P: 'Push' };
@@ -11,9 +12,10 @@ const TONE = { W: 'win', L: 'loss', P: 'pre' };
  * One leg on the slip: a status dot, who, the pick and odds, one live line, and
  * reaction and comment counts once there are any. Tapping it opens the leg
  * panel (LegSheet). Admins get a one-tap "Mark W" when a picked leg's game is final.
- *   st  live status from liveStatus() (null for typed legs or no feed)
+ *   st   live status from liveStatus() (null for typed legs or no feed)
+ *   inj  the player's injury status for an NFL prop before kickoff (legInjury()), or null
  */
-export default function LegRow({ leg, st, me, isAdmin, beltId, pname, reactions, comments, onOpen, onGrade }) {
+export default function LegRow({ leg, st, inj, me, isAdmin, beltId, pname, reactions, comments, onOpen, onGrade }) {
   const who = pname(leg.player_id);
   const mine = me && leg.player_id === me;
   const state = legState(leg, st);
@@ -29,7 +31,7 @@ export default function LegRow({ leg, st, me, isAdmin, beltId, pname, reactions,
         <span className="leg-dot" aria-hidden="true" />
         <span className="leg-body">
           <span className="leg-who">{who}<Belt on={beltId === leg.player_id} />{mine && <span className="you"> · you</span>}</span>
-          <span className="leg-pick">{leg.pick}</span>
+          <span className="leg-pick">{leg.pick}{inj && <> <InjuryTag s={inj} /></>}</span>
           {showLive ? <LiveLine bet={leg.bet} s={st} /> : (
             <span className={`leg-live tone-${TONE[leg.result] || 'pre'}`}>
               <span className="ll-row">{leg.result && <strong>{WORD[leg.result]}</strong>}<span>{leg.sport}</span></span>

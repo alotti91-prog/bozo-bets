@@ -8,6 +8,8 @@ import { Sheet, IconShare, IconPhoto, IconPlus, IconClock, IconLock, IconBoard }
 import { slipPaths } from '../lib/slip.js';
 import { liveStatus, aliveCount, gameKey, gradeMargin, finishedGrades } from '../lib/bets.js';
 import { useLiveGames } from '../lib/useLiveGames.js';
+import { getDepth } from '../lib/scores.js';
+import { legInjury } from '../lib/depth.js';
 import PlacedSheet from './PlacedSheet.jsx';
 import LegRow from './week/LegRow.jsx';
 import LegSheet from './week/LegSheet.jsx';
@@ -32,6 +34,15 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
     return () => clearInterval(t);
   }, []);
   const [games, updatedAt] = useLiveGames(week ? data.legs.filter((l) => l.week_id === week.id) : []);
+  // Injury tags for NFL player props on the slip (Sleeper, via getDepth); only fetched when there's one
+  const [depth, setDepth] = useState(null);
+  const hasProps = !!week && data.legs.some((l) => l.week_id === week.id && l.bet?.player && l.bet.sport === 'nfl');
+  useEffect(() => {
+    if (!hasProps) return undefined;
+    let live = true;
+    getDepth('nfl').then((d) => { if (live) setDepth(d); });
+    return () => { live = false; };
+  }, [hasProps]);
 
   if (!week) {
     return (
@@ -166,7 +177,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         {legs.length > 0 && (
           <ol className="legs">
             {legs.map((l) => (
-              <LegRow key={l.id} leg={l} st={statusOf(l)} me={me} isAdmin={isAdmin} beltId={beltId} pname={pname}
+              <LegRow key={l.id} leg={l} st={statusOf(l)} inj={legInjury(l, statusOf(l), depth, now)} me={me} isAdmin={isAdmin} beltId={beltId} pname={pname}
                 reactions={data.reactions || []} comments={data.comments || []}
                 onOpen={() => setOpenId(l.id)} onGrade={(r) => grade(l, r)} />
             ))}
