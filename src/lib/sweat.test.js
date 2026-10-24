@@ -3,6 +3,7 @@ import { legOutcome, carrier, slipOutcome, sweatEvents, sweatMessage } from './s
 import { currentBozo } from './stats.js';
 import { herePeople, hereLine, arrivals, WHERE } from './presence.js';
 import { autoCheck, autoGrades } from './autograde.js';
+import { feedbackLists, unseenFeedback, WEEK_MS } from './feedback.js';
 
 const leg = (id, player, pick, result = null) => ({ id, player_id: player, pick, result });
 const names = (id) => ({ p1: 'Lotti', p2: 'Danny B', p3: 'Mikey' }[id] || id);
@@ -161,5 +162,25 @@ describe('Sunday sweat mode', () => {
     expect(all.check).toEqual([{ leg: yards, why: 'close' }]);
     // The commish cleared a grade by hand: auto-grading leaves it alone
     expect(autoGrades([spread, yards, catches], (l) => status[l.id], new Set(['spread', 'yards'])).grade.map((g) => g.leg.id)).toEqual(['catches']);
+  });
+  it('feedback: new until you see it, this week for a week after, then older; done goes straight to older', () => {
+    const now = Date.parse('2026-10-24T12:00:00Z');
+    const iso = (msAgo) => new Date(now - msAgo).toISOString();
+    const fb = [
+      { id: 'a', user_id: 'u2', body: 'faster wheel', done_at: null, created_at: iso(3600e3) },
+      { id: 'b', user_id: 'u3', body: 'college props', done_at: null, created_at: iso(10 * 864e5) },
+      { id: 'c', user_id: 'u3', body: 'dark mode', done_at: null, created_at: iso(3 * 864e5) },
+      { id: 'd', user_id: 'u2', body: 'fixed thing', done_at: iso(864e5), created_at: iso(2 * 864e5) }, // done, never seen by me
+      { id: 'e', user_id: 'me', body: 'my own note', done_at: null, created_at: iso(864e5) },
+    ];
+    const views = [{ feedback_id: 'b', seen_at: iso(WEEK_MS + 1000) }, { feedback_id: 'c', seen_at: iso(2 * 864e5) }];
+    const l = feedbackLists(fb, views, 'me', now);
+    expect(l.fresh.map((f) => f.id)).toEqual(['a']);
+    expect(l.recent.map((f) => f.id)).toEqual(['e', 'c']); // my own counts as seen when I sent it
+    expect(l.older.map((f) => f.id)).toEqual(['d', 'b']); // done by another admin, and seen over a week ago
+    expect(unseenFeedback(fb, views, 'me')).toBe(1);
+    // Another admin's timer is their own
+    expect(feedbackLists(fb, [], 'other', now).fresh.map((f) => f.id)).toEqual(['a', 'e', 'c', 'b']);
+    expect(feedbackLists(null, null, 'me', now)).toEqual({ fresh: [], recent: [], older: [] });
   });
 });

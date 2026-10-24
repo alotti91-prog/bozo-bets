@@ -172,6 +172,12 @@ const db = {
   reactions: [],
   comments: [],
   spin_views: [],
+  // One note from Sully the commish hasn't seen, and one from last week that's been handled.
+  feedback: [
+    { id: 'fb1', league_id: L, user_id: 'u2', body: 'Can the wheel spin a little faster? The suspense is killing me.', done_at: null, done_by: null, created_at: new Date(Date.now() - 3 * 3600e3).toISOString() },
+    { id: 'fb2', league_id: L, user_id: 'u3', body: 'Add college props please', done_at: daysAgo(5) + 'T15:00:00Z', done_by: uid, created_at: daysAgo(9) + 'T20:00:00Z' },
+  ],
+  feedback_views: [{ feedback_id: 'fb2', league_id: L, user_id: uid, seen_at: daysAgo(8) + 'T12:00:00Z' }],
 };
 // A few sample reactions on this week's picks (Sully is the other signed-in member).
 W[3].lock_at = nextLock(0, '12:55');
@@ -219,7 +225,10 @@ function query(table) {
     const match = (r) => filters.every((f) => f(r));
     if (op === 'insert') {
       const rows = (Array.isArray(payload) ? payload : [payload]).map((r) => ({ id: id(), created_at: now(), active: true, result: null, ...r }));
-      if (table === 'reactions' || table === 'comments' || table === 'spin_views') rows.forEach((r) => { r.user_id = uid; r.league_id = L; });
+      if (table === 'reactions' || table === 'comments' || table === 'spin_views' || table === 'feedback_views') rows.forEach((r) => { r.user_id = uid; r.league_id = L; });
+      if (table === 'feedback_views') rows.forEach((r) => { r.seen_at = now(); });
+      if (table === 'feedback') rows.forEach((r) => { r.user_id = uid; r.body = String(r.body || '').trim(); r.done_at = null; r.done_by = null; });
+      if (table === 'feedback' && rows.some((r) => !r.body)) return { data: null, error: { message: 'Write something first' } };
       if (table === 'spin_views' && rows.some((r) => db.spin_views.some((v) => v.spin_id === r.spin_id))) return { data: null, error: { message: 'duplicate key value violates unique constraint "spin_views_pkey"' } };
       if (table === 'legs') rows.forEach((r) => { r.bet = r.bet ?? null; r.margin = null; r.miss = null; }); // like the real columns' defaults
       if (table === 'comments') rows.forEach((r) => { r.body = String(r.body || '').trim(); });
@@ -239,6 +248,7 @@ function query(table) {
         Object.assign(r, payload);
         if (table === 'legs' && !r.result) r.margin = null; // as the database does when a grade is undone
         if (table === 'legs' && r.result !== 'L') r.miss = null;
+        if (table === 'feedback') r.done_by = r.done_at ? uid : null; // as the database's feedback_guard does
         emit(table, 'UPDATE', r);
       });
       return { data: null, error: null };

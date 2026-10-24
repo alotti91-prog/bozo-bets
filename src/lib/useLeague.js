@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, friendly } from './supabase.js';
 import { spinMs } from './wheel.js';
 
-const TABLES = ['players', 'members', 'weeks', 'legs', 'spins', 'reactions', 'comments'];
+const TABLES = ['players', 'members', 'weeks', 'legs', 'spins', 'reactions', 'comments', 'feedback'];
 
 /**
  * Loads everything for one league and keeps it live. Any change by anyone
@@ -20,7 +20,7 @@ export function useLeague(leagueId, onSpin) {
 
   const load = useCallback(async () => {
     if (!leagueId) return;
-    const [lg, pl, mb, wk, lgs, sp, rx, cm, vw] = await Promise.all([
+    const [lg, pl, mb, wk, lgs, sp, rx, cm, vw, fb, fv] = await Promise.all([
       supabase.from('leagues').select('*').eq('id', leagueId).maybeSingle(),
       supabase.from('players').select('*').eq('league_id', leagueId).order('sort').order('created_at'),
       supabase.from('members').select('*').eq('league_id', leagueId).order('joined_at'),
@@ -30,17 +30,19 @@ export function useLeague(leagueId, onSpin) {
       supabase.from('reactions').select('*').eq('league_id', leagueId).order('created_at'),
       supabase.from('comments').select('*').eq('league_id', leagueId).order('created_at'),
       supabase.from('spin_views').select('spin_id').eq('league_id', leagueId), // only your own come back
+      supabase.from('feedback').select('*').eq('league_id', leagueId).order('created_at'), // admins get all; members their own
+      supabase.from('feedback_views').select('feedback_id, seen_at').eq('league_id', leagueId), // your own
     ]);
     // Comments and spin views are optional: if the database hasn't been updated yet, carry on without them.
     const err = [lg, pl, mb, wk, lgs, sp, rx].find((r) => r.error);
     // A missing table (not a network blip) means schema.sql hasn't been re-run since an update.
     const noTable = (r) => !!r.error && (r.error.code === 'PGRST205' || r.error.code === '42P01' || /does not exist|schema cache/i.test(r.error.message || ''));
     const oldLegs = !lgs.error && lgs.data.length > 0 && !('miss' in lgs.data[0]); // no legs.margin/miss columns yet
-    const missing = [noTable(cm) && 'comments', noTable(vw) && 'hidden spins', oldLegs && 'close-call and blowout faces'].filter(Boolean);
+    const missing = [noTable(cm) && 'comments', noTable(vw) && 'hidden spins', oldLegs && 'close-call and blowout faces', noTable(fb) && 'feedback'].filter(Boolean);
     if (err) { setError(friendly(err.error)); return; }
     if (!lg.data) { setError('That league doesn’t exist or you’re not in it.'); return; }
     setError('');
-    setData({ league: lg.data, players: pl.data, members: mb.data, weeks: wk.data, legs: lgs.data, spins: sp.data, reactions: rx.data, comments: cm.error ? [] : cm.data, views: vw.error ? null : vw.data.map((v) => v.spin_id), missing });
+    setData({ league: lg.data, players: pl.data, members: mb.data, weeks: wk.data, legs: lgs.data, spins: sp.data, reactions: rx.data, comments: cm.error ? [] : cm.data, views: vw.error ? null : vw.data.map((v) => v.spin_id), feedback: fb.error ? null : fb.data, feedbackViews: fv.error ? [] : fv.data, missing });
   }, [leagueId]);
 
   const reload = useCallback(() => {
@@ -64,7 +66,7 @@ export function useLeague(leagueId, onSpin) {
     ch.on('postgres_changes', { event: '*', schema: 'public', table: 'leagues', filter: `id=eq.${leagueId}` }, reload);
     // Supabase can't filter delete events by league, so listen for all of them
     // (a removed pick, reaction, or comment) and reload. With one group, that's cheap.
-    ['legs', 'reactions', 'comments', 'spins', 'weeks', 'players'].forEach((t) => {
+    ['legs', 'reactions', 'comments', 'spins', 'weeks', 'players', 'feedback'].forEach((t) => {
       ch.on('postgres_changes', { event: 'DELETE', schema: 'public', table: t }, reload);
     });
     ch.subscribe();

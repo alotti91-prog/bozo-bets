@@ -27,15 +27,35 @@ export function Belt({ on, size = 18 }) {
   return <span className="belt" title="Bozo Belt: most misses this season" aria-label="(Bozo Belt holder)" role="img"><BozoFace face="full" size={size} /></span>;
 }
 
+/**
+ * One toast at a time, and a newer toast always shows right away. A toast with
+ * a button (Watch, View) that gets cut off comes back afterward for the rest of
+ * its time, so the feedback heads-up isn't lost to an auto-grade note a second
+ * later.
+ */
 export function Toaster() {
   const [msg, setMsg] = useState(null);
+  const next = useRef(() => setMsg(null));
   useEffect(() => {
     let t;
+    let cur = null;
+    let started = 0;
+    const queue = [];
+    const show = (d) => {
+      clearTimeout(t);
+      cur = d;
+      started = Date.now();
+      setMsg(d && { ...d, key: started });
+      if (d) t = setTimeout(() => show(queue.shift() || null), d.ms ?? (d.action ? 8000 : 3400));
+    };
+    next.current = () => show(queue.shift() || null);
     const on = (e) => {
       const d = typeof e.detail === 'string' ? { text: e.detail } : e.detail;
-      setMsg({ ...d, key: Date.now() });
-      clearTimeout(t);
-      t = setTimeout(() => setMsg(null), d.action ? 8000 : 3400);
+      if (cur?.action) {
+        const left = (cur.ms ?? 8000) - (Date.now() - started);
+        if (left > 1500) queue.unshift({ ...cur, ms: left });
+      }
+      show(d);
     };
     window.addEventListener('bz-toast', on);
     return () => { window.removeEventListener('bz-toast', on); clearTimeout(t); };
@@ -44,7 +64,7 @@ export function Toaster() {
   return (
     <div className="toast" role="status" key={msg.key}>
       <span>{msg.text}</span>
-      {msg.action && <button type="button" className="toast-act" onClick={() => { msg.action.onClick(); setMsg(null); }}>{msg.action.label}</button>}
+      {msg.action && <button type="button" className="toast-act" onClick={() => { msg.action.onClick(); next.current(); }}>{msg.action.label}</button>}
     </div>
   );
 }

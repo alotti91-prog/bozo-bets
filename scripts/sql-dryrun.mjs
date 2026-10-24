@@ -435,6 +435,46 @@ await as(A, `select public.set_deadline($1, null, null, null)`, [lid4]);
 assert.equal((await as(A, `select lock_at from public.weeks where league_id = $1 and n = 8`, [lid4])).rows[0].lock_at, null);
 ok('turning the deadline off clears it for the current week');
 
+// ---- Feedback ----
+// In league 4: A is the owner (admin), B a member, C a stranger.
+await as(B, `insert into public.feedback (league_id, body, user_id, done_at) values ($1, '  The wheel is too slow  ', $2, now())`, [lid4, A]);
+let fb = (await as(A, `select id, body, user_id, done_at from public.feedback where league_id = $1`, [lid4])).rows;
+assert.equal(fb.length, 1);
+assert.deepEqual([fb[0].body, fb[0].user_id, fb[0].done_at], ['The wheel is too slow', B, null]); // trimmed, sent as B, not done
+await fails(B, `insert into public.feedback (league_id, body) values ($1, '   ')`, [lid4], /Write something/);
+await fails(B, `insert into public.feedback (league_id, body) values ($1, $2)`, [lid4, 'x'.repeat(1001)], /1,000/);
+await fails(C, `insert into public.feedback (league_id, body) values ($1, 'let me in')`, [lid4]);
+ok('feedback: members send it as themselves; empty, too long, or from outside the league is refused');
+
+await as(A, `insert into public.feedback (league_id, body) values ($1, 'Note to self')`, [lid4]);
+assert.equal((await as(B, `select count(*)::int c from public.feedback`)).rows[0].c, 1); // only B's own
+assert.equal((await as(C, `select count(*)::int c from public.feedback`)).rows[0].c, 0);
+assert.equal((await as(A, `select count(*)::int c from public.feedback where league_id = $1`, [lid4])).rows[0].c, 2);
+ok('feedback: admins read all of it; members only their own; strangers nothing');
+
+const fid = fb[0].id;
+await as(B, `update public.feedback set done_at = now() where id = $1`, [fid]); // member: 0 rows
+assert.equal((await as(A, `select done_at from public.feedback where id = $1`, [fid])).rows[0].done_at, null);
+await as(A, `update public.feedback set done_at = now() where id = $1`, [fid]);
+let done = (await as(A, `select done_at, done_by from public.feedback where id = $1`, [fid])).rows[0];
+assert.ok(done.done_at); assert.equal(done.done_by, A);
+await fails(A, `update public.feedback set body = 'nice wheel' where id = $1`, [fid], /only be marked done/);
+await as(A, `update public.feedback set done_at = null where id = $1`, [fid]);
+done = (await as(A, `select done_at, done_by from public.feedback where id = $1`, [fid])).rows[0];
+assert.deepEqual([done.done_at, done.done_by], [null, null]);
+ok('feedback: only admins mark it done (and undo it); nobody can edit what was said');
+
+await as(A, `insert into public.feedback_views (feedback_id, user_id) values ($1, $2)`, [fid, B]); // tries to record for B
+assert.deepEqual((await as(A, `select user_id, league_id from public.feedback_views`)).rows, [{ user_id: A, league_id: lid4 }]);
+await fails(A, `insert into public.feedback_views (feedback_id) values ($1)`, [fid], /duplicate/);
+await fails(B, `insert into public.feedback_views (feedback_id) values ($1)`, [fid]); // members don't track views
+assert.equal((await as(B, `select count(*)::int c from public.feedback_views`)).rows[0].c, 0);
+await as(B, `delete from public.feedback where id = $1`, [fid]); // member: 0 rows
+assert.equal((await as(A, `select count(*)::int c from public.feedback where id = $1`, [fid])).rows[0].c, 1);
+await as(A, `delete from public.feedback where id = $1`, [fid]);
+assert.equal((await as(A, `select count(*)::int c from public.feedback_views`)).rows[0].c, 0); // its views go with it
+ok('feedback: each admin records only their own “seen”; only admins delete');
+
 // ---- Re-running the setup file, and upgrading from the first version ----
 const before = (await db.query(`select (select count(*) from public.legs)::int legs, (select count(*) from public.weeks)::int weeks`)).rows[0];
 await db.exec(schema);

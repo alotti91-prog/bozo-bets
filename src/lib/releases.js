@@ -5,6 +5,17 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-24-j',
+    date: '2026-10-24',
+    title: 'Send the commish feedback',
+    idea: 'Lotti',
+    items: [
+      'Everyone has Settings → Send feedback: ideas, bugs, complaints about the wheel. It goes to the admins with your name on it.',
+      'Admins get a dot on the gear and a heads-up when there’s something new, and read it all in Settings → Feedback.',
+      'Each admin’s “new” is their own. A note moves to Older a week after you’ve seen it, or as soon as any admin marks it Done. Nothing is deleted.',
+    ],
+  },
+  {
     id: '2026-10-24-i',
     date: '2026-10-24',
     title: 'Legs grade themselves',

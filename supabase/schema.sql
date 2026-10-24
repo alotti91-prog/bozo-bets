@@ -120,6 +120,29 @@ create table if not exists public.spin_views (
 );
 create index if not exists spin_views_league_idx on public.spin_views (league_id, user_id);
 
+-- Feedback: anyone in the league can send the commish a note (Settings → Send
+-- feedback). Only admins read it, plus your own. Any admin can mark it done for
+-- everyone; who has seen what is tracked per admin in feedback_views.
+create table if not exists public.feedback (
+  id         uuid primary key default gen_random_uuid(),
+  league_id  uuid not null references public.leagues(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  body       text not null check (char_length(body) between 1 and 1000),
+  done_at    timestamptz,
+  done_by    uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists feedback_league_idx on public.feedback (league_id, created_at);
+
+create table if not exists public.feedback_views (
+  feedback_id uuid not null references public.feedback(id) on delete cascade,
+  league_id   uuid not null references public.leagues(id) on delete cascade,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  seen_at     timestamptz not null default now(),
+  primary key (feedback_id, user_id)
+);
+create index if not exists feedback_views_league_idx on public.feedback_views (league_id, user_id);
+
 -- "Bet placed": whoever's on the hook marks the slip placed, with an optional
 -- screenshot stored in the private "slips" storage bucket (set up below).
 alter table public.weeks add column if not exists placed_at timestamptz;
@@ -294,6 +317,8 @@ alter table public.spins   enable row level security;
 alter table public.reactions enable row level security;
 alter table public.comments enable row level security;
 alter table public.spin_views enable row level security;
+alter table public.feedback enable row level security;
+alter table public.feedback_views enable row level security;
 
 -- Leagues: members read; commish edits name/stake. Created via create_league().
 drop policy if exists "league read" on public.leagues;
@@ -411,6 +436,72 @@ create policy "comment add" on public.comments for insert to authenticated
 drop policy if exists "comment remove" on public.comments;
 create policy "comment remove" on public.comments for delete to authenticated
   using (user_id = auth.uid() or public.is_admin(league_id));
+
+-- Feedback: members send it as themselves; admins (and the sender) read it.
+-- Admins mark it done or delete it; nobody edits what was said.
+create or replace function public.feedback_fill() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  new.user_id := auth.uid();
+  new.body := btrim(coalesce(new.body, ''));
+  if new.body = '' then raise exception 'Write something first'; end if;
+  if char_length(new.body) > 1000 then raise exception 'Keep it under 1,000 characters'; end if;
+  new.done_at := null;
+  new.done_by := null;
+  new.created_at := now();
+  return new;
+end $$;
+drop trigger if exists feedback_fill on public.feedback;
+create trigger feedback_fill before insert on public.feedback
+  for each row execute function public.feedback_fill();
+
+create or replace function public.feedback_guard() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.body is distinct from old.body or new.user_id is distinct from old.user_id
+     or new.league_id is distinct from old.league_id or new.created_at is distinct from old.created_at then
+    raise exception 'Feedback can only be marked done';
+  end if;
+  new.done_by := case when new.done_at is null then null else auth.uid() end;
+  if new.done_at is not null and old.done_at is null then new.done_at := now(); end if;
+  return new;
+end $$;
+drop trigger if exists feedback_guard on public.feedback;
+create trigger feedback_guard before update on public.feedback
+  for each row execute function public.feedback_guard();
+
+drop policy if exists "feedback read" on public.feedback;
+create policy "feedback read" on public.feedback for select to authenticated
+  using (user_id = auth.uid() or public.is_admin(league_id));
+drop policy if exists "feedback add" on public.feedback;
+create policy "feedback add" on public.feedback for insert to authenticated
+  with check (user_id = auth.uid() and public.is_member(league_id));
+drop policy if exists "feedback done" on public.feedback;
+create policy "feedback done" on public.feedback for update to authenticated
+  using (public.is_admin(league_id)) with check (public.is_admin(league_id));
+drop policy if exists "feedback remove" on public.feedback;
+create policy "feedback remove" on public.feedback for delete to authenticated
+  using (public.is_admin(league_id));
+
+-- Feedback views: each admin records and reads only their own "seen".
+create or replace function public.feedback_views_fill() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  select league_id into new.league_id from public.feedback where id = new.feedback_id;
+  if new.league_id is null then raise exception 'That feedback does not exist'; end if;
+  new.user_id := auth.uid();
+  new.seen_at := now();
+  return new;
+end $$;
+drop trigger if exists feedback_views_fill on public.feedback_views;
+create trigger feedback_views_fill before insert on public.feedback_views
+  for each row execute function public.feedback_views_fill();
+
+drop policy if exists "feedback view read" on public.feedback_views;
+create policy "feedback view read" on public.feedback_views for select to authenticated using (user_id = auth.uid());
+drop policy if exists "feedback view add" on public.feedback_views;
+create policy "feedback view add" on public.feedback_views for insert to authenticated
+  with check (user_id = auth.uid() and public.is_admin(league_id));
 
 -- ---------- Functions the app calls ----------------------------------
 
@@ -998,7 +1089,7 @@ to authenticated;
 do $$
 declare t text;
 begin
-  foreach t in array array['leagues','players','members','weeks','legs','spins','reactions','comments'] loop
+  foreach t in array array['leagues','players','members','weeks','legs','spins','reactions','comments','feedback'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

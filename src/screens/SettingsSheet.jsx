@@ -5,6 +5,9 @@ import { weeklyRule } from '../lib/deadline.js';
 import { unseenReleases } from '../lib/releases.js';
 import { Sheet, IconChevR, IconShare, IconClock } from '../components/common.jsx';
 import WhatsNew from './settings/WhatsNew.jsx';
+import FeedbackForm from './settings/FeedbackForm.jsx';
+import FeedbackInbox from './settings/FeedbackInbox.jsx';
+import { unseenFeedback } from '../lib/feedback.js';
 import PasswordForm from './settings/PasswordForm.jsx';
 import DeadlineForm from './settings/DeadlineForm.jsx';
 import LeagueForm from './settings/LeagueForm.jsx';
@@ -20,17 +23,24 @@ const IconPeople = () => <svg {...svg}><circle cx="9" cy="8" r="3.5" /><path d="
 const IconCheckIn = () => <svg {...svg}><circle cx="10" cy="8" r="3.5" /><path d="M3.5 20a6.5 6.5 0 0 1 11-4.7M15.5 18.5l2 2 4-4.5" /></svg>;
 const IconStar = () => <svg {...svg}><path d="m12 3 2.4 5.6 5.6.8-4.3 3.9 1.3 5.9L12 16.3 7 19.2l1.3-5.9L4 9.4l5.6-.8z" /></svg>;
 const IconEye = () => <svg {...svg}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></svg>;
+const IconChat = () => <svg {...svg}><path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4.5 19.5l1.4-4.2A7.5 7.5 0 1 1 20 11.5z" /></svg>;
+const IconInbox = () => <svg {...svg}><path d="M3.5 13.5 6 5.5h12l2.5 8V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19z" /><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5" /></svg>;
 const IconKey = () => <svg {...svg}><circle cx="8" cy="15" r="4" /><path d="m11 12 9-9M17 6l3 3M14.5 8.5l2 2" /></svg>;
 
 // Settings: a short list of rows. Each opens its own page (the forms live in ./settings/).
-export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, reload, onClose, onChangePlayer, leagues, onSwitchLeague, onAddLeague, onSignOut, onNotesSeen, canPreview, previewing, onPreview }) {
-  const [page, setPage] = useState(null);
+export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, reload, onClose, onChangePlayer, leagues, onSwitchLeague, onAddLeague, onSignOut, onNotesSeen, canPreview, previewing, onPreview, initialPage = null }) {
+  const [page, setPage] = useState(initialPage);
   const league = data.league;
   const cur = data.weeks[data.weeks.length - 1];
   const pname = (id) => data.players.find((p) => p.id === id)?.name || 'Unknown';
   const myName = member?.player_id ? pname(member.player_id) : null;
   const hasPw = store.get('bz-has-pw', false);
   const unseen = isAdmin ? unseenReleases(store.get('bz-seen-release')).length : 0;
+  const fbNew = isAdmin ? unseenFeedback(data.feedback, data.feedbackViews, userId) : 0;
+  const nameOfUser = (uid) => {
+    const m = data.members.find((x) => x.user_id === uid);
+    return (m?.player_id && pname(m.player_id)) || m?.email?.split('@')[0] || 'Someone';
+  };
 
   const pages = {
     profile: ['You', <Profile key="p" data={data} member={member} pname={pname} leagues={leagues} onChangePlayer={onChangePlayer} onSwitchLeague={onSwitchLeague} onAddLeague={onAddLeague} />],
@@ -41,6 +51,8 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
     league: ['League name and stake', <LeagueForm key="l" league={league} reload={reload} />],
     weeks: ['Weeks', <Weeks key="w" data={data} isOwner={isOwner} reload={reload} />],
     whatsnew: ['What’s new', <WhatsNew key="n" onSeen={onNotesSeen} />],
+    feedback: ['Send feedback', <FeedbackForm key="f" data={data} userId={userId} reload={reload} />],
+    inbox: ['Feedback', <FeedbackInbox key="fi" data={data} userId={userId} nameOfUser={nameOfUser} reload={reload} />],
     password: [hasPw ? 'Change password' : 'Set a password', <PasswordForm key="pw" />],
   };
   const open = page && pages[page];
@@ -57,6 +69,7 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
 
           <div className="rows">
             <Row icon={<IconShare />} tint="nose" label="Invite friends" value={league.invite_code} onClick={() => setPage('invite')} />
+            <Row icon={<IconChat />} tint="teal" label="Send feedback" onClick={() => setPage('feedback')} />
           </div>
 
           {isAdmin && (
@@ -71,6 +84,7 @@ export default function SettingsSheet({ data, userId, member, isAdmin, isOwner, 
           {canPreview && (
             <Group label="Admin">
               {isAdmin && <Row icon={<IconStar />} tint="purple" label="What’s new" badge={unseen ? `${unseen} new` : null} onClick={() => setPage('whatsnew')} />}
+              {isAdmin && data.feedback != null && <Row icon={<IconInbox />} tint="blue" label="Feedback" badge={fbNew ? `${fbNew} new` : null} value={!fbNew && data.feedback.length ? data.feedback.length : null} onClick={() => setPage('inbox')} />}
               <div className="row">
                 <span className="row-icon tint-gold" aria-hidden="true"><IconEye /></span>
                 <span className="row-label" id="member-view-label">Member view<span className="row-note">Only hides buttons. Anything you do still counts.</span></span>

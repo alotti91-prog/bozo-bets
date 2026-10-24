@@ -3,6 +3,7 @@ import { supabase, demo } from '../lib/supabase.js';
 import { useLeague } from '../lib/useLeague.js';
 import { usePresence } from '../lib/usePresence.js';
 import { herePeople } from '../lib/presence.js';
+import { unseenFeedback } from '../lib/feedback.js';
 import { store, toast } from '../lib/ui.js';
 import { Brand, IconGear, IconTicket, IconWheel, IconBars, IconHistory } from '../components/common.jsx';
 import Claim from './Claim.jsx';
@@ -94,6 +95,16 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   const { data, error, reload } = useLeague(leagueId, onSpin);
   // Who's here: shares your player and tab while the app is on screen (no names; see presence.js)
   const presence = usePresence(leagueId, data?.members.find((m) => m.user_id === userId)?.player_id || null, tab);
+  // Admins: new feedback gets a toast once, right after the app loads (and a dot on the gear until they look).
+  const fbToasted = useRef(false);
+  useEffect(() => {
+    if (fbToasted.current || !data) return;
+    fbToasted.current = true;
+    const m = data.members.find((x) => x.user_id === userId);
+    if (!m || !['owner', 'admin'].includes(m.role)) return;
+    const n = unseenFeedback(data.feedback, data.feedbackViews, userId);
+    if (n) toast(`${n} new feedback for the commish`, { label: 'View', onClick: () => setSettings('inbox') });
+  }, [data, userId]);
 
   if (error) {
     return (
@@ -162,6 +173,7 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   const bozoId = currentBozo(view); // from the masked view, so an unwatched spin doesn't give it away
   const bozoUser = (uid) => !!bozoId && data.members.some((m) => m.user_id === uid && m.player_id === bozoId);
   const here = herePeople(presence, data.players);
+  const fbNew = isAdmin ? unseenFeedback(data.feedback, data.feedbackViews, userId) : 0;
   const props = { data: view, me, here, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, bozoId, bozoUser, nameOfUser,
     openSettings: () => setSettings(true), watchSpin, markWatched, openRecap: (weekId) => setRecapOpen({ weekId }) };
   return (
@@ -169,8 +181,8 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
       <header className="top">
         <div className="wrap brand-row">
           <h1 className="brand"><Brand name={data.league.name} /></h1>
-          <button className="icon-btn" onClick={() => setSettings(true)} aria-label={isAdmin && !notesSeen ? 'Settings (new updates)' : 'Settings'}>
-            <IconGear />{isAdmin && !notesSeen && <span className="dot-new" aria-hidden="true" />}
+          <button className="icon-btn" onClick={() => setSettings(true)} aria-label={isAdmin && (!notesSeen || fbNew) ? 'Settings (new updates)' : 'Settings'}>
+            <IconGear />{isAdmin && (!notesSeen || fbNew > 0) && <span className="dot-new" aria-hidden="true" />}
           </button>
         </div>
         {previewing && (
@@ -216,7 +228,8 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
           canPreview={realAdmin} previewing={previewing} onPreview={(on) => { setAsMember(on); setSettings(false); window.scrollTo(0, 0); }}
           onClose={() => setSettings(false)} onChangePlayer={changePlayer}
           leagues={leagues} onSwitchLeague={(id) => { setSettings(false); onSwitchLeague(id); }}
-          onAddLeague={() => { setSettings(false); onAddLeague(); }} onSignOut={onSignOut} />
+          onAddLeague={() => { setSettings(false); onAddLeague(); }} onSignOut={onSignOut}
+          initialPage={typeof settings === 'string' ? settings : null} />
       )}
       {prompt && (
         <WatchPrompt weekN={data.weeks.find((w) => w.id === prompt.week_id)?.n} nextN={cur.n} stake={Number(cur.stake)}
