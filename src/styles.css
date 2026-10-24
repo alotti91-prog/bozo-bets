@@ -588,3 +588,27 @@ main.wrap.gate { min-height: 100dvh; display: flex; flex-direction: column; just
 .recap-awards { list-style: none; margin: 0; padding: 0; }
 .recap-awards .row { cursor: default; min-height: 56px; }
 .award-icon { width: 40px; height: 40px; flex: none; display: grid; place-items: center; font-size: 24px; border-radius: 50%; background: var(--sunk); }
+
+/* Who's here (lib/presence.js): the strip above the slip, its sheet, green dots, and the Wheel tab's watching chip. */
+.here-strip { appearance: none; display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 0; border-radius: 16px; background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.here-strip .chev { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.here-stack { display: flex; flex: none; }
+.here-av { position: relative; width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--sunk); border: 2px solid var(--surface); box-sizing: border-box; display: grid; place-items: center; font: 700 12px/1 var(--body); color: var(--ink); }
+.here-stack .here-av + .here-av { margin-left: -10px; }
+.here-av.is-here::after { content: ""; position: absolute; right: -2px; bottom: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--win); border: 2px solid var(--surface); box-sizing: border-box; }
+.here-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.here-text b { font-size: 16px; font-weight: 800; }
+.here-text span { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.here-list { list-style: none; margin: 0; padding: 0; }
+.here-list .row { cursor: default; }
+.here-list .is-away .here-av { background: transparent; border: 1.5px dashed var(--line); color: var(--muted); }
+.here-dot { display: inline-block; width: 8px; height: 8px; margin-left: 5px; border-radius: 50%; background: var(--p-win); vertical-align: 1px; }
+.watching { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.watching-chip { display: inline-flex; align-items: center; gap: 10px; padding: 5px 14px 5px 5px; border-radius: 999px; background: var(--surface); font-size: 14px; }
+.watching-chip .here-av { width: 28px; height: 28px; font-size: 10px; }
+.watching-chip .here-av.is-here::after { display: none; }
+.watching-chip .here-stack .here-av + .here-av { margin-left: -8px; }
+.watching-chip b { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--nose); }
+.watching-joined { font-size: 14px; color: var(--muted); }
+.watching-joined b { color: var(--ink); }

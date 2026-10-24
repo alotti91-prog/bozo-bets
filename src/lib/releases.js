@@ -5,6 +5,17 @@
 
 export const RELEASES = [
   {
+    id: '2026-10-24-g',
+    date: '2026-10-24',
+    title: 'See who’s here',
+    idea: 'Lotti',
+    items: [
+      'This week now shows who has the app open right now (“4 sweating the slip” during games). Tap it to see who’s where.',
+      'A green dot on the slip marks each leg whose owner is on the app.',
+      'The Wheel tab shows how many are watching a spin live, and who just showed up.',
+    ],
+  },
+  {
     id: '2026-10-24-f',
     date: '2026-10-24',
     title: 'Share the recap as a picture',

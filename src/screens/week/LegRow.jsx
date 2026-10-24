@@ -15,8 +15,9 @@ const TONE = { W: 'win', L: 'loss', P: 'pre' };
  *   st   live status from liveStatus() (null for typed legs or no feed)
  *   inj  the player's injury status for an NFL prop before kickoff (legInjury()), or null
  *   fx   'shake' (it just busted) or 'carry' (last leg standing), from useSweat
+ *   here the leg's owner has the app open right now (a green dot after their name)
  */
-export default function LegRow({ leg, st, inj, fx, me, isAdmin, beltId, bozoId, pname, reactions, comments, onOpen, onGrade }) {
+export default function LegRow({ leg, st, inj, fx, here, me, isAdmin, beltId, bozoId, pname, reactions, comments, onOpen, onGrade }) {
   const who = pname(leg.player_id);
   const mine = me && leg.player_id === me;
   const state = legState(leg, st);
@@ -31,7 +32,7 @@ export default function LegRow({ leg, st, inj, fx, me, isAdmin, beltId, bozoId, 
       <button type="button" className="leg-main" onClick={onOpen} aria-haspopup="dialog">
         <span className="leg-dot" aria-hidden="true" />
         <span className="leg-body">
-          <span className="leg-who">{who}<Belt on={beltId === leg.player_id} /><BozoTag on={bozoId === leg.player_id} />{mine && <span className="you"> · you</span>}</span>
+          <span className="leg-who">{who}{here && <span className="here-dot" role="img" aria-label="(here now)" title="Here now" />}<Belt on={beltId === leg.player_id} /><BozoTag on={bozoId === leg.player_id} />{mine && <span className="you"> · you</span>}</span>
           <span className="leg-pick">{leg.pick}{inj && <> <InjuryTag s={inj} /></>}</span>
           {showLive ? <LiveLine bet={leg.bet} s={st} /> : (
             <span className={`leg-live tone-${TONE[leg.result] || 'pre'}`}>

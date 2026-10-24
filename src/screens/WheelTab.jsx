@@ -7,6 +7,7 @@ import WheelCanvas from '../components/WheelCanvas.jsx';
 import { IconSound } from '../components/common.jsx';
 import WheelLog from './wheel/WheelLog.jsx';
 import { useSpinPlayer } from './wheel/useSpinPlayer.js';
+import Watching from './wheel/Watching.jsx';
 
 /**
  * The database decides the result (spin_wheel): it knocks names out one at a
@@ -15,7 +16,7 @@ import { useSpinPlayer } from './wheel/useSpinPlayer.js';
  * same sequence, once. Any past spin can be replayed; it always plays the same.
  * Spins from before elimination replay as a single spin onto the bozo.
  */
-export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seenSpins, markWatched, autoplay, onAutoplay, openRecap }) {
+export default function WheelTab({ data, me, here = [], isAdmin, reload, pname, spinEvent, seenSpins, markWatched, autoplay, onAutoplay, openRecap }) {
   const wheelRef = useRef(null);
   const cardRef = useRef(null);
   const [poolSel, setPoolSel] = useState(null); // { week, ids }: a hand-picked pool for one week
@@ -155,6 +156,8 @@ export default function WheelTab({ data, isAdmin, reload, pname, spinEvent, seen
         <button type="button" className="icon-btn" aria-pressed={!muted} aria-label="Sound"
           onClick={() => { setMuted(!muted); setMutedState(!muted); }}><IconSound off={muted} /></button>
       </div>
+
+      <Watching here={here} me={me} pname={pname} spinning={!!active && !active.replay} />
 
       <section className="card wheel-card" ref={cardRef} data-noswipe={active ? '' : undefined}>
         <WheelCanvas ref={wheelRef} names={names} restAt={restAt} restKey={restKey} struck={struck} />

@@ -114,6 +114,23 @@ const DEMO_PROPS = {
 export function demoProps(game) {
   return game?.id === '900001' ? { at: now(), via: 'team', lines: DEMO_PROPS } : { lines: {} };
 }
+// Fake "who's here" for demo mode (stands in for Realtime Presence): Sully and
+// Big Chris on the slip, Mikey on Standings, Danny B on the Wheel tab. In the
+// browser console, __bzDemoJoin('p6', 'wheel') makes T-Bone show up.
+const DEMO_HERE = { a: [{ p: 'p2', t: 'week', at: 1 }], b: [{ p: 'p3', t: 'standings', at: 1 }], c: [{ p: 'p5', t: 'week', at: 1 }], d: [{ p: 'p4', t: 'wheel', at: 1 }] };
+function demoPresence() {
+  let mine = null;
+  let sync = null;
+  const ch = {
+    on(type, _opts, cb) { if (type === 'presence') sync = cb; return ch; },
+    subscribe(cb) { setTimeout(() => { cb?.('SUBSCRIBED'); sync?.(); }, 50); return ch; },
+    presenceState() { return mine ? { ...DEMO_HERE, me: [mine] } : { ...DEMO_HERE }; },
+    async track(m) { mine = m; sync?.(); return 'ok'; },
+    async untrack() { mine = null; sync?.(); return 'ok'; },
+  };
+  if (typeof window !== 'undefined') window.__bzDemoJoin = (p, t) => { DEMO_HERE[`j${p}`] = [{ p, t, at: Date.now() }]; sync?.(); };
+  return ch;
+}
 export async function demoScores({ kind, sport, event, team }) {
   await new Promise((r) => setTimeout(r, 120));
   if (kind === 'scoreboard') return { games: DEMO_GAMES.filter((g) => g.sport === sport).map(({ players: _players, ...g }) => g) };
@@ -376,7 +393,8 @@ export const demoClient = {
     await new Promise((r) => setTimeout(r, 150));
     try { return { data: rpcs[name](args), error: null }; } catch (e) { return { data: null, error: { message: e.message } }; }
   },
-  channel() {
+  channel(name) {
+    if (String(name).startsWith('presence-')) return demoPresence();
     const ch = {
       on(_type, opts, cb) { listeners.push({ table: opts.table, cb, ch }); return ch; },
       subscribe() { return ch; },

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, demo } from '../lib/supabase.js';
 import { useLeague } from '../lib/useLeague.js';
+import { usePresence } from '../lib/usePresence.js';
+import { herePeople } from '../lib/presence.js';
 import { store, toast } from '../lib/ui.js';
 import { Brand, IconGear, IconTicket, IconWheel, IconBars, IconHistory } from '../components/common.jsx';
 import Claim from './Claim.jsx';
@@ -90,6 +92,8 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   }, [liveSpins]);
 
   const { data, error, reload } = useLeague(leagueId, onSpin);
+  // Who's here: shares your player and tab while the app is on screen (no names; see presence.js)
+  const presence = usePresence(leagueId, data?.members.find((m) => m.user_id === userId)?.player_id || null, tab);
 
   if (error) {
     return (
@@ -157,7 +161,8 @@ export default function League({ leagueId, userId, leagues, onSwitchLeague, onAd
   };
   const bozoId = currentBozo(view); // from the masked view, so an unwatched spin doesn't give it away
   const bozoUser = (uid) => !!bozoId && data.members.some((m) => m.user_id === uid && m.player_id === bozoId);
-  const props = { data: view, me, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, bozoId, bozoUser, nameOfUser,
+  const here = herePeople(presence, data.players);
+  const props = { data: view, me, here, isAdmin, reload, pname, userId, beltId: belt?.id || null, belt, bozoId, bozoUser, nameOfUser,
     openSettings: () => setSettings(true), watchSpin, markWatched, openRecap: (weekId) => setRecapOpen({ weekId }) };
   return (
     <>

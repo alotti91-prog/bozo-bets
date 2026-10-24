@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { legOutcome, carrier, slipOutcome, sweatEvents, sweatMessage } from './sweat.js';
 import { currentBozo } from './stats.js';
+import { herePeople, hereLine, arrivals, WHERE } from './presence.js';
 
 const leg = (id, player, pick, result = null) => ({ id, player_id: player, pick, result });
 const names = (id) => ({ p1: 'Lotti', p2: 'Danny B', p3: 'Mikey' }[id] || id);
@@ -84,5 +85,33 @@ describe('Sunday sweat mode', () => {
     expect(currentBozo({ weeks, spins: [...spins, spin('d', 'w8', 'p1', '2026-10-26T23:00Z')] })).toBe('p1'); // this week's spin takes over
     expect(currentBozo({ weeks, spins: [] })).toBe(null);
     expect(currentBozo({ weeks: [], spins })).toBe(null);
+  });
+  it('who’s here: one entry per player, their latest app, in player order; no names shared', () => {
+    const players = [{ id: 'p1', name: 'Lotti' }, { id: 'p2', name: 'Sully' }, { id: 'p3', name: 'Mikey' }];
+    const state = {
+      k1: [{ p: 'p3', t: 'standings', at: 5 }],
+      k2: [{ p: 'p1', t: 'week', at: 3 }],
+      k3: [{ p: 'p1', t: 'wheel', at: 9 }], // Lotti on a second phone, more recently
+      k4: [{ p: 'p9', t: 'week', at: 1 }], // not a player here
+      k5: [{ p: null, t: 'week', at: 1 }], // hasn't claimed a player
+      k6: [{ p: 'p2', t: 'nonsense', at: 2 }],
+    };
+    expect(herePeople(state, players)).toEqual([{ id: 'p1', tab: 'wheel', at: 9 }, { id: 'p2', tab: 'week', at: 2 }, { id: 'p3', tab: 'standings', at: 5 }]);
+    expect(herePeople(null, players)).toEqual([]);
+    expect(Object.keys(WHERE)).toEqual(['week', 'wheel', 'standings', 'history']);
+  });
+  it('the line above the slip, only when someone else is here', () => {
+    const here = [{ id: 'p1', tab: 'week' }, { id: 'p2', tab: 'week' }, { id: 'p3', tab: 'standings' }];
+    expect(hereLine(here, 'p1', names, true)).toEqual({ head: '3 sweating the slip', sub: 'Danny B & Mikey are here' });
+    expect(hereLine(here, 'p1', names, false).head).toBe('3 here now');
+    expect(hereLine(here.slice(0, 2), 'p1', names).sub).toBe('Danny B is here');
+    expect(hereLine([{ id: 'p1', tab: 'week' }], 'p1', names)).toBe(null);
+    expect(hereLine([], 'p1', names)).toBe(null);
+  });
+  it('notices who just opened the wheel', () => {
+    const here = [{ id: 'p1', tab: 'wheel' }, { id: 'p2', tab: 'wheel' }, { id: 'p3', tab: 'week' }];
+    expect(arrivals(['p1'], here, 'wheel', 'p1')).toEqual(['p2']);
+    expect(arrivals(['p1', 'p2'], here, 'wheel', 'p1')).toEqual([]);
+    expect(arrivals([], here, 'wheel', 'p1')).toEqual(['p2']); // never you
   });
 });

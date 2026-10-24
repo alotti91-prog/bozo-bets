@@ -13,6 +13,7 @@ import { legInjury } from '../lib/depth.js';
 import PlacedSheet from './PlacedSheet.jsx';
 import LegRow from './week/LegRow.jsx';
 import useSweat from './week/useSweat.js';
+import HereStrip from './week/HereStrip.jsx';
 import LegSheet from './week/LegSheet.jsx';
 import LegForm from './week/LegForm.jsx';
 import PayoutForm from './week/PayoutForm.jsx';
@@ -23,7 +24,7 @@ const FINAL = { W: 'won', L: 'lost', P: 'pushed' };
 // The This week tab: the week and its deadline, a summary row, the slip (legs,
 // who's still missing, the total), and the actions. Tapping a leg opens its
 // panel (week/LegSheet); adding or editing a leg opens a sheet with week/LegForm.
-export default function WeekTab({ data, me, isAdmin, reload, pname, userId, beltId, bozoId, bozoUser, nameOfUser, openSettings, watchSpin }) {
+export default function WeekTab({ data, me, here = [], isAdmin, reload, pname, userId, beltId, bozoId, bozoUser, nameOfUser, openSettings, watchSpin }) {
   const week = data.weeks[data.weeks.length - 1];
   const [form, setForm] = useState(null); // null, 'new', or the leg being edited
   const [openId, setOpenId] = useState(null); // leg whose panel is open
@@ -161,6 +162,8 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         ))}
       </div>
 
+      <HereStrip here={here} me={me} pname={pname} players={data.players} live={anyLive} weekN={week.n} />
+
       <section className="slip" aria-label={`Week ${week.n} parlay`}>
         <div className="slip-head">
           <div>
@@ -187,7 +190,7 @@ export default function WeekTab({ data, me, isAdmin, reload, pname, userId, belt
         {legs.length > 0 && (
           <ol className="legs">
             {legs.map((l) => (
-              <LegRow key={l.id} leg={l} st={statusOf(l)} inj={legInjury(l, statusOf(l), depth, now)} me={me} isAdmin={isAdmin} beltId={beltId} bozoId={bozoId} pname={pname}
+              <LegRow key={l.id} leg={l} st={statusOf(l)} inj={legInjury(l, statusOf(l), depth, now)} me={me} isAdmin={isAdmin} beltId={beltId} bozoId={bozoId} pname={pname} here={here.some((p) => p.id === l.player_id)}
                 fx={sweat.shaking.has(l.id) ? 'shake' : sweat.carry?.id === l.id ? 'carry' : null}
                 reactions={data.reactions || []} comments={data.comments || []}
                 onOpen={() => setOpenId(l.id)} onGrade={(r) => grade(l, r)} />
