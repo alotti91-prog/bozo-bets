@@ -45,7 +45,7 @@ export async function runChecks(now = new Date()) {
   const ok = Object.values(checks).every((v) => v === 'ok');
   // Prop lines (SportsGameOdds): only whether the key is set. Calling them would use up the
   // free plan's monthly allowance every few minutes, and the app works without them anyway.
-  checks.props = process.env.SPORTSGAMEODDS_KEY ? 'ok' : 'not set up';
+  checks.props = (process.env.SPORTSGAMEODDS_KEY || '').trim() ? 'ok' : 'not set up';
   return { ok, checks, at: now.toISOString() };
 }
 

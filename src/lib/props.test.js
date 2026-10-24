@@ -96,7 +96,7 @@ describe('DraftKings prop lines (SportsGameOdds)', () => {
     try {
       delete process.env.SPORTSGAMEODDS_KEY;
       expect((await propsHandler({ query }, res())).code).toBe(503);
-      process.env.SPORTSGAMEODDS_KEY = 'test-key';
+      process.env.SPORTSGAMEODDS_KEY = ' test-key\n'; // pasted with a space and a line break: trimmed
       expect((await propsHandler({ query: { ...query, home: 'NOPE' } }, res())).code).toBe(400);
       const calls = [];
       globalThis.fetch = async (url, opts) => { calls.push([url, opts.headers['x-api-key']]); return { ok: true, json: async () => ({ data: calls.length === 1 ? [] : [event] }) }; };
@@ -110,7 +110,7 @@ describe('DraftKings prop lines (SportsGameOdds)', () => {
       globalThis.fetch = async () => ({ ok: false, status: 401 });
       const bad = await propsHandler({ query }, res());
       expect(bad.code).toBe(502);
-      expect(bad.body.error).toMatch(/401/);
+      expect(bad.body.error).toMatch(/didn’t accept the key \(401\)/);
       expect(bad.body.error).not.toMatch(/test-key/);
     } finally {
       globalThis.fetch = saved.fetch;

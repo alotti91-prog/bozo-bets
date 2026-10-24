@@ -7,6 +7,7 @@ import { parsePropsQuery, propsUrl, findEvent, normalizeProps } from '../src/lib
 
 async function sgo(url, key) {
   const r = await fetch(url, { headers: { 'x-api-key': key, accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
+  if (r.status === 401 || r.status === 403) throw new Error(`SportsGameOdds didn’t accept the key (${r.status}). Check SPORTSGAMEODDS_KEY in Vercel, then redeploy`);
   if (!r.ok) throw new Error(`SportsGameOdds answered ${r.status}`);
   return r.json();
 }
@@ -14,7 +15,7 @@ async function sgo(url, key) {
 export default async function handler(req, res) {
   const q = parsePropsQuery(req.query);
   if (q.error) return res.status(400).json({ error: q.error });
-  const key = process.env.SPORTSGAMEODDS_KEY;
+  const key = (process.env.SPORTSGAMEODDS_KEY || '').trim(); // a pasted key often carries a space or line break
   if (!key) {
     res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=300');
     return res.status(503).json({ error: 'Prop lines aren’t set up yet.' });
