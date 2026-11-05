@@ -278,6 +278,14 @@ begin
     new.miss := null; -- only a lost leg can be a close call or a blowout
   end if;
 
+  -- set_leg_odds() (Bet it on DraftKings) updates odds only, for whoever's on
+  -- the hook, even after picks lock; it checks who's asking itself.
+  if tg_op = 'UPDATE' and current_setting('bozo.odds_sync', true) = 'on'
+     and new.pick = old.pick and new.player_id = old.player_id and new.week_id = old.week_id
+     and new.bet is not distinct from old.bet and new.result is not distinct from old.result then
+    return new;
+  end if;
+
   if not public.is_admin(w_league) then
     if tg_op = 'INSERT' then
       new.result := null;
@@ -933,6 +941,49 @@ begin
   end if;
 end $$;
 
+-- Bet it on DraftKings: right before placing the bet, whoever's on the hook
+-- (or the commish) brings the legs' odds up to DraftKings' current prices.
+-- Odds only, ungraded legs of this week only, and only until the bet is marked
+-- placed. p_odds: [{ "id": leg id, "odds": -115 }, ...]. Returns how many changed.
+create or replace function public.set_leg_odds(p_week uuid, p_odds jsonb)
+returns int language plpgsql security definer set search_path = public as $$
+declare
+  w public.weeks;
+  e jsonb;
+  o int;
+  n int := 0;
+  k int;
+begin
+  select * into w from public.weeks where id = p_week;
+  if w.id is null then raise exception 'That week does not exist'; end if;
+  if not (public.is_admin(w.league_id) or (w.payer_id is not null and w.payer_id = public.my_player(w.league_id))) then
+    raise exception 'Only whoever is on the hook, or the commish, can update the odds';
+  end if;
+  if w.n <> (select max(n) from public.weeks where league_id = w.league_id) then
+    raise exception 'Only this week''s odds can be updated';
+  end if;
+  if w.placed_at is not null then
+    raise exception 'The bet is already placed, so the odds stay as they are';
+  end if;
+  if p_odds is null or jsonb_typeof(p_odds) <> 'array' or jsonb_array_length(p_odds) > 50 then
+    raise exception 'That list of odds didn''t make sense';
+  end if;
+  perform set_config('bozo.odds_sync', 'on', true);
+  for e in select value from jsonb_array_elements(p_odds) loop
+    o := case when (e->>'odds') ~ '^-?[0-9]{3,6}$' then (e->>'odds')::int end;
+    if o is null or abs(o) < 100 then
+      perform set_config('bozo.odds_sync', 'off', true);
+      raise exception 'Odds look like -110 or +150';
+    end if;
+    update public.legs set odds = o
+    where id = public.uuid_or_null(e->>'id') and week_id = w.id and result is null and odds <> o;
+    get diagnostics k = row_count;
+    n := n + k;
+  end loop;
+  perform set_config('bozo.odds_sync', 'off', true);
+  return n;
+end $$;
+
 -- Turns text into a uuid, or null if it isn't one. Used by the storage rules.
 create or replace function public.uuid_or_null(t text) returns uuid
 language sql immutable as $$
@@ -1055,6 +1106,7 @@ revoke execute on function
   public.delete_spin(uuid),
   public.add_slips(uuid, text[]),
   public.remove_slip(uuid, text),
+  public.set_leg_odds(uuid, jsonb),
   public.can_mark_placed(public.weeks),
   public.new_invite_code()
 from public, anon;
@@ -1080,6 +1132,7 @@ grant execute on function
   public.delete_spin(uuid),
   public.add_slips(uuid, text[]),
   public.remove_slip(uuid, text),
+  public.set_leg_odds(uuid, jsonb),
   public.can_mark_placed(public.weeks)
 to authenticated;
 

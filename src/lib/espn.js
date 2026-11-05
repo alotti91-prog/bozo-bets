@@ -108,19 +108,49 @@ const lineOf = (v) => { // "+3.5", "-3.5", "o44.5", "u44.5", "PK", or a number �
 };
 const latest = (x) => x?.close || x?.current || x?.open || null; // ESPN calls the current line "close"
 
-/** The full board: { spread: { away: { line, price }, home }, ml: { away, home }, total: { line, over, under } }, or null. */
+/**
+ * DraftKings' own id for one pick, out of a betslip link like
+ * sportsbook.draftkings.com/event/34118009?outcomes=0ML84695442_1 (ESPN wraps it
+ * in a tracking link as preurl=…). null if there isn't one.
+ */
+export function dkOutcomeId(href) {
+  if (typeof href !== 'string') return null;
+  const isDk = (u) => u.protocol === 'https:' && /(^|\.)draftkings\.com$/.test(u.hostname);
+  try {
+    let u = new URL(href);
+    const pre = u.searchParams.get('preurl');
+    if (pre) u = new URL(pre);
+    if (!isDk(u)) return null;
+    const id = (u.searchParams.get('outcomes') || '').split(/[+ ]/)[0];
+    return /^[\w#.-]{3,80}$/.test(id) ? id : null;
+  } catch { return null; }
+}
+
+/**
+ * The full board: { spread: { away: { line, price }, home }, ml: { away, home }, total: { line, over, under },
+ * dk: DraftKings' id for each of those picks ({ spread: { away, home }, ml: { away, home }, over, under }, any missing) }, or null.
+ */
 export function oddsBoard(o) {
   if (!o) return null;
   const sa = latest(o.pointSpread?.away), sh = latest(o.pointSpread?.home);
   const spread = lineOf(sa?.line) != null && lineOf(sh?.line) != null
     ? { away: { line: lineOf(sa.line), price: price(sa.odds) }, home: { line: lineOf(sh.line), price: price(sh.odds) } } : null;
-  const ma = price(latest(o.moneyline?.away)?.odds ?? o.awayTeamOdds?.moneyLine);
-  const mh = price(latest(o.moneyline?.home)?.odds ?? o.homeTeamOdds?.moneyLine);
+  const mla = latest(o.moneyline?.away), mlh = latest(o.moneyline?.home);
+  const ma = price(mla?.odds ?? o.awayTeamOdds?.moneyLine);
+  const mh = price(mlh?.odds ?? o.homeTeamOdds?.moneyLine);
   const ml = ma != null && mh != null ? { away: ma, home: mh } : null;
   const ov = latest(o.total?.over), un = latest(o.total?.under);
   const tl = lineOf(ov?.line) ?? lineOf(un?.line) ?? (typeof o.overUnder === 'number' ? o.overUnder : null);
   const total = tl != null && (ov || un) ? { line: tl, over: price(ov?.odds), under: price(un?.odds) } : null;
-  return spread || ml || total ? { spread, ml, total } : null;
+  if (!spread && !ml && !total) return null;
+  const id = (x) => dkOutcomeId(x?.link?.href);
+  const dk = {
+    spread: spread ? { away: id(sa), home: id(sh) } : {},
+    ml: ml ? { away: id(mla), home: id(mlh) } : {},
+    over: total ? id(ov) : null,
+    under: total ? id(un) : null,
+  };
+  return { spread, ml, total, dk };
 }
 
 /** Scoreboard → [{ id, sport, start, short, state, detail, home, away, odds: { details, total, board } }] */

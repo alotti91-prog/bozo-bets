@@ -435,6 +435,39 @@ await as(A, `select public.set_deadline($1, null, null, null)`, [lid4]);
 assert.equal((await as(A, `select lock_at from public.weeks where league_id = $1 and n = 8`, [lid4])).rows[0].lock_at, null);
 ok('turning the deadline off clears it for the current week');
 
+// ---- Bet it on DraftKings: set_leg_odds (odds only, for whoever's on the hook) ----
+// League 4, week 8: Sully (B) is on the hook from the spin above.
+const w8id = (await as(A, `select id, payer_id from public.weeks where league_id = $1 and n = 8`, [lid4])).rows[0];
+assert.equal(w8id.payer_id, p4.Sully);
+await as(A, `insert into public.legs (week_id, league_id, player_id, pick, odds) values ($1,$2,$3,'Bills -3',-110), ($1,$2,$4,'Lions ML',150), ($1,$2,$5,'Mine',-120)`,
+  [w8id.id, lid4, p4.Lotti, p4.Mikey, p4.Sully]);
+const L8 = Object.fromEntries((await as(A, `select player_id, id from public.legs where week_id = $1`, [w8id.id])).rows.map((r) => [r.player_id, r.id]));
+await as(A, `update public.legs set result = 'W' where id = $1`, [L8[p4.Sully]]);
+await as(A, `select public.set_week_lock($1, now() - interval '1 minute')`, [w8id.id]);
+const odds8 = async () => Object.fromEntries((await as(A, `select player_id, odds from public.legs where week_id = $1`, [w8id.id])).rows.map((r) => [r.player_id, r.odds]));
+const changes = JSON.stringify([{ id: L8[p4.Lotti], odds: -115 }, { id: L8[p4.Mikey], odds: 150 }, { id: L8[p4.Sully], odds: -200 }, { id: 'nope', odds: -110 }]);
+assert.equal((await as(B, `select public.set_leg_odds($1, $2::jsonb) n`, [w8id.id, changes])).rows[0].n, 1);
+assert.deepEqual(await odds8(), { [p4.Lotti]: -115, [p4.Mikey]: 150, [p4.Sully]: -120 });
+ok('whoever’s on the hook can bring everyone’s odds up to DraftKings’ price after picks lock (graded legs and unchanged odds left alone)');
+
+await as(B, `update public.legs set odds = -130 where id = $1`, [L8[p4.Lotti]]); // someone else's leg: the rules allow 0 rows
+await fails(B, `update public.legs set odds = -130 where id = $1`, [L8[p4.Sully]], /locked/);
+assert.deepEqual(await odds8(), { [p4.Lotti]: -115, [p4.Mikey]: 150, [p4.Sully]: -120 });
+ok('outside set_leg_odds, members still can’t change odds once picks lock');
+
+await fails(C, `select public.set_leg_odds($1, $2::jsonb)`, [w8id.id, changes], /on the hook/);
+await as(A, `update public.weeks set payer_id = $2 where id = $1`, [w8id.id, p4.Lotti]);
+await fails(B, `select public.set_leg_odds($1, $2::jsonb)`, [w8id.id, changes], /on the hook/);
+await as(A, `update public.weeks set payer_id = $2 where id = $1`, [w8id.id, p4.Sully]);
+await fails(B, `select public.set_leg_odds($1, $2::jsonb)`, [w8id.id, JSON.stringify([{ id: L8[p4.Lotti], odds: 50 }])], /like -110/);
+await fails(B, `select public.set_leg_odds($1, $2::jsonb)`, [w8id.id, '{"id":1}'], /didn't make sense/);
+await fails(A, `select public.set_leg_odds($1, $2::jsonb)`, [w7, changes], /this week/);
+await as(B, `select public.mark_placed($1, true, null)`, [w8id.id]);
+await fails(B, `select public.set_leg_odds($1, $2::jsonb)`, [w8id.id, changes], /already placed/);
+await as(A, `select public.mark_placed($1, false, null)`, [w8id.id]);
+assert.equal((await as(A, `select public.set_leg_odds($1, $2::jsonb) n`, [w8id.id, JSON.stringify([{ id: L8[p4.Mikey], odds: 145 }])])).rows[0].n, 1);
+ok('nobody else can, bad odds and old weeks are refused, it stops once the bet is placed, and the commish can too');
+
 // ---- Feedback ----
 // In league 4: A is the owner (admin), B a member, C a stranger.
 await as(B, `insert into public.feedback (league_id, body, user_id, done_at) values ($1, '  The wheel is too slow  ', $2, now())`, [lid4, A]);

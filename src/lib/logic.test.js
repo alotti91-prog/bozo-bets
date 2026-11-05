@@ -590,9 +590,9 @@ describe('small labels', () => {
 // DraftKings odds as ESPN sent them for PIT @ NO (Oct 2026), trimmed to the parts we read.
 const PIT_NO = {
   details: 'PIT -3.5', overUnder: 44.5, spread: 3.5,
-  moneyline: { home: { close: { odds: '+145' }, open: { odds: '+114' } }, away: { close: { odds: '-175' }, open: { odds: '-135' } } },
-  pointSpread: { home: { close: { line: '+3.5', odds: '-118' } }, away: { close: { line: '-3.5', odds: '-102' } } },
-  total: { over: { close: { line: 'o44.5', odds: '-110' } }, under: { close: { line: 'u44.5', odds: '-110' } } },
+  moneyline: { home: { close: { odds: '+145', link: { href: 'https://sportsbook.draftkings.com/gateway?s=__s__&wpcn=ESPN&wpcrn=BetSlipDeepLink&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34118009%3Foutcomes%3D0ML84695442_1' } }, open: { odds: '+114' } }, away: { close: { odds: '-175' }, open: { odds: '-135' } } },
+  pointSpread: { home: { close: { line: '+3.5', odds: '-118', link: { href: 'https://example.com/not-draftkings?outcomes=nope' } } }, away: { close: { line: '-3.5', odds: '-102', link: { href: 'https://sportsbook.draftkings.com/event/34118009?outcomes=0HC84695442N350_3' } } } },
+  total: { over: { close: { line: 'o44.5', odds: '-110', link: { href: 'https://sportsbook.draftkings.com/gateway?preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34118009%3Foutcomes%3D0OU84695442O4450_1' } } }, under: { close: { line: 'u44.5', odds: '-110' } } },
 };
 const PIT_NO_GAME = {
   id: '401873011', sport: 'nfl', start: '2026-10-25T17:00Z', short: 'PIT @ NO', state: 'pre',
@@ -607,6 +607,8 @@ describe('the DraftKings board', () => {
       spread: { away: { line: -3.5, price: -102 }, home: { line: 3.5, price: -118 } },
       ml: { away: -175, home: 145 },
       total: { line: 44.5, over: -110, under: -110 },
+      // DraftKings' own id for each pick, from its betslip links (only DraftKings links count)
+      dk: { spread: { away: '0HC84695442N350_3', home: null }, ml: { away: null, home: '0ML84695442_1' }, over: '0OU84695442O4450_1', under: null },
     });
   });
   it('copes with what the feed sometimes sends', () => {

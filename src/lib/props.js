@@ -5,6 +5,7 @@
 // keeps each game's lines for 30 minutes. Pure functions, covered by props.test.js.
 import { nameKey } from './depth.js';
 import { STATS } from './bets.js';
+import { dkOutcomeId } from './espn.js';
 
 export const SGO_EVENTS = 'https://api.sportsgameodds.com/v2/events';
 export const BOOK = 'draftkings';
@@ -121,15 +122,16 @@ export function normalizeProps(event, book = BOOK) {
     const price = amer(bk?.odds);
     if (!name || !bk || bk.available === false || price == null) continue;
     const e = (out[nameKey(name)] ||= {});
+    const dk = dkOutcomeId(bk.deeplink); // DraftKings' id for this pick, when SportsGameOdds has its link (see draftkings.js)
     if (STATS[stat].yesNo) {
-      if (o.betTypeID === 'yn' && o.sideID === 'yes') e[stat] = { y: price };
+      if (o.betTypeID === 'yn' && o.sideID === 'yes') e[stat] = { y: price, ...(dk ? { yi: dk } : {}) };
       continue;
     }
     const line = num(bk.overUnder ?? o.bookOverUnder);
     if (o.betTypeID !== 'ou' || line == null) continue;
     const cur = e[stat];
-    if (o.sideID === 'over') e[stat] = { ...(cur?.l === line ? cur : {}), l: line, o: price };
-    else if (o.sideID === 'under' && (!cur || cur.l === line)) e[stat] = { ...(cur || { l: line }), u: price };
+    if (o.sideID === 'over') e[stat] = { ...(cur?.l === line ? cur : {}), l: line, o: price, ...(dk ? { oi: dk } : {}) };
+    else if (o.sideID === 'under' && (!cur || cur.l === line)) e[stat] = { ...(cur || { l: line }), u: price, ...(dk ? { ui: dk } : {}) };
   }
   return Object.fromEntries(Object.entries(out).filter(([, v]) => Object.keys(v).length));
 }
