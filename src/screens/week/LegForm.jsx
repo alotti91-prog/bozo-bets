@@ -15,7 +15,14 @@ const HINT = 'American odds, like −110 or +150. Tap the sign to flip it.';
 export default function LegForm({ week, editing, options, me, isAdmin, locked, pname, onDone, onCancel }) {
   const draftKey = 'bz-draft-' + week.id;
   const draft = editing ? null : store.get(draftKey, null);
-  const [player, setPlayer] = useState(editing ? editing.player_id : (draft && options.some((p) => p.id === draft.player) ? draft.player : options[0]?.id || ''));
+  // Whose leg: the one being edited, else the draft's, else your own (admins can add anyone's), else the first missing.
+  const [player, setPlayer] = useState(() => {
+    if (editing) return editing.player_id;
+    if (draft && options.some((p) => p.id === draft.player)) return draft.player;
+    if (me && options.some((p) => p.id === me)) return me;
+    return options[0]?.id || '';
+  });
+  const [choosing, setChoosing] = useState(false); // admins: "Change" opens the Whose-leg dropdown
   const [pick, setPick] = useState(editing ? editing.pick : draft?.pick || '');
   const [sign, setSign] = useState(editing ? (editing.odds > 0 ? '+' : '-') : draft?.sign || '-');
   const [odds, setOdds] = useState(editing ? String(Math.abs(editing.odds)) : draft?.odds || '');
@@ -84,10 +91,16 @@ export default function LegForm({ week, editing, options, me, isAdmin, locked, p
   return (
     <form className="stack" onSubmit={submit} noValidate>
       {locked && <p className="hint">Picks are locked. As an admin you can still add or fix legs.</p>}
-      {!editing && options.length > 1 && (
+      {!editing && options.length > 1 && player === me && !choosing && (
+        <p className="who-line">
+          <span>For <b>{pname(me)} (you)</b></span>
+          <button type="button" className="link" onClick={() => setChoosing(true)}>Change</button>
+        </p>
+      )}
+      {!editing && options.length > 1 && (player !== me || choosing) && (
         <div className="field">
           <label htmlFor="f-player">Whose leg</label>
-          <select id="f-player" value={player} onChange={(e) => { setPlayer(e.target.value); saveDraft({ player: e.target.value }); }}>
+          <select id="f-player" value={player} onChange={(e) => { setPlayer(e.target.value); setChoosing(true); saveDraft({ player: e.target.value }); }}>
             {options.map((p) => <option key={p.id} value={p.id}>{p.name}{p.id === me ? ' (you)' : ''}</option>)}
           </select>
         </div>

@@ -92,6 +92,8 @@ main.wrap { padding-block: 8px calc(var(--tab-h) + 28px + env(safe-area-inset-bo
 .text-btn.with-icon { display: inline-flex; align-items: center; gap: 6px; }
 .text-btn svg { width: 16px; height: 16px; }
 .text-btn:disabled { opacity: .45; }
+.who-line { margin: 0; display: flex; align-items: baseline; gap: 8px; font-size: 15px; color: var(--muted); }
+.who-line b { color: var(--ink); }
 .link { appearance: none; border: 0; background: none; padding: 4px 2px; font: 600 14px/1.25 var(--body); color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .link.danger { color: var(--nose); }
 .round-btn { appearance: none; width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--sunk); color: var(--ink); display: inline-grid; place-items: center; cursor: pointer; }

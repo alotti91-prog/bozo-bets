@@ -5,6 +5,16 @@
 
 export const RELEASES = [
   {
+    id: '2026-11-05-a',
+    date: '2026-11-05',
+    title: 'Your leg comes first',
+    idea: 'Lotti',
+    items: [
+      'Admins: Add a leg now starts on your own leg when you still need one, instead of whoever’s first on the list.',
+      'Adding one for someone else? Tap Change next to your name to pick who it’s for.',
+    ],
+  },
+  {
     id: '2026-10-24-j',
     date: '2026-10-24',
     title: 'Send the commish feedback',
