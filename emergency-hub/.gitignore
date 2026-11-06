@@ -1,0 +1,6 @@
+data/
+data.before-restore-*/
+.restore-*/
+__pycache__/
+*.pyc
+emergency-hub-backup-*.zip
